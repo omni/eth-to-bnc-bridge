@@ -1,0 +1,7 @@
+.idea/
+node_modules/
+.DS_Store
+**/keys*.store
+**/signature
+**/params
+src/tss/multi-party-ecdsa/

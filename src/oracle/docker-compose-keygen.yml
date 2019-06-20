@@ -1,0 +1,24 @@
+version: '3.7'
+services:
+  proxy:
+    image: blockchain-proxy
+    build: ./proxy
+    environment:
+      - RPC_URL
+      - SHARED_DB_ADDRESS
+      - VALIDATOR_PRIVATE_KEY
+    volumes:
+      - '../deploy/build/contracts:/proxy/contracts_data'
+    networks:
+      - keygen-proxy-net
+  keygen:
+    image: keygen-client
+    build: ./tss-keygen
+    command: 'http://proxy:8001'
+    volumes:
+      - './${KEY_FILE}:/tss/keys.store'
+      - './params:/tss/params'
+    networks:
+      - keygen-proxy-net
+networks:
+  keygen-proxy-net:
