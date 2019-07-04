@@ -1,0 +1,11 @@
+{
+  "name": "watcher",
+  "version": "0.0.1",
+  "dependencies": {
+    "ioredis": "4.10.0",
+    "amqplib": "0.5.3",
+    "web3": "1.0.0-beta.55"
+  }
+}
+
+

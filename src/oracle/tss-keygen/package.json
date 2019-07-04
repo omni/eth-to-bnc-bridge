@@ -1,0 +1,8 @@
+{
+  "name": "tss-keygen",
+  "version": "0.0.1",
+  "dependencies": {
+    "amqplib": "0.5.3",
+    "bech32": "1.1.3"
+  }
+}

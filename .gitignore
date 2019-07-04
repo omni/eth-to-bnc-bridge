@@ -5,3 +5,7 @@ node_modules/
 **/signature
 **/params
 src/tss/multi-party-ecdsa/
+data/
+demo/validator*/
+demo/ganache_data/
+src/deploy*/build/

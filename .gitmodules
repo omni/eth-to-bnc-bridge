@@ -1,0 +1,6 @@
+[submodule "src/deploy/contracts/openzeppelin-solidity"]
+	path = src/deploy/contracts/openzeppelin-solidity
+	url = https://github.com/OpenZeppelin/openzeppelin-solidity.git
+[submodule "src/deploy-test/contracts/openzeppelin-solidity"]
+	path = src/deploy-test/contracts/openzeppelin-solidity
+	url = https://github.com/OpenZeppelin/openzeppelin-solidity.git
