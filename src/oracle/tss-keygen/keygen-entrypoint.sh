@@ -8,9 +8,9 @@ until curl "$1" > /dev/null 2>&1; do
     sleep 1;
 done
 
-echo "Fetching current tss params"
+echo "Fetching next tss params"
 
-curl -X GET "$1/params?epoch=$3" -o ./params > /dev/null 2>&1
+curl -X GET "$1/next_params" -o ./params > /dev/null 2>&1
 
 echo "Generating key using server $1"
 
@@ -18,6 +18,6 @@ echo "Generating key using server $1"
 
 echo "Generated keys for all parties"
 
-echo "Sending confirmation"
+#echo "Sending confirmation"
 
-curl -X POST -H "Content-Type: application/json" -d @"$2" "$1/confirm" > /dev/null 2>&1
+#curl -X POST -H "Content-Type: application/json" -d @"$2" "$1/confirm" > /dev/null 2>&1

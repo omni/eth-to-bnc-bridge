@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "dependencies": {
     "web3": "1.0.0-beta.55",
-    "dotenv": "8.0.0",
     "express": "4.17.1",
-    "bignumber.js": "9.0.0",
-    "ethers": "4.0.31"
+    "async-lock": "1.2.0"
   }
 }

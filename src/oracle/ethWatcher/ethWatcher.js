@@ -1,7 +1,7 @@
 const amqp = require('amqplib')
 const Web3 = require('web3')
 const redis = require('./db')
-const bridgeAbi = require('./contracts_data/SharedDB.json').abi
+const bridgeAbi = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL } = process.env
 
@@ -52,11 +52,10 @@ async function initialize () {
   }
 }
 
-// By design, epoch change needs last epoch to be confirmed
-// Each transfer needs last epoch to be confirmed too
 async function main () {
   console.log(`Watching events in block #${blockNumber}`)
   if (await web3Home.eth.getBlock(blockNumber) === null) {
+    console.log('No block')
     await new Promise(r => setTimeout(r, 1000))
     return
   }
@@ -79,9 +78,10 @@ async function main () {
       console.log('Sent new epoch event')
 
       if (oldEpoch > 0) {
+        // Transfer all assets to new account tss account
         channel.sendToQueue(signQueue.queue, Buffer.from(JSON.stringify({
-          epoch: oldEpoch,
-          nonce: foreignNonce[oldEpoch],
+          epoch: newEpoch,
+          //nonce: foreignNonce[oldEpoch],
         })), {
           persistent: true
         })

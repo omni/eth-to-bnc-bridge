@@ -4,8 +4,12 @@ node_modules/
 **/keys*.store
 **/signature
 **/params
-src/tss/multi-party-ecdsa/
 data/
-demo/validator*/
+demo/validator*/db
+demo/validator*/keys
+demo/validator*/queue
 demo/ganache_data/
-src/deploy*/build/
+demo/ganache_data_side/
+src/deploy/deploy-home/build/
+src/deploy/deploy-side/build/
+src/deploy/deploy-test/build/

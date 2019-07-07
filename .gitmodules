@@ -1,6 +1,9 @@
-[submodule "src/deploy/contracts/openzeppelin-solidity"]
-	path = src/deploy/contracts/openzeppelin-solidity
+[submodule "src/deploy/deploy-home/contracts/openzeppelin-solidity"]
+	path = src/deploy/deploy-home/contracts/openzeppelin-solidity
 	url = https://github.com/OpenZeppelin/openzeppelin-solidity.git
-[submodule "src/deploy-test/contracts/openzeppelin-solidity"]
-	path = src/deploy-test/contracts/openzeppelin-solidity
+[submodule "src/deploy/deploy-test/contracts/openzeppelin-solidity"]
+	path = src/deploy/deploy-test/contracts/openzeppelin-solidity
 	url = https://github.com/OpenZeppelin/openzeppelin-solidity.git
+[submodule "src/tss/multi-party-ecdsa"]
+	path = src/tss/multi-party-ecdsa
+	url = https://github.com/k1rill-fedoseev/multi-party-ecdsa.git

@@ -8,7 +8,7 @@ module.exports = {
   networks: {
     development: {
       provider: new PrivateKeyProvider(PRIVATE_KEY_DEV, RPC_URL_DEV),
-      network_id: '33'
+      network_id: '44'
     },
     staging: {
       provider: new PrivateKeyProvider(PRIVATE_KEY, RPC_URL),

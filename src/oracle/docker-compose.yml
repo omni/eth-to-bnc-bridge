@@ -4,14 +4,23 @@ services:
     image: blockchain-proxy
     build: ./proxy
     environment:
-      - RPC_URL
-      - SHARED_DB_ADDRESS
+      - HOME_RPC_URL
+      - HOME_BRIDGE_ADDRESS
+      - HOME_CHAIN_ID
+      - SIDE_RPC_URL
+      - SIDE_SHARED_DB_ADDRESS
+      - SIDE_CHAIN_ID
       - VALIDATOR_PRIVATE_KEY
     volumes:
-      - '../deploy/build/contracts:/proxy/contracts_data'
+      - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
+      - '../deploy/deploy-side/build/contracts/SharedDB.json:/proxy/contracts_data/SharedDB.json'
+    ports:
+      - '${VOTES_PROXY_PORT}:8002'
     networks:
-      - sign-proxy-net
-      - keygen-proxy-net
+      - test_network
+#      - sign-proxy-net
+#      - keygen-proxy-net
+#      - bncwatcher-proxy-net
   keygen:
     image: keygen-client
     build: ./tss-keygen
@@ -21,9 +30,10 @@ services:
     volumes:
       - '${PWD}/keys:/keys'
     networks:
-      - keygen-proxy-net
-      - rabbit-keygen-net
-      - redis-keygen-net
+      - test_network
+#      - keygen-proxy-net
+#      - rabbit-keygen-net
+#      - redis-keygen-net
   signer:
     image: sign-client
     build: ./tss-sign
@@ -35,44 +45,68 @@ services:
     volumes:
       - '${PWD}/keys:/keys'
     networks:
-      - sign-proxy-net
-      - rabbit-signer-net
-      - redis-signer-net
+      - test_network
+#      - sign-proxy-net
+#      - rabbit-signer-net
+#      - redis-signer-net
   redis:
     image: redis:5.0.5-alpine
     volumes:
       - '${PWD}/db:/data'
     networks:
-      - redis-signer-net
-      - redis-keygen-net
-      - redis-watcher-net
+      - test_network
+#      - redis-signer-net
+#      - redis-keygen-net
+#      - redis-ethwatcher-net
+#      - redis-bncwatcher-net
   rabbitmq:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
     volumes:
       - '${PWD}/queue:/var/lib/rabbitmq/mnesia'
     networks:
-      - rabbit-signer-net
-      - rabbit-keygen-net
-      - rabbit-watcher-net
+      - test_network
+#      - rabbit-signer-net
+#      - rabbit-keygen-net
+#      - rabbit-ethwatcher-net
+#      - rabbit-bncwatcher-net
   eth-watcher:
-    build: ./watcher
+    build: ethWatcher
     image: eth-watcher
     environment:
-      - 'HOME_RPC_URL=${RPC_URL}'
-      - 'HOME_BRIDGE_ADDRESS=${SHARED_DB_ADDRESS}'
+      - HOME_RPC_URL
+      - HOME_BRIDGE_ADDRESS
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
     volumes:
-      - '../deploy/build/contracts:/watcher/contracts_data'
+      - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
     networks:
-      - rabbit-watcher-net
-      - redis-watcher-net
+      - test_network
+#      - rabbit-ethwatcher-net
+#      - redis-ethwatcher-net
+  bnc-watcher:
+    build: bncWatcher
+    image: bnc-watcher
+    environment:
+      - FOREIGN_URL
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'PROXY_URL=http://proxy:8001'
+    volumes:
+      - '${PWD}/keys:/keys'
+    networks:
+      - test_network
+#      - rabbit-bncwatcher-net
+#      - redis-bncwatcher-net
+#      - bncwatcher-proxy-net
 networks:
-  sign-proxy-net:
-  keygen-proxy-net:
-  rabbit-signer-net:
-  rabbit-keygen-net:
-  rabbit-watcher-net:
-  redis-keygen-net:
-  redis-signer-net:
-  redis-watcher-net:
+  test_network:
+#  sign-proxy-net:
+#  keygen-proxy-net:
+#  rabbit-signer-net:
+#  rabbit-keygen-net:
+#  rabbit-ethwatcher-net:
+#  rabbit-bncwatcher-net:
+#  redis-keygen-net:
+#  redis-signer-net:
+#  redis-ethwatcher-net:
+#  redis-bncwatcher-net:
+#  bncwatcher-proxy-net:

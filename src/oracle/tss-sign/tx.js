@@ -1,6 +1,6 @@
 const TransactionBnc = require('@binance-chain/javascript-sdk/lib/tx').default
 const { crypto } = require('@binance-chain/javascript-sdk')
-const BN = require('bn.js')
+const BN = require('bignumber.js')
 
 const { FOREIGN_CHAIN_ID } = process.env
 
@@ -9,7 +9,7 @@ class Transaction {
     const accCode = crypto.decodeAddress(fromAddress)
     const toAccCode = crypto.decodeAddress(toAddress)
 
-    amount *= 10 ** 8
+    amount = new BN(amount).multipliedBy(10 ** 8).toNumber()
 
     const coin = {
       denom: asset,
@@ -31,17 +31,11 @@ class Transaction {
     this.signMsg = {
       inputs: [{
         address: fromAddress,
-        coins: [{
-          amount: amount,
-          denom: asset
-        }]
+        coins: [coin]
       }],
       outputs: [{
         address: toAddress,
-        coins: [{
-          amount: amount,
-          denom: asset
-        }]
+        coins: [coin]
       }]
     }
 
@@ -64,9 +58,9 @@ class Transaction {
     const yLast = parseInt(publicKey.y[publicKey.y.length - 1], 16)
     const n = new BN('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141', 16)
     const s = new BN(signature.s, 16)
-    if (s.gt(n.divn(2))) {
+    if (s.gt(n.div(2))) {
       console.log('Normalizing s')
-      signature.s = n.sub(s).toString(16)
+      signature.s = n.minus(s).toString(16)
     }
     const publicKeyEncoded = Buffer.from('eb5ae98721' + (yLast % 2 ? '03' : '02') + padZeros(publicKey.x, 64), 'hex')
     this.tx.signatures = [{

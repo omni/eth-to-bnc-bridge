@@ -1,6 +1,6 @@
 require('dotenv').config()
 
-const SharedDB = artifacts.require('SharedDB')
+const Bridge = artifacts.require('Bridge')
 
 const {
   THRESHOLD, PARTIES, VALIDATOR_ADDRESS_1, VALIDATOR_ADDRESS_2, VALIDATOR_ADDRESS_3, VALIDATOR_ADDRESS_4,
@@ -9,7 +9,7 @@ const {
 
 module.exports = deployer => {
   deployer.deploy(
-    SharedDB,
+    Bridge,
     THRESHOLD,
     PARTIES,
     [
