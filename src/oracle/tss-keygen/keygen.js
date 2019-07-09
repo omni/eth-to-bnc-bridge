@@ -13,27 +13,15 @@ async function main () {
   const channel = await connection.createChannel()
   const queue = await channel.assertQueue('epochQueue')
 
-  let prev
-  let cmd
-
   channel.prefetch(2)
   channel.consume(queue.queue, msg => {
-    if (prev) {
-      const t = prev
-      prev = msg
-      channel.ack(t)
-    }
-    if (cmd) {
-      cmd.kill()
-    }
     const data = JSON.parse(msg.content)
     console.log(`Consumed new epoch event, starting keygen for epoch ${data.epoch}`)
 
     const keysFile = `/keys/keys${data.epoch}.store`
 
     console.log('Running ./keygen-entrypoint.sh')
-    cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
-      cmd = null
+    const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
       if (fs.existsSync(keysFile)) {
         console.log(`Finished keygen for epoch ${data.epoch}`)
         const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
@@ -42,14 +30,13 @@ async function main () {
           console.log('Sending keys confirmation on first generated epoch')
           await confirm(keysFile)
         }
-      }
-      else {
+      } else {
         console.log(`Keygen for epoch ${data.epoch} failed`)
       }
-      prev = null
+      console.log('Ack for keygen message')
       channel.ack(msg)
     })
-    cmd.stdout.on('data', data => console.log(data.toString()))
+    cmd.stdout.on('data', data => console.error(data.toString()))
     cmd.stderr.on('data', data => console.error(data.toString()))
   })
 }

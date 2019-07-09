@@ -1,21 +1,12 @@
 pragma solidity ^0.5.0;
 
 contract SharedDB {
-    mapping(bytes32 => bytes) public dbKeygen;
-    mapping(bytes32 => bytes) public dbSign;
+    mapping(bytes32 => bytes) public db;
     mapping(bytes32 => uint) public signupsCount;
     mapping(bytes32 => uint) public dbSignups;
 
-    function setKeygenData(bytes32 key, bytes memory data) public {
-        dbKeygen[keccak256(abi.encodePacked(msg.sender, key))] = data;
-    }
-
-    function getKeygenData(address from, bytes32 key) view public returns (bytes memory) {
-        return dbKeygen[keccak256(abi.encodePacked(from, key))];
-    }
-
     function signupSign(bytes32 hash) public {
-        require(dbSignups[keccak256(abi.encodePacked(msg.sender, hash))] == 0);
+        require(dbSignups[keccak256(abi.encodePacked(msg.sender, hash))] == 0, "Already signuped");
 
         dbSignups[keccak256(abi.encodePacked(msg.sender, hash))] = ++signupsCount[hash];
     }
@@ -40,11 +31,11 @@ contract SharedDB {
         return address(0);
     }
 
-    function setSignData(bytes32 hash, bytes32 key, bytes memory data) public {
-        dbSign[keccak256(abi.encodePacked(msg.sender, hash, key))] = data;
+    function setData(bytes32 hash, bytes32 key, bytes memory data) public {
+        db[keccak256(abi.encodePacked(msg.sender, hash, key))] = data;
     }
 
-    function getSignData(address from, bytes32 hash, bytes32 key) view public returns (bytes memory) {
-        return dbSign[keccak256(abi.encodePacked(from, hash, key))];
+    function getData(address from, bytes32 hash, bytes32 key) view public returns (bytes memory) {
+        return db[keccak256(abi.encodePacked(from, hash, key))];
     }
 }

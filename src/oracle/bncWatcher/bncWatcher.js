@@ -60,6 +60,7 @@ async function fetchNewTransactions () {
       }
     })
     .then(res => res.data.tx)
+    .catch(console.log)
 }
 
 function getLastForeignAddress () {

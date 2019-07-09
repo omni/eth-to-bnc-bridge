@@ -3,7 +3,7 @@ FROM node:10.16.0-slim
 WORKDIR /tss
 
 RUN apt-get update && \
-    apt-get install -y libssl1.1 libssl-dev curl
+    apt-get install -y libssl1.1 libssl-dev curl procps
 
 COPY package.json /tss/
 

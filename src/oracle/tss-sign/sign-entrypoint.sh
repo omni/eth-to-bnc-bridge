@@ -14,6 +14,6 @@ curl -X GET "$1/current_params" -o ./params > /dev/null 2>&1
 
 echo "Signing message using server $1"
 
-./gg18_sign_client "$1" "$2" "$3"
+rm -f signature
 
-echo "Signed message"
+./gg18_sign_client "$1" "$2" "$3"

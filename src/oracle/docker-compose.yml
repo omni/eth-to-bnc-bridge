@@ -6,12 +6,15 @@ services:
     environment:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
+      - HOME_TOKEN_ADDRESS
       - HOME_CHAIN_ID
       - SIDE_RPC_URL
       - SIDE_SHARED_DB_ADDRESS
       - SIDE_CHAIN_ID
       - VALIDATOR_PRIVATE_KEY
+      - FOREIGN_URL
     volumes:
+      - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
       - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
       - '../deploy/deploy-side/build/contracts/SharedDB.json:/proxy/contracts_data/SharedDB.json'
     ports:

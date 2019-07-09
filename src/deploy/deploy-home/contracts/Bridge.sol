@@ -26,6 +26,7 @@ contract Bridge {
     uint public nextThreshold;
 
     uint public epoch;
+    uint public nextEpoch;
 
     constructor(uint _threshold, uint _parties, address[] memory _validators, address _tokenContract) public {
         require(_parties > 0);
@@ -34,13 +35,14 @@ contract Bridge {
 
         tokenContract = IERC20(_tokenContract);
 
-        epoch = 1;
+        epoch = 0;
+        nextEpoch = 1;
         ready = false;
 
         nextThreshold = _threshold;
         savedNextValidators = _validators;
 
-        emit NewEpoch(epoch);
+        emit NewEpoch(nextEpoch);
     }
 
     IERC20 public tokenContract;
@@ -66,15 +68,17 @@ contract Bridge {
     function confirm(uint _x, uint _y) public {
         uint partyId = getNextPartyId(msg.sender);
         require(partyId != 0, "Not a next validator");
-        require(!confirmations[keccak256(abi.encodePacked(epoch, partyId, _x, _y))], "Already confirmed");
+        require(!confirmations[keccak256(abi.encodePacked(nextEpoch, partyId, _x, _y))], "Already confirmed");
 
-        confirmations[keccak256(abi.encodePacked(epoch, partyId, _x, _y))] = true;
-        if (++confirmationsCount[keccak256(abi.encodePacked(epoch, _x, _y))] == nextParties()) {
+        confirmations[keccak256(abi.encodePacked(nextEpoch, partyId, _x, _y))] = true;
+        if (++confirmationsCount[keccak256(abi.encodePacked(nextEpoch, _x, _y))] == nextParties()) {
+            confirmationsCount[keccak256(abi.encodePacked(nextEpoch, _x, _y))] = 2 ** 256 - 1;
             x = _x;
             y = _y;
             validators = savedNextValidators;
             nextValidators = savedNextValidators;
             threshold = nextThreshold;
+            epoch = nextEpoch;
             ready = true;
             emit KeygenCompleted(epoch, x, y);
         }
@@ -115,8 +119,6 @@ contract Bridge {
     function getNextValidatorsArray() view public returns (address[] memory) {
         return savedNextValidators;
     }
-
-    // Send current epoch in votes?
 
     function voteAddValidator(address validator) public {
         require(getPartyId() != 0, "Not a current validator");
@@ -161,17 +163,17 @@ contract Bridge {
     }
 
     function voteStartEpoch(uint newEpoch) public {
-        require(newEpoch == epoch + 1, "Wrong epoch number");
+        require(newEpoch == nextEpoch + 1, "Wrong epoch number");
         require(getPartyId() != 0, "Not a current validator");
-        require(!votes[keccak256(abi.encodePacked(uint(4), epoch, msg.sender))], "Voted already");
+        require(!votes[keccak256(abi.encodePacked(uint(4), newEpoch, msg.sender))], "Voted already");
 
-        votes[keccak256(abi.encodePacked(uint(4), epoch, msg.sender))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(4), epoch))] == threshold + 1) {
+        votes[keccak256(abi.encodePacked(uint(4), newEpoch, msg.sender))] = true;
+        if (++votesCount[keccak256(abi.encodePacked(uint(4), newEpoch))] == threshold + 1) {
             ready = false;
 
-            epoch++;
+            nextEpoch = newEpoch;
             savedNextValidators = nextValidators;
-            emit NewEpoch(epoch);
+            emit NewEpoch(newEpoch);
         }
     }
 }

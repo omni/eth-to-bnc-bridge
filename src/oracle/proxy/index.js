@@ -1,16 +1,25 @@
 const express = require('express')
 const Web3 = require('web3')
 const AsyncLock = require('async-lock')
+const crypto = require('crypto')
+const bech32 = require('bech32')
+const axios = require('axios')
+const BN = require('bignumber.js')
 
-const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY, HOME_CHAIN_ID, SIDE_CHAIN_ID } = process.env
+const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY, HOME_CHAIN_ID, SIDE_CHAIN_ID, HOME_TOKEN_ADDRESS, FOREIGN_URL } = process.env
 const abiSharedDb = require('./contracts_data/SharedDB.json').abi
 const abiBridge = require('./contracts_data/Bridge.json').abi
+const abiToken = require('./contracts_data/IERC20.json').abi
 
 const homeWeb3 = new Web3(HOME_RPC_URL, null, { transactionConfirmationBlocks: 1 })
 const sideWeb3 = new Web3(SIDE_RPC_URL, null, { transactionConfirmationBlocks: 1 })
 const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
+const token = new homeWeb3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 const sharedDb = new sideWeb3.eth.Contract(abiSharedDb, SIDE_SHARED_DB_ADDRESS)
 const validatorAddress = homeWeb3.eth.accounts.privateKeyToAccount(`0x${VALIDATOR_PRIVATE_KEY}`).address
+
+const FOREIGN_ASSET = 'BNB'
+const httpClient = axios.create({ baseURL: FOREIGN_URL })
 
 const lock = new AsyncLock()
 
@@ -65,6 +74,7 @@ function Err (data) {
 
 async function get (req, res) {
   console.log('Get call')
+  console.log(req.body.key)
   const round = req.body.key.second
   const uuid = req.body.key.third
   let from
@@ -77,9 +87,7 @@ async function get (req, res) {
   const to = Number(req.body.key.fourth) // 0 if empty
   const key = homeWeb3.utils.sha3(`${round}_${to}`)
 
-  const data = await (uuid.startsWith('k')
-    ? sharedDb.methods.getKeygenData(from, key).call()
-    : sharedDb.methods.getSignData(from, uuid, key).call())
+  const data = await sharedDb.methods.getData(from, sideWeb3.utils.sha3(uuid), key).call()
 
   const result = homeWeb3.utils.hexToUtf8(data)
   if (result.length)
@@ -98,9 +106,7 @@ async function set (req, res) {
   const to = Number(req.body.key.fourth)
   const key = homeWeb3.utils.sha3(`${round}_${to}`)
 
-  const query = uuid.startsWith('k')
-    ? sharedDb.methods.setKeygenData(key, sideWeb3.utils.utf8ToHex(req.body.value))
-    : sharedDb.methods.setSignData(uuid, key, sideWeb3.utils.utf8ToHex(req.body.value))
+  const query = sharedDb.methods.setData(sideWeb3.utils.sha3(uuid), key, sideWeb3.utils.utf8ToHex(req.body.value))
   await sideSendQuery(query)
 
   res.send(Ok(null))
@@ -109,7 +115,7 @@ async function set (req, res) {
 
 async function signupKeygen (req, res) {
   console.log('SignupKeygen call')
-  const epoch = (await bridge.methods.epoch().call()).toNumber()
+  const epoch = (await bridge.methods.nextEpoch().call()).toNumber()
   const partyId = (await bridge.methods.getNextPartyId(validatorAddress).call()).toNumber()
 
   if (partyId === 0) {
@@ -181,6 +187,10 @@ function sideSendQuery (query) {
     } catch (e) {
       //sideValidatorNonce--
       console.log('Side tx failed', e.message)
+      if (e.message.includes('out of gas')) {
+        console.log('Out of gas, retrying')
+        sideSendQuery(query)
+      }
       return null
     }
   })
@@ -204,6 +214,10 @@ function homeSendQuery (query) {
     } catch (e) {
       //homeValidatorNonce--
       console.log('Home tx failed', e.message)
+      if (e.message.includes('out of gas')) {
+        console.log('Out of gas, retrying')
+        homeSendQuery(query)
+      }
       return null
     }
   })
@@ -247,14 +261,20 @@ async function voteRemoveValidator (req, res) {
 
 async function info (req, res) {
   console.log('Info start')
+  const x = new BN(await bridge.methods.x().call()).toString(16)
+  const y = new BN(await bridge.methods.y().call()).toString(16)
   res.send({
     epoch: (await bridge.methods.epoch().call()).toNumber(),
+    nextEpoch: (await bridge.methods.nextEpoch().call()).toNumber(),
     threshold: (await bridge.methods.threshold().call()).toNumber(),
     nextThreshold: (await bridge.methods.nextThreshold().call()).toNumber(),
+    homeBridgeAddress: HOME_BRIDGE_ADDRESS,
+    foreignBridgeAddress: publicKeyToAddress({ x, y }),
     validators: await bridge.methods.getValidatorsArray().call(),
     nextValidators: await bridge.methods.getNextValidatorsArray().call(),
-    homeBalance: 0,
-    foreignBalance: 0
+    homeBalance: (await token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call()).toNumber(),
+    foreignBalance: await getForeignBalance(publicKeyToAddress({ x, y })),
+    bridgeStatus: await bridge.methods.ready().call()
   })
   console.log('Info end')
 }
@@ -271,6 +291,27 @@ async function transfer (req, res) {
   }
   res.send()
   console.log('Transfer end')
+}
+
+function getForeignBalance(address) {
+  return httpClient
+    .get(`/api/v1/account/${address}`)
+    .then(res => parseFloat(res.data.balances.find(x => x.symbol === FOREIGN_ASSET).free))
+    .catch(err => 0)
+}
+
+function publicKeyToAddress ({ x, y }) {
+  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
+  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
+  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
+  const words = bech32.toWords(Buffer.from(hash, 'hex'))
+  return bech32.encode('tbnb', words)
+}
+
+function padZeros (s, len) {
+  while (s.length < len)
+    s = '0' + s
+  return s
 }
 
 

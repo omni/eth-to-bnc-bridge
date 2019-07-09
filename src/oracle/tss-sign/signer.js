@@ -83,8 +83,6 @@ async function main () {
 
       const hash = crypto.createHash('sha256').update(tx.getSignBytes()).digest('hex')
 
-      fs.unlinkSync('signature')
-
       console.log(`Starting signature generation for transaction hash ${hash}`)
       const cmd = exec.execFile('./sign-entrypoint.sh', [PROXY_URL, prevKeysFile, hash], async () => {
         if (fs.existsSync('signature')) {
