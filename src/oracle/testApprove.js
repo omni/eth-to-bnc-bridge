@@ -9,16 +9,18 @@ const abiToken = require('../deploy/deploy-home/build/contracts/IERC20').abi
 const bridge = new web3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
 const token = new web3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 
-const query1 = token.methods.approve(HOME_BRIDGE_ADDRESS, 1)
-const query2 = bridge.methods.requestAffirmation(1, 'tbnb1h3nmmqukrtjc0prmtdts0kxlgmw8rend4zfasn')
+const amount = parseInt(process.argv[3])
+const query1 = token.methods.approve(HOME_BRIDGE_ADDRESS, amount)
+const query2 = bridge.methods.requestAffirmation(amount, process.argv[2])
 
 let nonce
 const deployAddress = web3.eth.accounts.privateKeyToAccount(`0x${DEPLOY_PRIVATE_KEY}`).address
 
 async function main () {
-  console.log(deployAddress)
+  console.log(`Transfer from ${deployAddress} to ${HOME_BRIDGE_ADDRESS}, ${amount} tokens`)
+  console.log(`Exchange to address ${process.argv[2]}`)
   nonce = await web3.eth.getTransactionCount(deployAddress)
-  await sendQuery(query1, HOME_TOKEN_ADDRESS)
+  console.log(await sendQuery(query1, HOME_TOKEN_ADDRESS))
   await sendQuery(query2, HOME_BRIDGE_ADDRESS)
 }
 
