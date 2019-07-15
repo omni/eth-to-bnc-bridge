@@ -3,7 +3,7 @@ FROM node:10.16.0-slim
 WORKDIR /tss
 
 RUN apt-get update && \
-    apt-get install -y libssl1.1 libssl-dev curl python make g++ libudev-dev libusb-dev usbutils
+    apt-get install -y libssl1.1 libssl-dev curl python make g++ libudev-dev libusb-dev usbutils procps
 #apk packages: libssl1.1 eudev-dev libressl-dev curl build-base python linux-headers libusb-dev
 
 COPY package.json /tss/

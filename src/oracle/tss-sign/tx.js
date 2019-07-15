@@ -5,49 +5,59 @@ const BN = require('bignumber.js')
 const { FOREIGN_CHAIN_ID } = process.env
 
 class Transaction {
-  constructor (fromAddress, accountNumber, sequence, toAddress, amount, asset, memo = 'test') {
-    const accCode = crypto.decodeAddress(fromAddress)
-    const toAccCode = crypto.decodeAddress(toAddress)
+  constructor (options) {
+    const { from, accountNumber, sequence, to, tokens, asset, bnbs, memo = '' } = options
+    const accCode = crypto.decodeAddress(from)
+    const toAccCode = crypto.decodeAddress(to)
 
-    amount = new BN(amount).multipliedBy(10 ** 8).toNumber()
+    const coins = []
 
-    const coin = {
-      denom: asset,
-      amount: amount,
+    if (tokens && tokens !== '0' && asset) {
+      coins.push({
+        denom: asset,
+        amount: new BN(tokens).multipliedBy(10 ** 8).toNumber(),
+      })
     }
+    if (bnbs && bnbs !== '0') {
+      coins.push({
+        denom: 'BNB',
+        amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber(),
+      })
+    }
+
+    coins.sort((a, b) => a.denom > b.denom)
 
     const msg = {
       inputs: [{
         address: accCode,
-        coins: [coin]
+        coins
       }],
       outputs: [{
         address: toAccCode,
-        coins: [coin]
+        coins
       }],
       msgType: 'MsgSend'
     }
 
     this.signMsg = {
       inputs: [{
-        address: fromAddress,
-        coins: [coin]
+        address: from,
+        coins
       }],
       outputs: [{
-        address: toAddress,
-        coins: [coin]
+        address: to,
+        coins
       }]
     }
 
-    const options = {
+    this.tx = new TransactionBnc({
       account_number: accountNumber,
       chain_id: FOREIGN_CHAIN_ID,
-      memo: memo,
+      memo,
       msg,
       sequence,
       type: msg.msgType,
-    }
-    this.tx = new TransactionBnc(options)
+    })
   }
 
   getSignBytes () {

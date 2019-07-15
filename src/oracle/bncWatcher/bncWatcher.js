@@ -4,9 +4,9 @@ const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const fs = require('fs')
 const crypto = require('crypto')
+const { computeAddress } = require('ethers').utils
 
-const { FOREIGN_URL, PROXY_URL } = process.env
-const FOREIGN_ASSET = 'BNB'
+const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
 const foreignHttpClient = axios.create({ baseURL: FOREIGN_URL })
 const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
@@ -30,15 +30,27 @@ async function main () {
 
   for (const tx of newTransactions.reverse()) {
     if (tx.memo !== 'funding') {
+      const publicKeyEncoded = (await getTx(tx.txHash)).signatures[0].pub_key.value
       await proxyHttpClient
         .post('/transfer', {
-          to: tx.memo,
+          to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
           value: new BN(tx.value).integerValue(BN.ROUND_FLOOR),//(new BN(tx.value).multipliedBy(10 ** 8)).toNumber(),
           hash: `0x${tx.txHash}`
         })
     }
     await redis.set('foreignTime', Date.parse(tx.timeStamp))
   }
+}
+
+function getTx(hash) {
+  return foreignHttpClient
+    .get(`/api/v1/tx/${hash}`, {
+      params: {
+        format: 'json'
+      }
+    })
+    .then(res => res.data.tx.value)
+    .catch(() => getTx(hash))
 }
 
 async function fetchNewTransactions () {
@@ -60,7 +72,7 @@ async function fetchNewTransactions () {
       }
     })
     .then(res => res.data.tx)
-    .catch(console.log)
+    .catch(() => fetchNewTransactions())
 }
 
 function getLastForeignAddress () {

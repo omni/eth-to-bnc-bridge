@@ -5,6 +5,7 @@
     "@binance-chain/javascript-sdk": "2.13.9",
     "amqplib": "0.5.3",
     "axios": "0.19.0",
-    "bignumber.js": "9.0.0"
+    "bignumber.js": "9.0.0",
+    "express": "4.17.1"
   }
 }

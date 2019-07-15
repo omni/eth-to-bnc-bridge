@@ -12,7 +12,8 @@ contract SharedDB {
     }
 
     function getSignupNumber(bytes32 hash, address[] memory validators, address validator) view public returns (uint) {
-        require(dbSignups[keccak256(abi.encodePacked(validator, hash))] > 0, "Have not voted yet");
+        if (dbSignups[keccak256(abi.encodePacked(validator, hash))] == 0)
+            return 0;
         uint id = 1;
         for (uint i = 0; i < validators.length; i++) {
             uint vid = dbSignups[keccak256(abi.encodePacked(validators[i], hash))];

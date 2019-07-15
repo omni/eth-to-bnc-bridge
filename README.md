@@ -8,6 +8,7 @@ two are enough to sign any transaction in the Binance Chain,
 confirm token transfer on the Ethereum Side, or vote for state changes.
 
 ERC20 Token is used on the Ethereum side of the bridge.
+All ERC20 tokens are located on address associated with DEPLOY_PRIVATE_KEY.
 
 BNB Token is used on the Binance Chain side.
 
@@ -49,13 +50,13 @@ container for listening GET requests
 
 Run this scripts from ```src/oracle``` dir
 
-* ```node testBinanceSend.js PRIVATE_KEY TO VALUE [MEMO]```
-    - ```PRIVATE_KEY``` - private key of sender in the Binance Chain
+* ```node testBinanceSend.js TO VALUE_TOKEN [VALUE_BNB]```
     - ```TO``` - receiver address, current bridge address in the Binance Chain
-    - ```VALUE``` - amount of BNB to send
-    - ```MEMO``` - transaction memo, receiver on the Ethereum side, leave blank for just pre-funding
-* ```node testApprove.js TO VALUE```
+    - ```VALUE_TOKEN``` - amount of tokens to send
+    - ```VALUE_BNB``` - amount of BNB tokens to send, if present, the 
+    transaction is considered as a funding one
+* ```node testEthereumSend.js TO VALUE```
     - Approves specified amount of tokens to the bridge account and calls
     needed method for starting exchange process
     - ```TO``` - receiver address in the Binance Chain
-    - ```VALUE``` - amount of tokens to transfer and exchange 
+    - ```VALUE``` - amount of tokens to transfer and exchange

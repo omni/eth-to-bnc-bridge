@@ -11,7 +11,7 @@ module.exports = deployer => {
   deployer.deploy(
     Bridge,
     THRESHOLD,
-    PARTIES,
+    //PARTIES,
     [
       VALIDATOR_ADDRESS_1,
       VALIDATOR_ADDRESS_2,

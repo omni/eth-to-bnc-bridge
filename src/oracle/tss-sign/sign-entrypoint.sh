@@ -8,10 +8,6 @@ until curl "$1" > /dev/null 2>&1; do
     sleep 1;
 done
 
-echo "Fetching current tss params"
-
-curl -X GET "$1/current_params" -o ./params > /dev/null 2>&1
-
 echo "Signing message using server $1"
 
 rm -f signature

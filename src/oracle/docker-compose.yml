@@ -13,6 +13,7 @@ services:
       - SIDE_CHAIN_ID
       - VALIDATOR_PRIVATE_KEY
       - FOREIGN_URL
+      - FOREIGN_ASSET
     volumes:
       - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
       - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
@@ -45,8 +46,11 @@ services:
       - 'PROXY_URL=http://proxy:8001'
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
+      - FOREIGN_ASSET
     volumes:
       - '${PWD}/keys:/keys'
+    ports:
+      - '${SIGN_RESTART_PORT}:8001'
     networks:
       - test_network
 #      - sign-proxy-net
@@ -79,9 +83,12 @@ services:
     environment:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
+      - HOME_TOKEN_ADDRESS
+      - HOME_CHAIN_ID
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
     volumes:
       - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
+      - '../deploy/deploy-test/build/contracts/IERC20.json:/watcher/contracts_data/IERC20.json'
     networks:
       - test_network
 #      - rabbit-ethwatcher-net
@@ -91,6 +98,7 @@ services:
     image: bnc-watcher
     environment:
       - FOREIGN_URL
+      - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
     volumes:

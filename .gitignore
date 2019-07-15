@@ -13,3 +13,4 @@ demo/ganache_data_side/
 src/deploy/deploy-home/build/
 src/deploy/deploy-side/build/
 src/deploy/deploy-test/build/
+test.js
