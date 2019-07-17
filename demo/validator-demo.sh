@@ -11,4 +11,4 @@ echo "Starting $NAME"
 
 mkdir -p "$NAME"
 cd "$NAME"
-docker-compose -p "$NAME" -f ../../src/oracle/docker-compose.yml up ${DCU_FLAGS}
+docker-compose -p "$NAME" -f ../../src/oracle/docker-compose-test.yml up ${DCU_FLAGS}

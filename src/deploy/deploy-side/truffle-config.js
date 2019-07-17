@@ -1,5 +1,3 @@
-require('dotenv').config()
-
 const PrivateKeyProvider = require('truffle-hdwallet-provider')
 
 const { RPC_URL, PRIVATE_KEY, RPC_URL_DEV, PRIVATE_KEY_DEV } = process.env

@@ -1,5 +1,3 @@
-require('dotenv').config()
-
 const Bridge = artifacts.require('Bridge')
 
 const {

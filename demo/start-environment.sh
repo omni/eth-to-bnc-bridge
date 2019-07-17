@@ -6,42 +6,51 @@ cd $(dirname "$0")
 
 echo "Starting side test blockchain"
 
-rm -rf ./ganache_data_side
-
-mkdir ganache_data_side
-
-kill $(lsof -t -i:3333) > /dev/null 2>&1 || true
-
-ganache-cli --db ./ganache_data_side -p 3333 -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q &
+docker kill ganache_side > /dev/null 2>&1 || true
+docker network create blockchain_side > /dev/null 2>&1 || true
+docker run -d --network blockchain_side --rm --name ganache_side trufflesuite/ganache-cli:latest -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q
 
 echo "Starting home test blockchain"
 
-rm -rf ./ganache_data
-
-mkdir ganache_data
-
-kill $(lsof -t -i:4444) > /dev/null 2>&1 || true
-
-ganache-cli -a 20 --db ./ganache_data -p 4444 -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q &
+docker kill ganache_home > /dev/null 2>&1 || true
+docker network create blockchain_home > /dev/null 2>&1 || true
+docker run -d --network blockchain_home --rm --name ganache_home trufflesuite/ganache-cli:latest -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q
 
 sleep 4
 
-echo "Deploying erc20"
+
+
+echo "Compiling and deploying erc20"
 
 cd ../src/deploy/deploy-test
 
-truffle deploy --network development --reset > /dev/null
+echo "Building deploy docker image"
+docker build -t deploy_test . > /dev/null 2>&1
+echo "Deploying"
+docker run --network blockchain_home --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_test --network development --reset > /dev/null 2>&1
 
-echo "Deploying home part"
+
+
+echo "Compiling and deploying home part"
 
 cd ../deploy-home
 
-truffle deploy --network development --reset > /dev/null
+echo "Building deploy docker image"
+docker build -t deploy_home . > /dev/null 2>&1
+echo "Deploying"
+docker run --network blockchain_home --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_home --network development --reset > /dev/null 2>&1
 
-echo "Deploying side part"
+
+
+echo "Compiling and deploying side part"
 
 cd ../deploy-side
 
-truffle deploy --network development --reset > /dev/null
+echo "Building deploy docker image"
+docker build -t deploy_side . > /dev/null 2>&1
+echo "Deploying"
+docker run --network blockchain_side --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_side --network development --reset > /dev/null 2>&1
+
+
 
 echo "Done"

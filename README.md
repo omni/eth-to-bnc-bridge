@@ -10,7 +10,7 @@ confirm token transfer on the Ethereum Side, or vote for state changes.
 ERC20 Token is used on the Ethereum side of the bridge.
 All ERC20 tokens are located on address associated with DEPLOY_PRIVATE_KEY.
 
-BNB Token is used on the Binance Chain side.
+BEP2 Token is used on the Binance Chain side.
 
 #### Running demo:
 1) Build tss from local source.  

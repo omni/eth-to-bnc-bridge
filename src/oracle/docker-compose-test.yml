@@ -21,9 +21,9 @@ services:
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
-      - sign-proxy-net
-      - keygen-proxy-net
-      - bncwatcher-proxy-net
+      - test_network
+      - blockchain_home
+      - blockchain_side
   keygen:
     image: keygen-client
     build: ./tss-keygen
@@ -33,9 +33,7 @@ services:
     volumes:
       - '${PWD}/keys:/keys'
     networks:
-      - keygen-proxy-net
-      - rabbit-keygen-net
-      - redis-keygen-net
+      - test_network
   signer:
     image: sign-client
     build: ./tss-sign
@@ -50,28 +48,20 @@ services:
     ports:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
-      - sign-proxy-net
-      - rabbit-signer-net
-      - redis-signer-net
+      - test_network
   redis:
     image: redis:5.0.5-alpine
     volumes:
       - '${PWD}/db:/data'
     networks:
-      - redis-signer-net
-      - redis-keygen-net
-      - redis-ethwatcher-net
-      - redis-bncwatcher-net
+      - test_network
   rabbitmq:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
     volumes:
       - '${PWD}/queue:/var/lib/rabbitmq/mnesia'
     networks:
-      - rabbit-signer-net
-      - rabbit-keygen-net
-      - rabbit-ethwatcher-net
-      - rabbit-bncwatcher-net
+      - test_network
   eth-watcher:
     build: ethWatcher
     image: eth-watcher
@@ -85,8 +75,8 @@ services:
       - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
       - '../deploy/deploy-test/build/contracts/IERC20.json:/watcher/contracts_data/IERC20.json'
     networks:
-      - rabbit-ethwatcher-net
-      - redis-ethwatcher-net
+      - test_network
+      - blockchain_home
   bnc-watcher:
     build: bncWatcher
     image: bnc-watcher
@@ -98,18 +88,10 @@ services:
     volumes:
       - '${PWD}/keys:/keys'
     networks:
-      - rabbit-bncwatcher-net
-      - redis-bncwatcher-net
-      - bncwatcher-proxy-net
+      - test_network
 networks:
-  sign-proxy-net:
-  keygen-proxy-net:
-  rabbit-signer-net:
-  rabbit-keygen-net:
-  rabbit-ethwatcher-net:
-  rabbit-bncwatcher-net:
-  redis-keygen-net:
-  redis-signer-net:
-  redis-ethwatcher-net:
-  redis-bncwatcher-net:
-  bncwatcher-proxy-net:
+  test_network:
+  blockchain_side:
+    external: true
+  blockchain_home:
+    external: true
