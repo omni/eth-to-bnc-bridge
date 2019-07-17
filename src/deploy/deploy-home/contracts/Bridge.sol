@@ -219,6 +219,7 @@ contract Bridge {
             status = 1;
 
             nextEpoch++;
+            states[nextEpoch].validators = getValidators();
             emit NewEpoch(epoch, nextEpoch);
         }
     }
