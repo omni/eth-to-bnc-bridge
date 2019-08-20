@@ -16,11 +16,40 @@ BEP2 Token is used on the Binance Chain side.
 All parts of this demo are docker containers.
 
 #### Running demo:
-1) Build tss from local source. (TSS cryptographic executables are taken from this image) \
-```docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss```
-2) Run test environment. (home and side ganache-cli blockchains, contracts deployment)
+
+1. Preparation
+1.1 Download `tbnbcli` from https://github.com/binance-chain/node-binary/tree/master/cli.
+1.2 Create several BNB accounts from console:
+    ```
+    ./tbnbcli keys add test_account1
+    ./tbnbcli keys add test_account2
+    ./tbnbcli keys add test_account3
+    ```
+1.3 Register on the Binance site and fund the accounts from the [testnet faucet](https://www.binance.com/en/dex/testnet/address).
+1.4 Re-arrange funds on the accounts as so the first account will have 550 BNB and others 10-20 BNBs to make transactions.
+    ```
+    ./tbnbcli send --from test_account2 --to <address of the first account> --amount 18500000000:BNB --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --memo "Test transfer"
+    ./tbnbcli send --from test_account3 --to <address of the first account> --amount 18500000000:BNB --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --memo "Test transfer"
+    ```
+1.5 Issue the BEP2 token from the first account
+    ```
+    ./tbnbcli token issue --token-name "ERC20toBEP2Bridge" --total-supply 3141500000000000 --symbol ETB0819 --from test1 --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
+    ```
+1.6 Get the BEP2 token ID in `denom` field.
+    ```
+    ./tbnbcli account tbnb1ack8qtpd5mm5wrjw0ajg8zpdnplw4qzeg5uuza --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
+    ```
+1.7 Clone the repo and initialize git submodules:
+    ```
+    git clone --recurse-submodules https://github.com/k1rill-fedoseev/eth-to-bnc-bridge.git
+    ```
+1.8 Build TSS to be used in the bridge oracles:
+    ```
+    docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
+    ```
+2. Run test environment. (home and side ganache-cli blockchains, contracts deployment)
 ```./demo/start-environment.sh```
-3) Run three validators in separate terminal sessions.\
+3. Run three validators in separate terminal sessions.\
 ```N=1 ./demo/validator-demo.sh```\
 ```N=2 ./demo/validator-demo.sh```\
 ```N=3 ./demo/validator-demo.sh```
