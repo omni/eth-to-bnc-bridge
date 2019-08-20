@@ -18,9 +18,7 @@ All parts of this demo are docker containers.
 #### Running demo:
 
 1. Preparation
-
   1.1 Download `tbnbcli` from https://github.com/binance-chain/node-binary/tree/master/cli.
-
   1.2 Create several BNB accounts from console:
     ```
     ./tbnbcli keys add test_account1
