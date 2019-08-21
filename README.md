@@ -7,18 +7,19 @@ The bridge is able to transfer an ERC20 tokens on an EVM based chain to BEP2 to 
 It includes the following components:
 1. The bridge contract on an EVM-based chain that is responsible to receive and release ERC20 tokens 
 2. The orchestration contract on an EVM-based chain that participate in MPC (multy-party computations) to generate a threshold signature.
-3. The oracle that monitors the chains and the send transactions. One oracle represents one validator.
+3. The oracle that monitors the chains and the send transactions. One oracle represents one bridge validator (one private key).
 
 The idea of the bridge is similar to [the token bridge](https://github.com/poanetwork/tokenbridge) produced by [POA.Network](https://poa.network/):
 - every oracle sends its confirmation as soon as a user sends the token relay request in one chain.
 - when enough confirmations collected the requested amount of tokens is unlocked in another chain.
 
+Collecting confirmations for the Binance Chain is made in form of mutlisig wallet - the validator's confirmation is participation in the transaction signature gneration with usage of Threshold Signature Scheme implemented for ECDSA by [KZen Research team](https://github.com/KZen-networks/multi-party-ecdsa).
+
 #### Demo
 
 This demo, at the beginning, consists of three validator parties, while only  two are enough to sign any transaction in the Binance Chain, confirm token transfer on the Ethereum Side, or vote for state changes.
 
-ERC20 Token is used on the Ethereum side of the bridge. All ERC20 tokens are initially located on the address associated 
-with ```DEPLOY_PRIVATE_KEY```.
+An ERC20 Token is being deployed automatically on the Ethereum side of the bridge. All minted tokens are initially owned by the address associated with `DEPLOY_PRIVATE_KEY`.
 
 BEP2 Token is used on the Binance Chain side.
 
