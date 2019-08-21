@@ -9,13 +9,15 @@ It includes the following components:
 2. The orchestration contract on an EVM-based chain that participate in MPC (multy-party computations) to generate a threshold signature.
 3. The oracle that monitors the chains and the send transactions. One oracle represents one validator.
 
-#### Demo info
-This demo, at the beginning, consists of three validator parties, while only 
-two are enough to sign any transaction in the Binance Chain, 
-confirm token transfer on the Ethereum Side, or vote for state changes.
+The idea of the bridge is similar to [the token bridge](https://github.com/poanetwork/tokenbridge) produced by [POA.Network](https://poa.network/):
+- every oracle sends its confirmation as soon as a user sends the token relay request in one chain.
+- when enough confirmations collected the requested amount of tokens is unlocked in another chain.
 
-ERC20 Token is used on the Ethereum side of the bridge.
-All ERC20 tokens are initially located on the address associated 
+#### Demo
+
+This demo, at the beginning, consists of three validator parties, while only  two are enough to sign any transaction in the Binance Chain, confirm token transfer on the Ethereum Side, or vote for state changes.
+
+ERC20 Token is used on the Ethereum side of the bridge. All ERC20 tokens are initially located on the address associated 
 with ```DEPLOY_PRIVATE_KEY```.
 
 BEP2 Token is used on the Binance Chain side.
