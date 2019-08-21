@@ -1,6 +1,13 @@
-### Ethereum to Binance Chain bridge demo
+## Ethereum to Binance Chain bridge
 
 https://forum.poa.network/t/ethereum-to-binance-chain-bridge/2696
+
+The bridge is able to transfer an ERC20 tokens on an EVM based chain to BEP2 to the Binance Chain.
+
+It includes the following components:
+1. The bridge contract on an EVM-based chain that is responsible to receive and release ERC20 tokens 
+2. The orchestration contract on an EVM-based chain that participate in MPC (multy-party computations) to generate a threshold signature.
+3. The oracle that monitors the chains and the send transactions. One oracle represents one validator.
 
 #### Demo info
 This demo, at the beginning, consists of three validator parties, while only 
