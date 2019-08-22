@@ -53,6 +53,7 @@ All parts of this demo are docker containers.
         --symbol ETB0819 --mintable --from test_account1 --chain-id=Binance-Chain-Nile \
         --node=data-seed-pre-2-s1.binance.org:80 --trust-node
       ```
+      In the real deployment most probably the token must not be mintable.
     * (1.8) Get the BEP2 token ID in `denom` field (in this example it is `ETB0819-863`).
       ```
       ./tbnbcli account <address of the first account> \
@@ -73,6 +74,16 @@ All parts of this demo are docker containers.
       ./demo/start-environment.sh
       ```
       This command will also mint tokens, the owner of tokens is the address that corresponds to the private key specified in `PRIVATE_KEY_DEV` of `src/deploy/deploy-test/.env`.
+    * (2.3) Get the Ethereum account address for the first test account from its private key (step 1.2). NiftyWallet could be used for this.
+    * (2.4) Modify the parameter `RECEIVER_ADDRESS` in `src/test-services/ethereumSend/.env` as so it contains the Ethereum address of the first account.
+    * (2.5) Send few tokens from the current token owner to the first account:
+      ```
+      ./src/test-services/ethereumSend/run.sh 5000000000000000000
+      ```
+    * (2.6) Check that the tokens were transferred properly:
+      ```
+      ./src/test-services/ethereumBalance/run.sh <first account Ethereum address>
+      ``` 
 3. Run validators nodes:
     * (3.1) Modify the parameter `FOREIGN_ASSET` in `demo/validator1/.env`, `demo/validator2/.env` and `demo/validator3/.env` to specify the identificator of the token (step 1.8) that the oracle will watch.
     * (3.2) Run three validators in separate terminal sessions.
@@ -93,11 +104,24 @@ All parts of this demo are docker containers.
         --amount 1000000000:BNB --chain-id=Binance-Chain-Nile \
         --node=data-seed-pre-2-s1.binance.org:80 --memo "initialization"
       ```    
-    * (4.2) Fund with BNB coins as so the account will be able to make transactions:
+    * (4.2) Fund the account with bridgeable tokens. **This transaction should have 'funding' in the memo**:
       ```
       ./tbnbcli send --from test_account1 --to <address of the bridge account> \ 
-        --amount 1000000000:BNB --chain-id=Binance-Chain-Nile \
-        --node=data-seed-pre-2-s1.binance.org:80 --memo "initialization"
+        --amount 3141500000000000:ETB0819-863 --chain-id=Binance-Chain-Nile \
+        --node=data-seed-pre-2-s1.binance.org:80 --memo "funding"
+      ```
+      The oracles should catch this transaction but will ignore it:
+      ```
+      bnc-watcher_1  | Fetching new transactions
+      bnc-watcher_1  | Sending api transactions request
+      bnc-watcher_1  | Found 1 new transactions
+      ```
+      To check the balance of the bridge account the [Binance Testnet Explorer could be used](https://testnet-explorer.binance.org). It should report about two assets owned by the account.
+5. Transfer tokens from Ethereum-based chain to the Binance Chain:
+    * (5.1) Modify the parameter `RECEIVER_ADDRESS` in `src/test-services/ethereumSend/.env` as so it contains the Ethereum address of the bridge contract (the same as `HOME_BRIDGE_ADDRESS`) and the parameter `HOME_PRIVATE_KEY` to contain the private key of the first test account (step 1.2)
+    * (2.5) Send some amount of tokens to the bridge contract:
+      ```
+      ./src/test-services/ethereumSend/run.sh 1000000000000000000
       ```
 
 
