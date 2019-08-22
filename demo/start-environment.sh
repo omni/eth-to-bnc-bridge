@@ -6,15 +6,29 @@ cd $(dirname "$0")
 
 echo "Starting side test blockchain"
 
+mntpoint=`pwd`/ganache_side_db
+if [ ! -d ${mntpoint} ]; then
+  mkdir ${mntpoint}
+fi
+
 docker kill ganache_side > /dev/null 2>&1 || true
 docker network create blockchain_side > /dev/null 2>&1 || true
-docker run -d --network blockchain_side --rm --name ganache_side trufflesuite/ganache-cli:latest -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q
+docker run -d --network blockchain_side --rm --name ganache_side -v ${mntpoint}:/app/db \
+    trufflesuite/ganache-cli:latest \
+    -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db
 
 echo "Starting home test blockchain"
 
+mntpoint=`pwd`/ganache_home_db
+if [ ! -d ${mntpoint} ]; then
+  mkdir ${mntpoint}
+fi
+
 docker kill ganache_home > /dev/null 2>&1 || true
 docker network create blockchain_home > /dev/null 2>&1 || true
-docker run -d --network blockchain_home --rm --name ganache_home trufflesuite/ganache-cli:latest -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q
+docker run -d --network blockchain_home --rm --name ganache_home -v ${mntpoint}:/app/db \
+    trufflesuite/ganache-cli:latest \
+    -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db
 
 sleep 4
 
