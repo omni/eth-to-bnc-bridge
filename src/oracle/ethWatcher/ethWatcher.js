@@ -177,7 +177,7 @@ async function sendSign (event) {
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: event.returnValues.value.toNumber(),
+    value: new BN(event.returnValues.value).dividedToIntegerBy(10 ** 8),
     epoch,
     nonce: foreignNonce[epoch],
     threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
