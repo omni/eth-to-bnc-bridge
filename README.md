@@ -17,9 +17,7 @@ Collecting confirmations for the Binance Chain is made in form of mutlisig walle
 
 #### Demo
 
-This demo, at the beginning, consists of three validator parties, while only  two are enough to sign any transaction in the Binance Chain, confirm token transfer on the Ethereum Side, or vote for state changes.
-
-An ERC20 Token is being deployed automatically on the Ethereum side of the bridge. All minted tokens are initially owned by the address associated with `DEPLOY_PRIVATE_KEY`.
+This demo, at the beginning, consists of three validator parties, while only two are enough to sign any transaction in the Binance Chain, confirm token transfer on the Ethereum Side, or vote for state changes.
 
 BEP2 Token is used on the Binance Chain side.
 
@@ -57,7 +55,7 @@ All parts of this demo are docker containers.
       ```
     * (1.8) Get the BEP2 token ID in `denom` field (in this example it is `ETB0819-863`).
       ```
-      ./tbnbcli account tbnb1ack8qtpd5mm5wrjw0ajg8zpdnplw4qzeg5uuza \
+      ./tbnbcli account <address of the first account> \
         --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
       ```
     * (1.9) Clone the repo and initialize git submodules:
@@ -68,12 +66,40 @@ All parts of this demo are docker containers.
       ```
       docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
       ```
-2. Run test environment. (home and side ganache-cli blockchains, contracts deployment)
-```./demo/start-environment.sh```
-3. Run three validators in separate terminal sessions.\
-```N=1 ./demo/validator-demo.sh```\
-```N=2 ./demo/validator-demo.sh```\
-```N=3 ./demo/validator-demo.sh```
+2. Run test environment
+    * (2.1) Modify `src/deploy/deploy-test/.env` and specify the amount of tokens to mint in the parameter `TOKEN_INITIAL_MINT`.
+    * (2.2) Run testnets and deploy contracts
+      ```
+      ./demo/start-environment.sh
+      ```
+      This command will also mint tokens, the owner of tokens is the address that corresponds to the private key specified in `PRIVATE_KEY_DEV` of `src/deploy/deploy-test/.env`.
+3. Run validators nodes:
+    * (3.1) Modify the parameter `FOREIGN_ASSET` in `demo/validator1/.env`, `demo/validator2/.env` and `demo/validator3/.env` to specify the identificator of the token (step 1.8) that the oracle will watch.
+    * (3.2) Run three validators in separate terminal sessions.
+      ```
+      N=1 ./demo/validator-demo.sh
+      N=2 ./demo/validator-demo.sh
+      N=3 ./demo/validator-demo.sh
+      ```
+      Wait for when the line like the following appears:
+      ```
+      keygen_1 | Generated multisig account in binance chain: tbnb1mutgnx9n9devmrjh3d0wz332fl8ymgel6tydx6
+      ```
+      The line contains the address of the bridge address in the Bincance Chain.
+4. Initialize the state of the bridge account in the Binance Chain
+    * (4.1) Fill the balance Fund with BNB coins as so the account will be able to make transactions:
+      ```
+      ./tbnbcli send --from test_account1 --to <address of the bridge account> \ 
+        --amount 1000000000:BNB --chain-id=Binance-Chain-Nile \
+        --node=data-seed-pre-2-s1.binance.org:80 --memo "initialization"
+      ```    
+    * (4.2) Fund with BNB coins as so the account will be able to make transactions:
+      ```
+      ./tbnbcli send --from test_account1 --to <address of the bridge account> \ 
+        --amount 1000000000:BNB --chain-id=Binance-Chain-Nile \
+        --node=data-seed-pre-2-s1.binance.org:80 --memo "initialization"
+      ```
+
 
 #### Interacting with validators, sending votes, retrieving bridge information
 * For each validator, a specific port is mapped outside of the docker 
