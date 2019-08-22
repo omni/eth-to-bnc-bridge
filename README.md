@@ -42,16 +42,23 @@ All parts of this demo are docker containers.
     * (1.5) Register on the Binance site and fund the accounts from the [testnet faucet](https://www.binance.com/en/dex/testnet/address).
     * (1.6) Re-arrange funds on the accounts as so the first account will have 550 BNB and others 10-20 BNBs to make transactions.
       ```
-      ./tbnbcli send --from test_account2 --to <address of the first account> --amount 18500000000:BNB --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --memo "Test transfer"
-      ./tbnbcli send --from test_account3 --to <address of the first account> --amount 18500000000:BNB --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --memo "Test transfer"
+      ./tbnbcli send --from test_account2 --to <address of the first account> \ 
+        --amount 18500000000:BNB --chain-id=Binance-Chain-Nile \
+        --node=data-seed-pre-2-s1.binance.org:80 --memo "donate"
+      ./tbnbcli send --from test_account3 --to <address of the first account> \
+        --amount 18500000000:BNB --chain-id=Binance-Chain-Nile 
+        --node=data-seed-pre-2-s1.binance.org:80 --memo "donate"
       ```
-    * (1.7) Issue the BEP2 token from the first account
+    * (1.7) Issue the BEP2 token from the first account. `3141500000000000` corresponds to `31415000.0` tokens.
       ```
-      ./tbnbcli token issue --token-name "ERC20toBEP2Bridge" --total-supply 3141500000000000 --symbol ETB0819 --from test1 --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
+      ./tbnbcli token issue --token-name "ERC20toBEP2Bridge" --total-supply 3141500000000000 \
+        --symbol ETB0819 --mintable --from test_account1 --chain-id=Binance-Chain-Nile \
+        --node=data-seed-pre-2-s1.binance.org:80 --trust-node
       ```
-    * (1.8) Get the BEP2 token ID in `denom` field.
+    * (1.8) Get the BEP2 token ID in `denom` field (in this example it is `ETB0819-863`).
       ```
-      ./tbnbcli account tbnb1ack8qtpd5mm5wrjw0ajg8zpdnplw4qzeg5uuza --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
+      ./tbnbcli account tbnb1ack8qtpd5mm5wrjw0ajg8zpdnplw4qzeg5uuza \
+        --chain-id=Binance-Chain-Nile --node=data-seed-pre-2-s1.binance.org:80 --trust-node
       ```
     * (1.9) Clone the repo and initialize git submodules:
       ```
