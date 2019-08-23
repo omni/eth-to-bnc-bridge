@@ -131,7 +131,28 @@ The public Binance Chain testnet will keep a BEP2 token.
         --node=data-seed-pre-2-s1.binance.org:80 --memo "any note"
       ```
     * Check the balances of the test account on both sides of the bridge to see that the funds were transferred properly. 
-        
+
+### Finish demo
+
+1. Stop all validator instances by pressing `^C` in the terminal.
+2. Stop the local testnets:
+   ```
+   docker kill ganache_home
+   docker kill ganache_side
+   ```
+3. Remove virtual networks:
+   ```
+   docker network rm blockchain_home
+   docker network rm blockchain_side
+   docker network rm validator1_test_network
+   docker network rm validator2_test_network
+   docker network rm validator3_test_network
+   ```
+4. Remove testnets and validators data:
+   ```
+   ./demo/clean.sh
+   ```
+
 #### Testing tools for both sides of the bridge
 
 In these tools, `run.sh` file simply builds and runs a docker container for interacting with test blockchains. Every tool contains the file `.env` where parameters (RPC urls and private keys) are kept.
