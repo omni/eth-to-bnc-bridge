@@ -6,6 +6,9 @@ const bech32 = require('bech32')
 const axios = require('axios')
 const BN = require('bignumber.js')
 
+const encode = require('./encode')
+const decode = require('./decode')
+
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY, HOME_CHAIN_ID,
   SIDE_CHAIN_ID, HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
@@ -91,9 +94,12 @@ async function get (req, res) {
 
   const data = await sharedDb.methods.getData(from, sideWeb3.utils.sha3(uuid), key).call()
 
-  const result = homeWeb3.utils.hexToUtf8(data)
-  if (result.length)
-    res.send(Ok({ key: req.body.key, value: result }))
+  if (data.length > 2) {
+    console.log(data)
+    const decoded = decode(uuid[0] === 'k', round, data)
+    console.log(decoded)
+    res.send(Ok({ key: req.body.key, value: decoded }))
+  }
   else {
     setTimeout(() => res.send(Err(null)), 1000)
   }
@@ -108,7 +114,11 @@ async function set (req, res) {
   const to = Number(req.body.key.fourth)
   const key = homeWeb3.utils.sha3(`${round}_${to}`)
 
-  const query = sharedDb.methods.setData(sideWeb3.utils.sha3(uuid), key, sideWeb3.utils.utf8ToHex(req.body.value))
+  console.log(req.body.value)
+  const encoded = encode(uuid[0] === 'k', round, req.body.value)
+  console.log(encoded.toString('hex'))
+
+  const query = sharedDb.methods.setData(sideWeb3.utils.sha3(uuid), key, encoded)
   await sideSendQuery(query)
 
   res.send(Ok(null))
@@ -299,7 +309,7 @@ async function voteRemoveValidator (req, res) {
 
 async function info (req, res) {
   console.log('Info start')
-  const [x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status] = await Promise.all([
+  const [ x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status ] = await Promise.all([
     bridge.methods.getX().call().then(x => new BN(x).toString(16)),
     bridge.methods.getY().call().then(x => new BN(x).toString(16)),
     bridge.methods.epoch().call().then(x => x.toNumber()),
@@ -335,7 +345,7 @@ async function transfer (req, res) {
   const { hash, to, value } = req.body
   if (homeWeb3.utils.isAddress(to)) {
     console.log(`Calling transfer to ${to}, ${value} tokens`)
-    const query = bridge.methods.transfer(hash, to, '0x'+(new BN(value).toString(16)))
+    const query = bridge.methods.transfer(hash, to, '0x' + (new BN(value).toString(16)))
     await homeSendQuery(query)
   } else {
     // return funds ?

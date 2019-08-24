@@ -6,6 +6,6 @@ COPY package.json /proxy/
 
 RUN npm install
 
-COPY index.js /proxy/
+COPY index.js encode.js decode.js /proxy/
 
 ENTRYPOINT ["node", "index.js"]
