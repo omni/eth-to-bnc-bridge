@@ -34,7 +34,7 @@ async function main () {
       await proxyHttpClient
         .post('/transfer', {
           to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
-          value: new BN(tx.value).integerValue(BN.ROUND_FLOOR),//(new BN(tx.value).multipliedBy(10 ** 8)).toNumber(),
+          value: new BN(tx.value).multipliedBy(10 ** 18).integerValue(),
           hash: `0x${tx.txHash}`
         })
     }

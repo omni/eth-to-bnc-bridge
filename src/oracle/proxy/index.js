@@ -213,6 +213,7 @@ function homeSendQuery (query) {
       chainId: parseInt(HOME_CHAIN_ID)
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
+    console.log(tx)
     const signedTx = await homeWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
 
     return homeWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
@@ -333,8 +334,8 @@ async function transfer (req, res) {
   console.log('Transfer start')
   const { hash, to, value } = req.body
   if (homeWeb3.utils.isAddress(to)) {
-    console.log('Calling transfer')
-    const query = bridge.methods.transfer(hash, to, value)
+    console.log(`Calling transfer to ${to}, ${value} tokens`)
+    const query = bridge.methods.transfer(hash, to, '0x'+(new BN(value).toString(16)))
     await homeSendQuery(query)
   } else {
     // return funds ?

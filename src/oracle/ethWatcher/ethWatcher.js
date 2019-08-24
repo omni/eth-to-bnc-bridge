@@ -172,20 +172,23 @@ async function sendSign (event) {
   })
   const hash = web3Home.utils.sha3(msg)
   const publicKey = utils.recoverPublicKey(hash, { r: tx.r, s: tx.s, v: tx.v })
-  channel.sendToQueue(signQueue.queue, Buffer.from(JSON.stringify({
+  const msgToQueue = JSON.stringify({
     recipient: publicKeyToAddress({
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: event.returnValues.value.toNumber(),
+    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3),
     epoch,
     nonce: foreignNonce[epoch],
     threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(epoch).call()).toNumber()
-  })), {
+  })
+
+  channel.sendToQueue(signQueue.queue, Buffer.from(msgToQueue), {
     persistent: true
   })
   console.log('Sent new sign event')
+  console.log(msgToQueue)
 
   redisTx.incr(`foreignNonce${epoch}`)
   foreignNonce[epoch]++
