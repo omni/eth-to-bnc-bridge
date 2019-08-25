@@ -206,8 +206,11 @@ function sendTx (tx) {
     .catch(err => {
       if (err.response.data.message.includes('Tx already exists in cache'))
         console.log('Tx already exists in cache')
-      else
+      else {
         console.log(err.response)
+        console.log('Something failed, restarting')
+        return new Promise(resolve => setTimeout(() => resolve(sendTx(tx)), 1000))
+      }
     })
 }
 

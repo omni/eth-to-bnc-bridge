@@ -8,8 +8,8 @@ data/
 demo/validator*/db
 demo/validator*/keys
 demo/validator*/queue
-demo/ganache_home
-demo/ganache_side
+demo/ganache_home_db/
+demo/ganache_side_db/
 src/deploy/deploy-home/build/
 src/deploy/deploy-side/build/
 src/deploy/deploy-test/build/

@@ -14,14 +14,14 @@ async function main () {
 
   let to = process.argv[2]
 
-  if (to == "bridge") {
+  if (to === "bridge") {
     to = HOME_BRIDGE_ADDRESS
-  } 
+  }
 
   const amount = parseInt(process.argv[3])
   let coins = process.argv[4]
 
-  if (amount != 0) {
+  if (amount !== 0) {
     console.log(`Transfer from ${sender} to ${to}, ${amount} tokens`)
 
     const query = token.methods.transfer(to, '0x'+(new BN(amount).toString(16)))
