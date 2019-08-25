@@ -5,6 +5,7 @@ function parseBuffer (buffer, base = 10) {
 }
 
 const keygenDecoders = [
+  null,
   // round 1
   function (value) {
     const res = {
@@ -80,11 +81,15 @@ const keygenDecoders = [
   }
 ]
 
+const signDecoders = []
+
 module.exports = function (isKeygen, round, value) {
   value = Buffer.from(value.substr(2), 'hex')
-  if (isKeygen) {
-    return keygenDecoders[parseInt(round[round.length - 1]) - 1](value)
-  }
+  const roundNumber = parseInt(round[round.length - 1])
+  const decoder = (isKeygen ? keygenDecoders : signDecoders)[roundNumber]
+  const decoded = decoder(value)
+  console.log(decoded)
+  return decoded
 }
 
 

@@ -11,6 +11,7 @@ function makeBuffer (value, length, base = 10) {
 }
 
 const keygenEncoders = [
+  null,
   // round 1
   function (value) {
     const buffers = []
@@ -59,13 +60,15 @@ const keygenEncoders = [
   }
 ]
 
+const signEncoders = []
+
 module.exports = function (isKeygen, round, value) {
   const parsedValue = JSON.parse(value)
-  if (isKeygen) {
-    const encoded = keygenEncoders[parseInt(round[round.length - 1]) - 1](parsedValue)
-    console.log(`Raw data: ${value.length} bytes, encoded data: ${encoded.length} bytes`)
-    return encoded
-  }
+  const roundNumber = parseInt(round[round.length - 1])
+  const encoder = (isKeygen ? keygenEncoders : signEncoders)[roundNumber]
+  const encoded = encoder(parsedValue)
+  console.log(`Raw data: ${value.length} bytes, encoded data: ${encoded.length} bytes`)
+  return encoded
 }
 
 
