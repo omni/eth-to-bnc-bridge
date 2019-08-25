@@ -41,7 +41,7 @@ cd ../src/deploy/deploy-test
 echo "Building deploy docker image"
 docker build -t deploy_test . > /dev/null 2>&1
 echo "Deploying"
-docker run --network blockchain_home --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_test --network development --reset > /dev/null 2>&1
+docker run --network blockchain_home --rm --env-file .env deploy_test --network development --reset > /dev/null 2>&1
 
 
 
@@ -52,7 +52,7 @@ cd ../deploy-home
 echo "Building deploy docker image"
 docker build -t deploy_home . > /dev/null 2>&1
 echo "Deploying"
-docker run --network blockchain_home --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_home --network development --reset > /dev/null 2>&1
+docker run --network blockchain_home --rm --env-file .env deploy_home --network development --reset > /dev/null 2>&1
 
 
 
@@ -63,7 +63,7 @@ cd ../deploy-side
 echo "Building deploy docker image"
 docker build -t deploy_side . > /dev/null 2>&1
 echo "Deploying"
-docker run --network blockchain_side --rm --env-file .env -v "$(pwd)/build:/build/build" deploy_side --network development --reset > /dev/null 2>&1
+docker run --network blockchain_side --rm --env-file .env deploy_side --network development --reset > /dev/null 2>&1
 
 
 
