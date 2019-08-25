@@ -10,6 +10,15 @@ RUN npm install truffle-hdwallet-provider
 RUN truffle obtain --solc 0.5.9
 
 COPY truffle-config-build.js /build/truffle-config.js
+
+RUN mkdir temp \
+ && cd temp \
+ && truffle init \
+ && mkdir ../contracts \
+ && cp ./contracts/Migrations.sol ../contracts/Migrations.sol \
+ && cd .. \
+ && rm -rf temp
+
 COPY contracts /build/contracts
 
 RUN truffle compile
