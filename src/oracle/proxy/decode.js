@@ -1,95 +1,230 @@
 const BN = require('bn.js')
 
-function parseBuffer (buffer, base = 10) {
-  return new BN(buffer).toString(base)
+function Tokenizer (_buffer) {
+  const buffer = _buffer
+  let position = 0
+  return {
+    isEmpty: function () {
+      return position === buffer.length
+    },
+    parse: function (length = 32, base = 16) {
+      const res = new BN(buffer.slice(position, position + length)).toString(base)
+      position += length
+      return res
+    },
+    byte: function () {
+      return buffer[position++]
+    }
+  }
 }
 
 const keygenDecoders = [
   null,
   // round 1
-  function (value) {
+  function (tokenizer) {
     const res = {
       e: {
-        n: parseBuffer(value.slice(0, 256))
+        n: tokenizer.parse(256, 10)
       },
-      com: parseBuffer(value.slice(256, 256 + 32), 16),
+      com: tokenizer.parse(),
       correct_key_proof: {
         sigma_vec: []
       }
     }
-    for (let i = 256 + 32; i < value.length; i += 256) {
-      res.correct_key_proof.sigma_vec.push(parseBuffer(value.slice(i, i + 256)))
+    while (!tokenizer.isEmpty()) {
+      res.correct_key_proof.sigma_vec.push(tokenizer.parse(256, 10))
     }
-    return JSON.stringify(res)
+    return res
   },
   // round 2
-  function (value) {
-    const res = {
-      blind_factor: parseBuffer(value.slice(0, 32), 16),
+  function (tokenizer) {
+    return {
+      blind_factor: tokenizer.parse(),
       y_i: {
-        x: parseBuffer(value.slice(32, 64), 16),
-        y: parseBuffer(value.slice(64, 96), 16)
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
       }
     }
-    return JSON.stringify(res)
   },
   // round 3
-  function (value) {
+  function (tokenizer) {
     const res = {
       ciphertext: [],
       tag: []
     }
     for (let i = 0; i < 32; i++) {
-      res.ciphertext.push(value[i])
+      res.ciphertext.push(tokenizer.byte())
     }
-    for (let i = 32; i < 48; i++) {
-      res.tag.push(value[i])
+    for (let i = 0; i < 16; i++) {
+      res.tag.push(tokenizer.byte())
     }
-    return JSON.stringify(res)
+    return res
   },
   // round 4
-  function (value) {
+  function (tokenizer) {
     const res = {
       parameters: {
-        threshold: value[0],
-        share_count: value[1]
+        threshold: tokenizer.byte(),
+        share_count: tokenizer.byte()
       },
       commitments: []
     }
-    for (let i = 2; i < value.length; i += 64) {
+    while (!tokenizer.isEmpty()) {
       res.commitments.push({
-        x: parseBuffer(value.slice(i, i + 32), 16),
-        y: parseBuffer(value.slice(i + 32, i + 64), 16),
+        x: tokenizer.parse(),
+        y: tokenizer.parse(),
       })
     }
-    return JSON.stringify(res)
+    return res
   },
   // round 5
-  function (value) {
-    const res = {
+  function (tokenizer) {
+    return {
       pk: {
-        x: parseBuffer(value.slice(0, 32), 16),
-        y: parseBuffer(value.slice(32, 64), 16)
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
       },
       pk_t_rand_commitment: {
-        x: parseBuffer(value.slice(64, 96), 16),
-        y: parseBuffer(value.slice(96, 128), 16)
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
       },
-      challenge_response: parseBuffer(value.slice(128, 160), 16)
+      challenge_response: tokenizer.parse()
     }
-    return JSON.stringify(res)
   }
 ]
 
-const signDecoders = []
+const signDecoders = [
+  // round 0
+  function (tokenizer) {
+    return tokenizer.byte()
+  },
+  // round 1
+  function (tokenizer) {
+    return [
+      {
+        com: tokenizer.parse()
+      },
+      {
+        c: tokenizer.parse(512)
+      }
+    ]
+  },
+  // round 2
+  function (tokenizer) {
+    const res = []
+    for (let i = 0; i < 2; i++) {
+      res[i] = {
+        c: tokenizer.parse(512),
+        b_proof: {
+          pk: {
+            x: tokenizer.parse(),
+            y: tokenizer.parse(),
+          },
+          pk_t_rand_commitment: {
+            x: tokenizer.parse(),
+            y: tokenizer.parse(),
+          },
+          challenge_response: tokenizer.parse(),
+        },
+        beta_tag_proof: {
+          pk: {
+            x: tokenizer.parse(),
+            y: tokenizer.parse(),
+          },
+          pk_t_rand_commitment: {
+            x: tokenizer.parse(),
+            y: tokenizer.parse(),
+          },
+          challenge_response: tokenizer.parse(),
+        }
+      }
+    }
+    return res
+  },
+  // round 3
+  function (tokenizer) {
+    return tokenizer.parse()
+  },
+  // round 4
+  function (tokenizer) {
+    return {
+      blind_factor: tokenizer.parse(),
+      g_gamma_i: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      }
+    }
+  },
+  // round 5
+  function (tokenizer) {
+    return {
+      com: tokenizer.parse()
+    }
+  },
+  // round 6
+  function (tokenizer) {
+    return [
+      {
+        V_i: {
+          x: tokenizer.parse(),
+          y: tokenizer.parse()
+        },
+        A_i: {
+          x: tokenizer.parse(),
+          y: tokenizer.parse()
+        },
+        B_i: {
+          x: tokenizer.parse(),
+          y: tokenizer.parse()
+        },
+        blind_factor: tokenizer.parse()
+      },
+      {
+        T: {
+          x: tokenizer.parse(),
+          y: tokenizer.parse()
+        },
+        A3: {
+          x: tokenizer.parse(),
+          y: tokenizer.parse()
+        },
+        z1: tokenizer.parse(),
+        z2: tokenizer.parse()
+      }
+    ]
+  },
+  // round 7
+  function (tokenizer) {
+    return {
+      com: tokenizer.parse()
+    }
+  },
+  // round 8
+  function (tokenizer) {
+    return {
+      u_i: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      },
+      t_i: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      },
+      blind_factor: tokenizer.parse()
+    }
+  },
+  // round 9
+  function (tokenizer) {
+    return tokenizer.parse()
+  },
+]
 
 module.exports = function (isKeygen, round, value) {
   value = Buffer.from(value.substr(2), 'hex')
+  const tokenizer = Tokenizer(value)
   const roundNumber = parseInt(round[round.length - 1])
   const decoder = (isKeygen ? keygenDecoders : signDecoders)[roundNumber]
-  const decoded = decoder(value)
+  const decoded = JSON.stringify(decoder(tokenizer))
   console.log(decoded)
   return decoded
 }
-
-
