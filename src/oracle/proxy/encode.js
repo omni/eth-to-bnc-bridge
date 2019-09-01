@@ -141,7 +141,3 @@ module.exports = function (isKeygen, round, value) {
   console.log(`Raw data: ${value.length} bytes, encoded data: ${encoded.length} bytes`)
   return encoded
 }
-
-
-module.exports(true, 'round2', '{"blind_factor":"11223344556677889900", "y_i":{"x":"00112233445566778899", "y":"00112233445566778899"}}')
-
