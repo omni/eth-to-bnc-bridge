@@ -4,6 +4,8 @@ set -e
 
 cd $(dirname "$0")
 
+TARGET_NETWORK=${TARGET_NETWORK:=development}
+
 start_blockchains() {
   echo "Starting side test blockchain"
 
@@ -25,25 +27,37 @@ start_blockchains() {
 }
 
 deploy_all() {
-  echo "Compiling and deploying erc20"
+  cd ../src/deploy
 
-  cd ../src/deploy/deploy-test
+  source .keys
 
-  echo "Building deploy docker image"
-  docker build -t deploy_test . > /dev/null 2>&1
-  echo "Deploying"
-  docker run --network blockchain_home --rm --env-file .env deploy_test --network development --reset > /dev/null 2>&1
+  TOKEN_ADDRESS=$(source ./deploy-home/.env; echo "$TOKEN_ADDRESS")
 
+  if [[ "$TARGET_NETWORK" == "development" ]] || [[ "$TOKEN_ADDRESS" == "0x" ]]; then
+    echo "Compiling and deploying erc20"
 
+    cd ./deploy-test
+
+    echo "Building deploy docker image"
+    docker build -t deploy_test . > /dev/null 2>&1
+    echo "Deploying"
+    TOKEN_ADDRESS=$(docker run --network blockchain_home --rm --env-file .env -e "PRIVATE_KEY=$PRIVATE_KEY_KOVAN" deploy_test --network "$TARGET_NETWORK" 2>&1 \
+      | grep "contract address" \
+      | awk '{print $4}')
+    sed -i 's/TOKEN_ADDRESS=0x$/TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' ../deploy-home/.env
+    cd ..
+  fi
 
   echo "Compiling and deploying home part"
 
-  cd ../deploy-home
+  cd ./deploy-home
 
   echo "Building deploy docker image"
   docker build -t deploy_home . > /dev/null 2>&1
   echo "Deploying"
-  docker run --network blockchain_home --rm --env-file .env deploy_home --network development --reset > /dev/null 2>&1
+  BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm --env-file .env -e "PRIVATE_KEY=$PRIVATE_KEY_KOVAN" deploy_home --network "$TARGET_NETWORK" 2>&1 \
+    | grep "contract address" \
+    | awk '{print $4}')
 
 
 
@@ -54,27 +68,44 @@ deploy_all() {
   echo "Building deploy docker image"
   docker build -t deploy_side . > /dev/null 2>&1
   echo "Deploying"
-  docker run --network blockchain_side --rm --env-file .env deploy_side --network development --reset > /dev/null 2>&1
+  SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm --env-file .env -e "PRIVATE_KEY=$PRIVATE_KEY_SOKOL" deploy_side --network "$TARGET_NETWORK" 2>&1 \
+    | grep "contract address" \
+    | awk '{print $4}')
+
+  echo "Token contract address in $TARGET_NETWORK network is $TOKEN_ADDRESS"
+  echo "Bridge contract address in $TARGET_NETWORK network is $BRIDGE_ADDRESS"
+  echo "Database contract address in $TARGET_NETWORK side network is $SHARED_DB_ADDRESS"
 }
 
+if [[ "$TARGET_NETWORK" == "development" ]]; then
+  if [[ -z "$(ls -A ganache_side_db)" ]] || [[ -z "$(ls -A ganache_home_db)" ]]; then
+    echo "Starting dev blockchain networks and deploying contracts"
+    need_to_deploy=true
+  else
+    echo "Restarting dev blockchain networks"
+  fi
 
-side_db_mount_point="$(pwd)/ganache_side_db"
-if [ ! -d "$side_db_mount_point" ]; then
-  mkdir "$side_db_mount_point"
-fi
+  side_db_mount_point="$(pwd)/ganache_side_db"
+  if [[ ! -d "$side_db_mount_point" ]]; then
+    mkdir "$side_db_mount_point"
+  fi
 
-home_db_mount_point="$(pwd)/ganache_home_db"
-if [ ! -d "$home_db_mount_point" ]; then
-  mkdir "$home_db_mount_point"
-fi
+  home_db_mount_point="$(pwd)/ganache_home_db"
+  if [[ ! -d "$home_db_mount_point" ]]; then
+    mkdir "$home_db_mount_point"
+  fi
 
-if [ -z "$(ls -A ganache_side_db)" ] || [ -z "$(ls -A ganache_home_db)" ]; then
-  echo "Starting new blockchain networks and deploying contracts"
   start_blockchains
-  deploy_all
+
+  if [[ -n "$need_to_deploy" ]]; then
+    deploy_all
+  fi
 else
-  echo "Restarting blockchain networks"
-  start_blockchains
+  echo "Deploying to staging blockchain environment"
+
+  source ../src/deploy/.keys
+
+  deploy_all
 fi
 
 echo "Done"
