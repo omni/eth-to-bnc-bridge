@@ -8,6 +8,7 @@ data/
 demo/validator*/db
 demo/validator*/keys
 demo/validator*/queue
+demo/validator*/.keys
 demo/ganache_home_db/
 demo/ganache_side_db/
 src/deploy/deploy-home/build/

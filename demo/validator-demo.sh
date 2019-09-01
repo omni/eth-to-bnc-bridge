@@ -11,4 +11,7 @@ echo "Starting $NAME"
 
 mkdir -p "$NAME"
 cd "$NAME"
+if [[ -e .keys ]]; then
+    source .keys
+fi
 docker-compose -p "$NAME" -f ../../src/oracle/docker-compose-test.yml up ${DCU_FLAGS}
