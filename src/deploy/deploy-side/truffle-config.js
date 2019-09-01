@@ -10,7 +10,7 @@ module.exports = {
     },
     staging: {
       provider: new PrivateKeyProvider(PRIVATE_KEY, RPC_URL),
-      network_id: '77'
+      network_id: '*'
     }
   },
   compilers: {
