@@ -13,4 +13,5 @@ demo/ganache_side_db/
 src/deploy/deploy-home/build/
 src/deploy/deploy-side/build/
 src/deploy/deploy-test/build/
+src/deploy/.keys
 test.js
