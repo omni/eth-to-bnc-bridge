@@ -9,6 +9,8 @@ const token = new web3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 
 const address = process.argv[2]
 
+web3.eth.getBalance(address).then(x => console.log(x.toString()))
+
 token.methods.balanceOf(address).call()
   .then(x => console.log(x.toString()))
   .catch(() => console.log(0))
