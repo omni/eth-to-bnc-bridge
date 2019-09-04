@@ -5,14 +5,14 @@ const addresses = Object.entries(process.env)
   .map(([ , value ]) => value)
 
 const {
-  THRESHOLD, TOKEN_ADDRESS, TOKEN_ADDRESS_DEV
+  THRESHOLD, HOME_TOKEN_ADDRESS
 } = process.env
 
-module.exports = (deployer, network) => {
+module.exports = deployer => {
   deployer.deploy(
     Bridge,
     THRESHOLD,
     addresses,
-    network === 'development' ? TOKEN_ADDRESS_DEV : TOKEN_ADDRESS
+    HOME_TOKEN_ADDRESS
   )
 }
