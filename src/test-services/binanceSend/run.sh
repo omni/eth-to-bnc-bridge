@@ -9,4 +9,4 @@ TARGET_NETWORK=${TARGET_NETWORK:=development}
 
 docker build -t binance-send . > /dev/null
 
-docker run --rm --env-file ".env.$TARGET_NETWORK" --env-file "../keys.$TARGET_NETWORK" binance-send $@
+docker run --rm --env-file ".env.$TARGET_NETWORK" --env-file "../.keys.$TARGET_NETWORK" binance-send $@

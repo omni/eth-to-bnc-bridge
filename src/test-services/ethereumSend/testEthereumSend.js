@@ -32,9 +32,11 @@ async function main () {
       from: sender,
       to: HOME_TOKEN_ADDRESS,
       nonce: await web3.eth.getTransactionCount(sender),
-      chainId: parseInt(HOME_CHAIN_ID)
+      chainId: HOME_CHAIN_ID
     }
-    tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
+    tx.gas = Math.min(Math.ceil(await query.estimateGas({
+      from: sender
+    }) * 1.5), 6721975)
     let signedTx = await web3.eth.accounts.signTransaction(tx, HOME_PRIVATE_KEY)
 
     let receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction)

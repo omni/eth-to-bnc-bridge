@@ -58,6 +58,8 @@ async function main () {
   homeValidatorNonce = await homeWeb3.eth.getTransactionCount(validatorAddress)
   sideValidatorNonce = await sideWeb3.eth.getTransactionCount(validatorAddress)
 
+  console.log(`My validator address in home and side networks is ${validatorAddress}`)
+
   app.listen(8001, () => {
     console.log('Proxy is listening on port 8001')
   })
@@ -186,7 +188,9 @@ function sideSendQuery (query) {
       nonce: sideValidatorNonce++,
       chainId: await sideWeb3.eth.net.getId()
     }
-    tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
+    tx.gas = Math.min(Math.ceil(await query.estimateGas({
+      from: validatorAddress
+    }) * 1.5), 6721975)
     const signedTx = await sideWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
 
     return sideWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
@@ -222,8 +226,9 @@ function homeSendQuery (query) {
       nonce: homeValidatorNonce++,
       chainId: await homeWeb3.eth.net.getId()
     }
-    tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
-    console.log(tx)
+    tx.gas = Math.min(Math.ceil(await query.estimateGas({
+      from: validatorAddress
+    }) * 1.5), 6721975)
     const signedTx = await homeWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
 
     return homeWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)

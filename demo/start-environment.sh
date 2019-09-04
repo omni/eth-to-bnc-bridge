@@ -9,6 +9,7 @@ cd ..
 TARGET_NETWORK=${TARGET_NETWORK:=development}
 
 DEPLOY_DIR="`pwd`/src/deploy"
+TEST_SERVICES_DIR="`pwd`/src/test-services"
 DEMO_DIR="`pwd`/demo"
 
 SIDE_GANACHE_DB="$DEMO_DIR/ganache_side_db"
@@ -101,9 +102,7 @@ deploy_db() {
 }
 
 deploy_all() {
-  cd "$DEPLOY_DIR"
-
-  TOKEN_ADDRESS=$(source "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK"; echo "$TOKEN_ADDRESS")
+  TOKEN_ADDRESS=$(source "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK"; echo "$HOME_TOKEN_ADDRESS")
 
   if [[ "$TARGET_NETWORK" == "development" ]] || [[ "$TOKEN_ADDRESS" == "0x" ]]; then
     deploy_token
@@ -119,10 +118,15 @@ deploy_all() {
 
   echo "Updating deployed contract addresses in demo validators .env.$TARGET_NETWORK configs"
   for file in "$DEMO_DIR"/validator*/.env."$TARGET_NETWORK"; do
-    sed -i 's/TOKEN_ADDRESS=.*$/TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$file"
-    sed -i 's/BRIDGE_ADDRESS=.*$/BRIDGE_ADDRESS='"$BRIDGE_ADDRESS"'/' "$file"
-    sed -i 's/SHARED_DB_ADDRESS=.*$/SHARED_DB_ADDRESS='"$SHARED_DB_ADDRESS"'/' "$file"
+    sed -i 's/HOME_TOKEN_ADDRESS=.*$/HOME_TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$file"
+    sed -i 's/HOME_BRIDGE_ADDRESS=.*$/HOME_BRIDGE_ADDRESS='"$BRIDGE_ADDRESS"'/' "$file"
+    sed -i 's/SIDE_SHARED_DB_ADDRESS=.*$/SIDE_SHARED_DB_ADDRESS='"$SHARED_DB_ADDRESS"'/' "$file"
   done
+
+  echo "Updating deployed contract addresses in test-services .env.$TARGET_NETWORK configs"
+  sed -i 's/HOME_TOKEN_ADDRESS=.*$/HOME_TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$TEST_SERVICES_DIR/ethereumBalance/.env.$TARGET_NETWORK"
+  sed -i 's/HOME_BRIDGE_ADDRESS=.*$/HOME_BRIDGE_ADDRESS='"$BRIDGE_ADDRESS"'/' "$TEST_SERVICES_DIR/ethereumSend/.env.$TARGET_NETWORK"
+  sed -i 's/HOME_TOKEN_ADDRESS=.*$/HOME_TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$TEST_SERVICES_DIR/ethereumSend/.env.$TARGET_NETWORK"
 }
 
 
