@@ -9,7 +9,7 @@ const bech32 = require('bech32')
 const abiBridge = require('./contracts_data/Bridge.json').abi
 const abiToken = require('./contracts_data/IERC20.json').abi
 
-const { HOME_RPC_URL, HOME_CHAIN_ID, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS } = process.env
+const { HOME_RPC_URL, HOME_CHAIN_ID, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
@@ -46,7 +46,7 @@ async function initialize () {
   epoch = events.length ? events[events.length - 1].returnValues.epoch.toNumber() : 0
   console.log(`Current epoch ${epoch}`)
   const epochStart = events.length ? events[events.length - 1].blockNumber : 1
-  const saved = (parseInt(await redis.get('homeBlock')) + 1) || 1
+  const saved = (parseInt(await redis.get('homeBlock')) + 1) || parseInt(HOME_START_BLOCK)
   console.log(epochStart, saved)
   if (epochStart > saved) {
     console.log(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
@@ -168,7 +168,7 @@ async function sendSign (event) {
     to: tx.to,
     value: `0x${new BN(tx.value).toString(16)}`,
     data: tx.input,
-    chainId: parseInt(HOME_CHAIN_ID)
+    chainId: await web3Home.eth.net.getId()
   })
   const hash = web3Home.utils.sha3(msg)
   const publicKey = utils.recoverPublicKey(hash, { r: tx.r, s: tx.s, v: tx.v })

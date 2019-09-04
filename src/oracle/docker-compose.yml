@@ -31,7 +31,7 @@ services:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - keygen-proxy-net
       - rabbit-keygen-net
@@ -46,7 +46,7 @@ services:
       - FOREIGN_URL
       - FOREIGN_ASSET
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     ports:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
@@ -56,7 +56,7 @@ services:
   redis:
     image: redis:5.0.5-alpine
     volumes:
-      - '${PWD}/db:/data'
+      - '${PWD}/${TARGET_NETWORK}/db:/data'
     networks:
       - redis-signer-net
       - redis-keygen-net
@@ -66,7 +66,7 @@ services:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
     volumes:
-      - '${PWD}/queue:/var/lib/rabbitmq/mnesia'
+      - '${PWD}/${TARGET_NETWORK}/queue:/var/lib/rabbitmq/mnesia'
     networks:
       - rabbit-signer-net
       - rabbit-keygen-net
@@ -80,6 +80,7 @@ services:
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
       - HOME_CHAIN_ID
+      - HOME_START_BLOCK
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
     volumes:
       - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
@@ -96,7 +97,7 @@ services:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - rabbit-bncwatcher-net
       - redis-bncwatcher-net

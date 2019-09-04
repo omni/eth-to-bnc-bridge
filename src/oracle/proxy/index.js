@@ -184,7 +184,7 @@ function sideSendQuery (query) {
       from: validatorAddress,
       to: SIDE_SHARED_DB_ADDRESS,
       nonce: sideValidatorNonce++,
-      chainId: parseInt(SIDE_CHAIN_ID)
+      chainId: await sideWeb3.eth.net.getId()
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
     const signedTx = await sideWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
@@ -220,7 +220,7 @@ function homeSendQuery (query) {
       from: validatorAddress,
       to: HOME_BRIDGE_ADDRESS,
       nonce: homeValidatorNonce++,
-      chainId: parseInt(HOME_CHAIN_ID)
+      chainId: await homeWeb3.eth.net.getId()
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas(tx) * 1.5), 6721975)
     console.log(tx)
