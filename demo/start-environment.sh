@@ -41,11 +41,19 @@ deploy_token() {
   docker build -t deploy_test "$DEPLOY_DIR/deploy-test" > /dev/null 2>&1
 
   echo "Deploying"
-  TOKEN_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-test/.env" -e "PRIVATE_KEY=$PRIVATE_KEY_KOVAN" \
+  if [[ "$TARGET_NETWORK" == "development" ]]; then
+    TOKEN_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" \
     deploy_test \
-    --network "$TARGET_NETWORK" 2>&1 \
+    --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
+  else
+    TOKEN_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    deploy_test \
+    --network home 2>&1 \
+    | grep "contract address" \
+    | awk '{print $4}')
+  fi
 }
 
 deploy_bridge() {
@@ -55,11 +63,19 @@ deploy_bridge() {
   docker build -t deploy_home "$DEPLOY_DIR/deploy-home" > /dev/null 2>&1
 
   echo "Deploying"
-  BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-home/.env" -e "PRIVATE_KEY=$PRIVATE_KEY_KOVAN" \
+  if [[ "$TARGET_NETWORK" == "development" ]]; then
+    BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" \
     deploy_home \
-    --network "$TARGET_NETWORK" 2>&1 \
+    --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
+  else
+    BRIDGE_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    deploy_home \
+    --network home 2>&1 \
+    | grep "contract address" \
+    | awk '{print $4}')
+  fi
 }
 
 deploy_db() {
@@ -69,23 +85,29 @@ deploy_db() {
   docker build -t deploy_side "$DEPLOY_DIR/deploy-side" > /dev/null 2>&1
 
   echo "Deploying"
-  SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm --env-file "$DEPLOY_DIR/deploy-side/.env" -e "PRIVATE_KEY=$PRIVATE_KEY_SOKOL" \
+  if [[ "$TARGET_NETWORK" == "development" ]]; then
+    SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" \
     deploy_side \
-    --network "$TARGET_NETWORK" 2>&1 \
+    --network side 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
+  else
+    SHARED_DB_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    deploy_side \
+    --network side 2>&1 \
+    | grep "contract address" \
+    | awk '{print $4}')
+  fi
 }
 
 deploy_all() {
   cd "$DEPLOY_DIR"
 
-  source "$DEPLOY_DIR/.keys"
-
-  TOKEN_ADDRESS=$(source "$DEPLOY_DIR/deploy-home/.env"; echo "$TOKEN_ADDRESS")
+  TOKEN_ADDRESS=$(source "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK"; echo "$TOKEN_ADDRESS")
 
   if [[ "$TARGET_NETWORK" == "development" ]] || [[ "$TOKEN_ADDRESS" == "0x" ]]; then
     deploy_token
-    sed -i 's/TOKEN_ADDRESS=0x$/TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$DEPLOY_DIR/deploy-home/.env"
+    sed -i 's/TOKEN_ADDRESS=0x$/TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK"
   fi
 
   deploy_bridge
