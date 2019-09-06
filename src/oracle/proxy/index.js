@@ -30,6 +30,8 @@ const lock = new AsyncLock()
 
 let homeValidatorNonce
 let sideValidatorNonce
+let homeBlockGasLimit
+let sideBlockGasLimit
 
 const app = express()
 app.use(express.json())
@@ -57,6 +59,9 @@ votesProxyApp.get('/info', info)
 async function main () {
   homeValidatorNonce = await homeWeb3.eth.getTransactionCount(validatorAddress)
   sideValidatorNonce = await sideWeb3.eth.getTransactionCount(validatorAddress)
+
+  homeBlockGasLimit = (await homeWeb3.eth.getBlock("latest", false)).gasLimit
+  sideBlockGasLimit = (await sideWeb3.eth.getBlock("latest", false)).gasLimit
 
   console.log(`My validator address in home and side networks is ${validatorAddress}`)
 
@@ -190,7 +195,7 @@ function sideSendQuery (query) {
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas({
       from: validatorAddress
-    }) * 1.5), 6721975)
+    }) * 1.5), sideBlockGasLimit)
     const signedTx = await sideWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
 
     return sideWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
@@ -204,8 +209,8 @@ function sideSendQuery (query) {
           console.log('Out of gas, retrying')
           return true
         } else {
-          console.log('Home tx failed', e.message)
-          return false
+          console.log('Side tx failed, retrying', e.message)
+          return true
         }
       })
   })
@@ -228,7 +233,7 @@ function homeSendQuery (query) {
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas({
       from: validatorAddress
-    }) * 1.5), 6721975)
+    }) * 1.5), homeBlockGasLimit)
     const signedTx = await homeWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
 
     return homeWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
@@ -242,8 +247,8 @@ function homeSendQuery (query) {
           console.log('Out of gas, retrying')
           return true
         } else {
-          console.log('Home tx failed', e.message)
-          return false
+          console.log('Home tx failed, retrying', e.message)
+          return true
         }
       })
   })

@@ -12,6 +12,7 @@ const sender = web3.eth.accounts.privateKeyToAccount(`0x${HOME_PRIVATE_KEY}`).ad
 
 async function main () {
   const HOME_CHAIN_ID = await web3.eth.net.getId()
+  const blockGasLimit = (await web3.eth.getBlock("latest", false)).gasLimit
 
   let to = process.argv[2]
 
@@ -36,7 +37,7 @@ async function main () {
     }
     tx.gas = Math.min(Math.ceil(await query.estimateGas({
       from: sender
-    }) * 1.5), 6721975)
+    }) * 1.5), blockGasLimit)
     let signedTx = await web3.eth.accounts.signTransaction(tx, HOME_PRIVATE_KEY)
 
     let receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction)
