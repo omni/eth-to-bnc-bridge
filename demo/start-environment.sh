@@ -43,13 +43,13 @@ deploy_token() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    TOKEN_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" \
+    TOKEN_ADDRESS=$(docker run --network blockchain_home --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" \
     deploy_test \
     --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    TOKEN_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    TOKEN_ADDRESS=$(docker run --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-test/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
     deploy_test \
     --network home 2>&1 \
     | grep "contract address" \
@@ -65,13 +65,13 @@ deploy_bridge() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" \
+    BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" \
     deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    BRIDGE_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    BRIDGE_ADDRESS=$(docker run --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-home/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
     deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
@@ -87,13 +87,13 @@ deploy_db() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" \
+    SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" \
     deploy_side \
     --network side 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    SHARED_DB_ADDRESS=$(docker run --rm --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
+    SHARED_DB_ADDRESS=$(docker run --rm -v "$(pwd)/build:/build/build" --env-file "$DEPLOY_DIR/deploy-side/.env.$TARGET_NETWORK" --env-file "$DEPLOY_DIR/.keys.$TARGET_NETWORK" \
     deploy_side \
     --network side 2>&1 \
     | grep "contract address" \
