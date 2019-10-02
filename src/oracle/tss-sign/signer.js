@@ -36,7 +36,12 @@ async function main () {
     const { recipient, value, nonce, epoch, newEpoch, parties, threshold } = data
 
     const keysFile = `/keys/keys${epoch}.store`
-    const { address: from, publicKey } = await getAccountFromFile(keysFile)
+    const { address: from, publicKey } = getAccountFromFile(keysFile)
+    if (from === '') {
+      console.log('Acking message')
+      channel.ack(msg)
+      return
+    }
     const account = await getAccount(from)
 
     console.log('Writing params')
@@ -71,9 +76,9 @@ async function main () {
       }
     } else if (account.sequence <= nonce) {
       const newKeysFile = `/keys/keys${newEpoch}.store`
-      const { address: to } = await getAccountFromFile(newKeysFile)
+      const { address: to } = getAccountFromFile(newKeysFile)
 
-      while (true) {
+      while (to !== '') {
         console.log(`Building corresponding transaction for transferring all funds, nonce ${nonce}, recipient ${to}`)
         const tx = new Transaction({
           from,
@@ -99,8 +104,7 @@ async function main () {
         nextAttempt = null
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
-    }
-    else {
+    } else {
       console.log('Tx has been already sent')
     }
     console.log('Acking message')
@@ -112,7 +116,7 @@ main()
 
 function sign (keysFile, hash, tx, publicKey) {
   return new Promise(resolve => {
-    const cmd = exec.execFile('./sign-entrypoint.sh', [PROXY_URL, keysFile, hash], async (error) => {
+    const cmd = exec.execFile('./sign-entrypoint.sh', [ PROXY_URL, keysFile, hash ], async (error) => {
       if (fs.existsSync('signature')) {
         console.log('Finished signature generation')
         const signature = JSON.parse(fs.readFileSync('signature'))
@@ -158,11 +162,11 @@ function confirmFundsTransfer () {
   exec.execSync(`curl -X POST -H "Content-Type: application/json" "${PROXY_URL}/confirmFundsTransfer"`, { stdio: 'pipe' })
 }
 
-async function getAccountFromFile (file) {
+function getAccountFromFile (file) {
   console.log(`Reading ${file}`)
-  while (!fs.existsSync(file)) {
-    console.log('Waiting for needed epoch key', file)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  if (!fs.existsSync(file)) {
+    console.log('No keys found, skipping')
+    return { address: '' }
   }
   const publicKey = JSON.parse(fs.readFileSync(file))[5]
   return {

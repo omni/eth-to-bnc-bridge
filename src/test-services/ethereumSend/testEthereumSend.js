@@ -26,7 +26,7 @@ async function main () {
   if (amount !== 0) {
     console.log(`Transfer from ${sender} to ${to}, ${amount} tokens`)
 
-    const query = token.methods.transfer(to, '0x'+(new BN(amount).toString(16)))
+    const query = token.methods.transfer(to, '0x'+(new BN(amount).multipliedBy(10 ** 18).toString(16)))
     const encodedABI = query.encodeABI()
     const tx = {
       data: encodedABI,

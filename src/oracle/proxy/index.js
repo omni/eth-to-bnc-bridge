@@ -363,7 +363,7 @@ async function info (req, res) {
     bridge.methods.getNextThreshold().call().then(x => x.toNumber()),
     bridge.methods.getValidators().call(),
     bridge.methods.getNextValidators().call(),
-    token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => x.toNumber()),
+    token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
     bridge.methods.status().call().then(x => x.toNumber()),
   ])
   const foreignAddress = publicKeyToAddress({ x, y })
