@@ -181,6 +181,18 @@ The public Binance Chain testnet will keep a BEP2 token.
         --node=data-seed-pre-2-s1.binance.org:80 --memo "any note"
       ```
     * Check the balances of the test account on both sides of the bridge to see that the funds were transferred properly. 
+7. Bridge supports changing the list of validators and required voting threshold via voting process, and then keys regeneration.
+    * Obtain information about current epoch, current list validators, upcoming epoch information, bridge state via:
+      ```
+      ./curl http://localhost:$PORT/info
+      ```
+      Where `$PORT` is specific port for some validator oracle.
+    * Start voting process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startVoting` url. Bridge 
+      state should be successfully changed to `voting`.
+    * Add / remove validator in next validators list, via sending `$THRESHOLD + 1` requests to 
+      `/vote/addValidator/$ADDRESS` / `/vote/removeValidator/$ADDRESS`.
+    * Start keygen process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startKeygen` url. Bridge 
+      state should be successfully changed to `keygen`, and in some time to `funds_transfer`, and then to `ready`.
 
 ### Finish demo
 
