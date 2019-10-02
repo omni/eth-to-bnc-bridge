@@ -25,8 +25,9 @@ contract Bridge {
     mapping(bytes32 => bool) public votes;
 
     // 0 - ready
-    // 1 - keygen, can be cancelled
-    // 2 - funds transfer, cannot be cancelled
+    // 1 - voting for changing in next epoch, but still ready
+    // 2 - keygen, can be cancelled
+    // 3 - funds transfer, cannot be cancelled
     uint public status;
 
     uint public epoch;
@@ -39,7 +40,7 @@ contract Bridge {
         tokenContract = IERC20(_tokenContract);
 
         epoch = 0;
-        status = 1;
+        status = 2;
         nextEpoch = 1;
 
         states[1] = State(validators, threshold, 0, 0);
@@ -54,13 +55,23 @@ contract Bridge {
         _;
     }
 
+    modifier readyOrVoting {
+        require(status < 2, "Not in ready or voting state");
+        _;
+    }
+
+    modifier voting {
+        require(status == 1, "Not in voting state");
+        _;
+    }
+
     modifier keygen {
-        require(status == 1, "Not in keygen state");
+        require(status == 2, "Not in keygen state");
         _;
     }
 
     modifier fundsTransfer {
-        require(status == 2, "Not in funds transfer state");
+        require(status == 3, "Not in funds transfer state");
         _;
     }
 
@@ -69,7 +80,7 @@ contract Bridge {
         _;
     }
 
-    function transfer(bytes32 hash, address to, uint value) public ready currentValidator {
+    function transfer(bytes32 hash, address to, uint value) public readyOrVoting currentValidator {
         require(!dbTransfer[keccak256(abi.encodePacked(hash, msg.sender, to, value))], "Already voted");
 
         dbTransfer[keccak256(abi.encodePacked(hash, msg.sender, to, value))] = true;
@@ -94,7 +105,7 @@ contract Bridge {
                 emit EpochStart(epoch, x, y);
             }
             else {
-                status = 2;
+                status = 3;
                 emit NewFundsTransfer(epoch, nextEpoch);
             }
         }
@@ -171,7 +182,18 @@ contract Bridge {
         return states[nextEpoch].validators;
     }
 
-    function voteAddValidator(address validator) public ready currentValidator {
+    function startVoting() public readyOrVoting currentValidator {
+        require(!votes[keccak256(abi.encodePacked(uint(6), nextEpoch, msg.sender))], "Already voted");
+
+        votes[keccak256(abi.encodePacked(uint(6), nextEpoch, msg.sender))] = true;
+        if (++votesCount[keccak256(abi.encodePacked(uint(6), nextEpoch))] == getThreshold() + 1) {
+            nextEpoch++;
+            states[nextEpoch].threshold = threshold;
+            states[nextEpoch].validators = validators;
+        }
+    }
+
+    function voteAddValidator(address validator) public voting currentValidator {
         require(getNextPartyId(validator) == 0, "Already a validator");
         require(!votes[keccak256(abi.encodePacked(uint(1), nextEpoch, msg.sender, validator))], "Already voted");
 
@@ -181,7 +203,7 @@ contract Bridge {
         }
     }
 
-    function voteRemoveValidator(address validator) public ready currentValidator {
+    function voteRemoveValidator(address validator) public voting currentValidator {
         require(getNextPartyId(validator) != 0, "Already not a validator");
         require(!votes[keccak256(abi.encodePacked(uint(2), nextEpoch, msg.sender, validator))], "Already voted");
 
@@ -202,7 +224,7 @@ contract Bridge {
         states[nextEpoch].validators.length--;
     }
 
-    function voteChangeThreshold(uint threshold) public ready currentValidator {
+    function voteChangeThreshold(uint threshold) public voting currentValidator {
         require(!votes[keccak256(abi.encodePacked(uint(3), nextEpoch, msg.sender, threshold))], "Already voted");
 
         votes[keccak256(abi.encodePacked(uint(3), nextEpoch, msg.sender, threshold))] = true;
@@ -211,12 +233,12 @@ contract Bridge {
         }
     }
 
-    function voteStartKeygen() public ready currentValidator {
+    function voteStartKeygen() public voting currentValidator {
         require(!votes[keccak256(abi.encodePacked(uint(4), nextEpoch + 1, msg.sender))], "Voted already");
 
         votes[keccak256(abi.encodePacked(uint(4), nextEpoch + 1, msg.sender))] = true;
         if (++votesCount[keccak256(abi.encodePacked(uint(4), nextEpoch + 1))] == getThreshold() + 1) {
-            status = 1;
+            status = 2;
 
             nextEpoch++;
             states[nextEpoch].validators = getValidators();
