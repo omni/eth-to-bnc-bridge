@@ -50,10 +50,12 @@ const votesProxyApp = express()
 votesProxyApp.use(express.json())
 votesProxyApp.use(express.urlencoded({ extended: true }))
 
+votesProxyApp.get('/vote/startVoting', voteStartVoting)
 votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
 votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
+votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
 votesProxyApp.get('/info', info)
 
 async function main () {
@@ -269,6 +271,18 @@ function parseError (message) {
   return result ? result[0] : ''
 }
 
+async function voteStartVoting (req, res) {
+  console.log('Voting for starting new epoch voting process')
+  const query = bridge.methods.voteStartVoting()
+  try {
+    await homeSendQuery(query)
+  } catch (e) {
+    console.log(e)
+  }
+  res.send('Voted')
+  console.log('Voted successfully')
+}
+
 async function voteStartKeygen (req, res) {
   console.log('Voting for starting new epoch keygen')
   const query = bridge.methods.voteStartKeygen()
@@ -305,6 +319,18 @@ async function voteAddValidator (req, res) {
   console.log('Voted successfully')
 }
 
+async function voteChangeThreshold (req, res) {
+  console.log('Voting for changing threshold')
+  const query = bridge.methods.voteChangeThreshold(req.params.theshold)
+  try {
+    await homeSendQuery(query)
+  } catch (e) {
+    console.log(e)
+  }
+  res.send('Voted')
+  console.log('Voted successfully')
+}
+
 async function voteRemoveValidator (req, res) {
   console.log('Voting for removing validator')
   const query = bridge.methods.voteRemoveValidator(req.params.validator)
@@ -315,6 +341,15 @@ async function voteRemoveValidator (req, res) {
   }
   res.send('Voted')
   console.log('Voted successfully')
+}
+
+function decodeStatus(status) {
+  switch (status) {
+    case 0: return 'ready'
+    case 1: return 'voting'
+    case 2: return 'keygen'
+    case 3: return 'funds_transfer'
+  }
 }
 
 async function info (req, res) {
@@ -345,7 +380,7 @@ async function info (req, res) {
     homeBalance,
     foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
     foreignBalanceNative: parseFloat(balances['BNB']) || 0,
-    bridgeStatus: status ? (status === 1 ? 'keygen' : 'funds transfer') : 'ready'
+    bridgeStatus: decodeStatus(status)
   })
   console.log('Info end')
 }

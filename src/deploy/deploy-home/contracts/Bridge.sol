@@ -188,6 +188,7 @@ contract Bridge {
         votes[keccak256(abi.encodePacked(uint(6), nextEpoch, msg.sender))] = true;
         if (++votesCount[keccak256(abi.encodePacked(uint(6), nextEpoch))] == getThreshold() + 1) {
             nextEpoch++;
+            status = 1;
             states[nextEpoch].threshold = threshold;
             states[nextEpoch].validators = validators;
         }
