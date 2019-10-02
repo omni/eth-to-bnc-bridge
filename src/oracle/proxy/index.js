@@ -273,7 +273,7 @@ function parseError (message) {
 
 async function voteStartVoting (req, res) {
   console.log('Voting for starting new epoch voting process')
-  const query = bridge.methods.voteStartVoting()
+  const query = bridge.methods.startVoting()
   try {
     await homeSendQuery(query)
   } catch (e) {

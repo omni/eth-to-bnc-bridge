@@ -189,8 +189,8 @@ contract Bridge {
         if (++votesCount[keccak256(abi.encodePacked(uint(6), nextEpoch))] == getThreshold() + 1) {
             nextEpoch++;
             status = 1;
-            states[nextEpoch].threshold = threshold;
-            states[nextEpoch].validators = validators;
+            states[nextEpoch].threshold = states[epoch].threshold;
+            states[nextEpoch].validators = states[epoch].validators;
         }
     }
 
@@ -241,8 +241,6 @@ contract Bridge {
         if (++votesCount[keccak256(abi.encodePacked(uint(4), nextEpoch + 1))] == getThreshold() + 1) {
             status = 2;
 
-            nextEpoch++;
-            states[nextEpoch].validators = getValidators();
             emit NewEpoch(epoch, nextEpoch);
         }
     }
