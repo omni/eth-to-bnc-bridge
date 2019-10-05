@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const bech32 = require('bech32')
 const axios = require('axios')
 const BN = require('bignumber.js')
+const { utils } = require('ethers')
 
 const encode = require('./encode')
 const decode = require('./decode')
@@ -62,8 +63,8 @@ async function main () {
   homeValidatorNonce = await homeWeb3.eth.getTransactionCount(validatorAddress)
   sideValidatorNonce = await sideWeb3.eth.getTransactionCount(validatorAddress)
 
-  homeBlockGasLimit = (await homeWeb3.eth.getBlock("latest", false)).gasLimit
-  sideBlockGasLimit = (await sideWeb3.eth.getBlock("latest", false)).gasLimit
+  homeBlockGasLimit = (await homeWeb3.eth.getBlock('latest', false)).gasLimit
+  sideBlockGasLimit = (await sideWeb3.eth.getBlock('latest', false)).gasLimit
 
   console.log(`My validator address in home and side networks is ${validatorAddress}`)
 
@@ -108,8 +109,7 @@ async function get (req, res) {
     const decoded = decode(uuid[0] === 'k', round, data)
     console.log(decoded)
     res.send(Ok({ key: req.body.key, value: decoded }))
-  }
-  else {
+  } else {
     setTimeout(() => res.send(Err(null)), 1000)
   }
 
@@ -343,12 +343,16 @@ async function voteRemoveValidator (req, res) {
   console.log('Voted successfully')
 }
 
-function decodeStatus(status) {
+function decodeStatus (status) {
   switch (status) {
-    case 0: return 'ready'
-    case 1: return 'voting'
-    case 2: return 'keygen'
-    case 3: return 'funds_transfer'
+    case 0:
+      return 'ready'
+    case 1:
+      return 'voting'
+    case 2:
+      return 'keygen'
+    case 3:
+      return 'funds_transfer'
   }
 }
 
@@ -364,7 +368,13 @@ async function info (req, res) {
     bridge.methods.getValidators().call(),
     bridge.methods.getNextValidators().call(),
     token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
-    bridge.methods.status().call().then(x => x.toNumber()),
+    bridge.methods.status().call()
+  ])
+  const [ confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen ] = await Promise.all([
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(x => x.toNumber()),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(x => x.toNumber()),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(x => x.toNumber()),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(x => x.toNumber())
   ])
   const foreignAddress = publicKeyToAddress({ x, y })
   const balances = await getForeignBalances(foreignAddress)
@@ -380,7 +390,11 @@ async function info (req, res) {
     homeBalance,
     foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
     foreignBalanceNative: parseFloat(balances['BNB']) || 0,
-    bridgeStatus: decodeStatus(status)
+    bridgeStatus: decodeStatus(status),
+    votesForVoting,
+    votesForKeygen,
+    votesForCancelKeygen,
+    confirmationsForFundsTransfer
   })
   console.log('Info end')
 }
