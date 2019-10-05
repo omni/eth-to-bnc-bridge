@@ -370,11 +370,18 @@ async function info (req, res) {
     token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
     bridge.methods.status().call()
   ])
+  const boundX = x => {
+    try {
+      return x.toNumber()
+    } catch (e) {
+      return -1
+    }
+  }
   const [ confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen ] = await Promise.all([
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(x => x.toNumber()),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(x => x.toNumber()),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(x => x.toNumber()),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(x => x.toNumber())
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(boundX),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(boundX),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(boundX),
+    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(boundX)
   ])
   const foreignAddress = publicKeyToAddress({ x, y })
   const balances = await getForeignBalances(foreignAddress)
