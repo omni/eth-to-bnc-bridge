@@ -321,7 +321,7 @@ async function voteAddValidator (req, res) {
 
 async function voteChangeThreshold (req, res) {
   console.log('Voting for changing threshold')
-  const query = bridge.methods.voteChangeThreshold(req.params.theshold)
+  const query = bridge.methods.voteChangeThreshold(req.params.threshold)
   try {
     await homeSendQuery(query)
   } catch (e) {
