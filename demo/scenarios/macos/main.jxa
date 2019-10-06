@@ -1,0 +1,73 @@
+ObjC.import('stdlib')
+
+const terminal = Application('Terminal')
+const windows = terminal.windows()
+
+const wins = []
+
+function closeOldWindows() {
+	for (let i in windows) {
+		if (windows[i].name().includes("Validator")) {
+			windows[i].close()
+		}
+	}
+}
+
+function openNewWindows() {
+	for (let i = 0; i < 3; i++) {
+		// open new terminal
+		const tab = terminal.doScript()
+		// get opened window
+		const winId = terminal.windows[0].id()
+		wins[i] = terminal.windows.byId(winId)
+		tab.customTitle = `Validator ${i + 1}`
+		wins[i].bounds = {x: 560 * i, y: 0, width: 560, height: 1080}
+	}
+	terminal.activate()
+	delay(0.5)
+}
+
+function exec(n, script) {
+	terminal.doScript(script, {in: wins[n - 1]})
+}
+
+function wait(n) {
+	while (wins[n - 1].selectedTab().busy()) {
+		delay(0.3)
+	}
+}
+
+function waitAll () {
+	wait(1)
+	wait(2)
+	wait(3)
+}
+
+function run() {
+	closeOldWindows()
+
+	openNewWindows()
+
+	const cwd = $.getenv('PWD')
+
+	exec(1, `cd "${cwd}"`)
+	exec(2, `cd "${cwd}"`)
+	exec(3, `cd "${cwd}"`)
+	waitAll()
+
+	exec(1, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
+	wait(1)
+	exec(1, `./demo/clean.sh`)
+	wait(1)
+	exec(1, `./demo/start-environment.sh`)
+	wait(1)
+
+	exec(1, `clear`)
+	exec(2, `clear`)
+	exec(3, `clear`)
+	waitAll()
+
+	exec(1, `N=1 ./demo/validator-demo.sh`)
+	exec(2, `N=2 ./demo/validator-demo.sh`)
+	exec(3, `N=3 ./demo/validator-demo.sh`)
+}
