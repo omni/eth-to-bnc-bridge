@@ -2,7 +2,9 @@ version: '3.7'
 services:
   proxy:
     image: blockchain-proxy
-    build: ./proxy
+    build:
+      dockerfile: proxy/Dockerfile
+      context: .
     environment:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
@@ -26,7 +28,9 @@ services:
       - bncwatcher-proxy-net
   keygen:
     image: keygen-client
-    build: ./tss-keygen
+    build:
+      dockerfile: tss-keygen/Dockerfile
+      context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
@@ -38,7 +42,9 @@ services:
       - redis-keygen-net
   signer:
     image: sign-client
-    build: ./tss-sign
+    build:
+      dockerfile: tss-sign/Dockerfile
+      context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
@@ -75,7 +81,9 @@ services:
       - rabbit-ethwatcher-net
       - rabbit-bncwatcher-net
   eth-watcher:
-    build: ethWatcher
+    build:
+      dockerfile: ethWatcher/Dockerfile
+      context: .
     image: eth-watcher
     environment:
       - HOME_RPC_URL
@@ -91,7 +99,9 @@ services:
       - rabbit-ethwatcher-net
       - redis-ethwatcher-net
   bnc-watcher:
-    build: bncWatcher
+    build:
+      dockerfile: bncWatcher
+      context: .
     image: bnc-watcher
     environment:
       - FOREIGN_URL
