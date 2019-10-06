@@ -137,7 +137,5 @@ module.exports = function (isKeygen, round, value) {
       break
     buffers.push(next.value)
   }
-  const encoded = Buffer.concat(buffers)
-  console.log(`Raw data: ${value.length} bytes, encoded data: ${encoded.length} bytes`)
-  return encoded
+  return Buffer.concat(buffers)
 }

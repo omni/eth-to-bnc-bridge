@@ -4,14 +4,16 @@ const crypto = require('crypto')
 const bech32 = require('bech32')
 const amqp = require('amqplib')
 
+const logger = require('./logger')
+
 const { RABBITMQ_URL, PROXY_URL } = process.env
 
 let currentKeygenEpoch = null
 
 async function main () {
-  console.log('Connecting to RabbitMQ server')
+  logger.info('Connecting to RabbitMQ server')
   const connection = await connectRabbit(RABBITMQ_URL)
-  console.log('Connecting to epoch events queue')
+  logger.info('Connecting to epoch events queue')
   const channel = await connection.createChannel()
   const keygenQueue = await channel.assertQueue('keygenQueue')
   const cancelKeygenQueue = await channel.assertQueue('cancelKeygenQueue')
@@ -19,39 +21,39 @@ async function main () {
   channel.prefetch(1)
   channel.consume(keygenQueue.queue, msg => {
     const { epoch, parties, threshold } = JSON.parse(msg.content)
-    console.log(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
+    logger.info(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
 
     const keysFile = `/keys/keys${epoch}.store`
 
-    console.log('Running ./keygen-entrypoint.sh')
+    logger.info('Running ./keygen-entrypoint.sh')
     currentKeygenEpoch = epoch
 
-    console.log('Writing params')
+    logger.debug('Writing params')
     fs.writeFileSync('./params', JSON.stringify({ parties: parties.toString(), threshold: threshold.toString() }))
     const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
       currentKeygenEpoch = null
       if (fs.existsSync(keysFile)) {
-        console.log(`Finished keygen for epoch ${epoch}`)
+        logger.info(`Finished keygen for epoch ${epoch}`)
         const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
-        console.log(`Generated multisig account in binance chain: ${publicKeyToAddress(publicKey)}`)
+        logger.warn(`Generated multisig account in binance chain: ${publicKeyToAddress(publicKey)}`)
 
-        console.log('Sending keys confirmation')
+        logger.info('Sending keys confirmation')
         await confirmKeygen(keysFile)
       } else {
-        console.log(`Keygen for epoch ${epoch} failed`)
+        logger.warn(`Keygen for epoch ${epoch} failed`)
       }
-      console.log('Ack for keygen message')
+      logger.debug('Ack for keygen message')
       channel.ack(msg)
     })
-    cmd.stdout.on('data', data => console.log(data.toString()))
-    cmd.stderr.on('data', data => console.error(data.toString()))
+    cmd.stdout.on('data', data => logger.debug(data.toString()))
+    cmd.stderr.on('data', data => logger.debug(data.toString()))
   })
 
   channel.consume(cancelKeygenQueue.queue, async msg => {
     const { epoch } = JSON.parse(msg.content)
-    console.log(`Consumed new cancel event for epoch ${epoch} keygen`)
+    logger.info(`Consumed new cancel event for epoch ${epoch} keygen`)
     if (currentKeygenEpoch === epoch) {
-      console.log('Cancelling current keygen')
+      logger.info('Cancelling current keygen')
       exec.execSync('pkill gg18_keygen || true')
     }
     channel.ack(msg)
@@ -62,7 +64,7 @@ main()
 
 async function connectRabbit (url) {
   return amqp.connect(url).catch(() => {
-    console.log('Failed to connect, reconnecting')
+    logger.debug('Failed to connect, reconnecting')
     return new Promise(resolve =>
       setTimeout(() => resolve(connectRabbit(url)), 1000)
     )

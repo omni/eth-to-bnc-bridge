@@ -9,6 +9,7 @@ const { utils } = require('ethers')
 
 const encode = require('./encode')
 const decode = require('./decode')
+const logger = require('./logger')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY, HOME_CHAIN_ID,
@@ -66,14 +67,14 @@ async function main () {
   homeBlockGasLimit = (await homeWeb3.eth.getBlock('latest', false)).gasLimit
   sideBlockGasLimit = (await sideWeb3.eth.getBlock('latest', false)).gasLimit
 
-  console.log(`My validator address in home and side networks is ${validatorAddress}`)
+  logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
 
   app.listen(8001, () => {
-    console.log('Proxy is listening on port 8001')
+    logger.debug('Proxy is listening on port 8001')
   })
 
   votesProxyApp.listen(8002, () => {
-    console.log('Votes proxy is listening on port 8001')
+    logger.debug('Votes proxy is listening on port 8001')
   })
 }
 
@@ -88,8 +89,7 @@ function Err (data) {
 }
 
 async function get (req, res) {
-  console.log('Get call')
-  console.log(req.body.key)
+  logger.debug('Get call, %o', req.body.key)
   const round = req.body.key.second
   const uuid = req.body.key.third
   let from
@@ -105,58 +105,59 @@ async function get (req, res) {
   const data = await sharedDb.methods.getData(from, sideWeb3.utils.sha3(uuid), key).call()
 
   if (data.length > 2) {
-    console.log(data)
+    logger.trace(`Received encoded data: ${data}`)
     const decoded = decode(uuid[0] === 'k', round, data)
-    console.log(decoded)
+    logger.trace('Decoded data: %o', decoded)
     res.send(Ok({ key: req.body.key, value: decoded }))
   } else {
     setTimeout(() => res.send(Err(null)), 1000)
   }
 
-  console.log('Get end')
+  logger.debug('Get end')
 }
 
 async function set (req, res) {
-  console.log('Set call')
+  logger.debug('Set call')
   const round = req.body.key.second
   const uuid = req.body.key.third
   const to = Number(req.body.key.fourth)
   const key = homeWeb3.utils.sha3(`${round}_${to}`)
 
-  console.log(req.body.value)
+  logger.trace('Received data: %o', req.body.value)
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
-  console.log(encoded.toString('hex'))
-
+  logger.trace(`Encoded data: ${encoded.toString('hex')}`)
+  logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
   const query = sharedDb.methods.setData(sideWeb3.utils.sha3(uuid), key, encoded)
   await sideSendQuery(query)
 
   res.send(Ok(null))
-  console.log('Set end')
+  logger.debug('Set end')
 }
 
 async function signupKeygen (req, res) {
-  console.log('SignupKeygen call')
+  logger.debug('SignupKeygen call')
   const epoch = (await bridge.methods.nextEpoch().call()).toNumber()
   const partyId = (await bridge.methods.getNextPartyId(validatorAddress).call()).toNumber()
 
   if (partyId === 0) {
     res.send(Err({ message: 'Not a validator' }))
+    logger.debug('Not a validator')
   } else {
     res.send(Ok({ uuid: `k${epoch}`, number: partyId }))
-    console.log('SignupKeygen end')
+    logger.debug('SignupKeygen end')
   }
 }
 
 async function signupSign (req, res) {
-  console.log('SignupSign call')
+  logger.debug('SignupSign call')
   const hash = sideWeb3.utils.sha3(`0x${req.body.third}`)
   const query = sharedDb.methods.signupSign(hash)
   const receipt = await sideSendQuery(query)
 
   // Already have signup
   if (receipt === false) {
-    console.log('Already have signup')
     res.send(Ok({ uuid: hash, number: 0 }))
+    logger.debug('Already have signup')
     return
   }
 
@@ -164,29 +165,29 @@ async function signupSign (req, res) {
   const id = (await sharedDb.methods.getSignupNumber(hash, validators, validatorAddress).call()).toNumber()
 
   res.send(Ok({ uuid: hash, number: id }))
-  console.log('SignupSign end')
+  logger.debug('SignupSign end')
 }
 
 async function confirmKeygen (req, res) {
-  console.log('Confirm keygen call')
+  logger.debug('Confirm keygen call')
   const { x, y } = req.body[5]
   const query = bridge.methods.confirmKeygen(`0x${x}`, `0x${y}`)
   await homeSendQuery(query)
   res.send()
-  console.log('Confirm keygen end')
+  logger.debug('Confirm keygen end')
 }
 
 async function confirmFundsTransfer (req, res) {
-  console.log('Confirm funds transfer call')
+  logger.debug('Confirm funds transfer call')
   const query = bridge.methods.confirmFundsTransfer()
   await homeSendQuery(query)
   res.send()
-  console.log('Confirm funds transfer end')
+  logger.debug('Confirm funds transfer end')
 }
 
 function sideSendQuery (query) {
   return lock.acquire('side', async () => {
-    console.log('Sending query')
+    logger.debug('Sending query')
     const encodedABI = query.encodeABI()
     const tx = {
       data: encodedABI,
@@ -205,13 +206,13 @@ function sideSendQuery (query) {
         const error = parseError(e.message)
         const reason = parseReason(e.message)
         if (error === 'revert' && reason.length) {
-          console.log(reason)
+          logger.debug(reason)
           return false
         } else if (error === 'out of gas') {
-          console.log('Out of gas, retrying')
+          logger.debug('Out of gas, retrying')
           return true
         } else {
-          console.log('Side tx failed, retrying', e.message)
+          logger.debug('Side tx failed, retrying, %o', e.message)
           return true
         }
       })
@@ -219,12 +220,13 @@ function sideSendQuery (query) {
     .then(result => {
       if (result === true)
         return sideSendQuery(query)
-      return result
+      return result !== false
     })
 }
 
 function homeSendQuery (query) {
   return lock.acquire('home', async () => {
+    logger.debug('Sending query')
     const encodedABI = query.encodeABI()
     const tx = {
       data: encodedABI,
@@ -243,13 +245,13 @@ function homeSendQuery (query) {
         const error = parseError(e.message)
         const reason = parseReason(e.message)
         if (error === 'revert' && reason.length) {
-          console.log(reason)
+          logger.debug(reason)
           return false
         } else if (error === 'out of gas') {
-          console.log('Out of gas, retrying')
+          logger.debug('Out of gas, retrying')
           return true
         } else {
-          console.log('Home tx failed, retrying', e.message)
+          logger.debug('Home tx failed, retrying, %o', e.message)
           return true
         }
       })
@@ -257,7 +259,7 @@ function homeSendQuery (query) {
     .then(result => {
       if (result === true)
         return homeSendQuery(query)
-      return result
+      return result !== false
     })
 }
 
@@ -271,76 +273,54 @@ function parseError (message) {
   return result ? result[0] : ''
 }
 
-async function voteStartVoting (req, res) {
-  console.log('Voting for starting new epoch voting process')
-  const query = bridge.methods.startVoting()
+async function sendVote(query, req, res) {
   try {
-    await homeSendQuery(query)
+    if (await homeSendQuery(query)) {
+      res.send('Voted\n')
+      logger.info('Voted successfully')
+    } else {
+      res.send('Failed\n')
+      logger.info('Failed to vote')
+    }
   } catch (e) {
-    console.log(e)
+    logger.debug(e)
   }
-  res.send('Voted')
-  console.log('Voted successfully')
+}
+
+async function voteStartVoting (req, res) {
+  logger.info('Voting for starting new epoch voting process')
+  const query = bridge.methods.startVoting()
+  sendVote(query, req, res)
 }
 
 async function voteStartKeygen (req, res) {
-  console.log('Voting for starting new epoch keygen')
+  logger.info('Voting for starting new epoch keygen')
   const query = bridge.methods.voteStartKeygen()
-  try {
-    await homeSendQuery(query)
-  } catch (e) {
-    console.log(e)
-  }
-  res.send('Voted')
-  console.log('Voted successfully')
+  sendVote(query, req, res)
 }
 
 async function voteCancelKeygen (req, res) {
-  console.log('Voting for cancelling new epoch keygen')
+  logger.info('Voting for cancelling new epoch keygen')
   const query = bridge.methods.voteCancelKeygen()
-  try {
-    await homeSendQuery(query)
-  } catch (e) {
-    console.log(e)
-  }
-  res.send('Voted')
-  console.log('Voted successfully')
+  sendVote(query, req, res)
 }
 
 async function voteAddValidator (req, res) {
-  console.log('Voting for adding new validator')
+  logger.info('Voting for adding new validator')
   const query = bridge.methods.voteAddValidator(req.params.validator)
-  try {
-    await homeSendQuery(query)
-  } catch (e) {
-    console.log(e)
-  }
-  res.send('Voted')
-  console.log('Voted successfully')
+  sendVote(query, req, res)
 }
 
 async function voteChangeThreshold (req, res) {
-  console.log('Voting for changing threshold')
+  logger.info('Voting for changing threshold')
   const query = bridge.methods.voteChangeThreshold(req.params.threshold)
-  try {
-    await homeSendQuery(query)
-  } catch (e) {
-    console.log(e)
-  }
-  res.send('Voted')
-  console.log('Voted successfully')
+  sendVote(query, req, res)
 }
 
 async function voteRemoveValidator (req, res) {
-  console.log('Voting for removing validator')
+  logger.info('Voting for removing validator')
   const query = bridge.methods.voteRemoveValidator(req.params.validator)
-  try {
-    await homeSendQuery(query)
-  } catch (e) {
-    console.log(e)
-  }
-  res.send('Voted')
-  console.log('Voted successfully')
+  sendVote(query, req, res)
 }
 
 function decodeStatus (status) {
@@ -357,7 +337,7 @@ function decodeStatus (status) {
 }
 
 async function info (req, res) {
-  console.log('Info start')
+  logger.debug('Info start')
   const [ x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status ] = await Promise.all([
     bridge.methods.getX().call().then(x => new BN(x).toString(16)),
     bridge.methods.getY().call().then(x => new BN(x).toString(16)),
@@ -403,21 +383,21 @@ async function info (req, res) {
     votesForCancelKeygen,
     confirmationsForFundsTransfer
   })
-  console.log('Info end')
+  logger.debug('Info end')
 }
 
 async function transfer (req, res) {
-  console.log('Transfer start')
+  logger.info('Transfer start')
   const { hash, to, value } = req.body
   if (homeWeb3.utils.isAddress(to)) {
-    console.log(`Calling transfer to ${to}, ${value} tokens`)
+    logger.info(`Calling transfer to ${to}, ${value} tokens`)
     const query = bridge.methods.transfer(hash, to, '0x' + (new BN(value).toString(16)))
     await homeSendQuery(query)
   } else {
     // return funds ?
   }
   res.send()
-  console.log('Transfer end')
+  logger.info('Transfer end')
 }
 
 function getForeignBalances (address) {

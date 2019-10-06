@@ -6,6 +6,8 @@ const fs = require('fs')
 const crypto = require('crypto')
 const { computeAddress } = require('ethers').utils
 
+const logger = require('./logger')
+
 const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
 const foreignHttpClient = axios.create({ baseURL: FOREIGN_URL })
@@ -13,7 +15,7 @@ const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
 
 async function initialize () {
   if (await redis.get('foreignTime') === null) {
-    console.log('Set default foreign time')
+    logger.info('Set default foreign time')
     await redis.set('foreignTime', 1562306990672)
   }
 }
@@ -26,7 +28,10 @@ async function main () {
     return
   }
 
-  console.log(`Found ${newTransactions.length} new transactions`)
+  if (newTransactions.length)
+    logger.info(`Found ${newTransactions.length} new transactions`)
+  else
+    logger.debug(`Found 0 new transactions`)
 
   for (const tx of newTransactions.reverse()) {
     if (tx.memo !== 'funding') {
@@ -54,12 +59,12 @@ function getTx(hash) {
 }
 
 async function fetchNewTransactions () {
-  console.log('Fetching new transactions')
+  logger.debug('Fetching new transactions')
   const startTime = parseInt(await redis.get('foreignTime')) + 1
   const address = await getLastForeignAddress()
   if (address === null)
     return null
-  console.log('Sending api transactions request')
+  logger.debug('Sending api transactions request')
   return foreignHttpClient
     .get('/api/v1/transactions', {
       params: {

@@ -2,6 +2,8 @@ const TransactionBnc = require('@binance-chain/javascript-sdk/lib/tx').default
 const { crypto } = require('@binance-chain/javascript-sdk')
 const BN = require('bignumber.js')
 
+const logger = require('./logger')
+
 const { FOREIGN_CHAIN_ID } = process.env
 
 class Transaction {
@@ -69,7 +71,7 @@ class Transaction {
     const n = new BN('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141', 16)
     const s = new BN(signature.s, 16)
     if (s.gt(n.div(2))) {
-      console.log('Normalizing s')
+      logger.debug('Normalizing s')
       signature.s = n.minus(s).toString(16)
     }
     const publicKeyEncoded = Buffer.from('eb5ae98721' + (yLast % 2 ? '03' : '02') + padZeros(publicKey.x, 64), 'hex')

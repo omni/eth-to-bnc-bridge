@@ -6,9 +6,11 @@ const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const express = require('express')
 
+const logger = require('./logger')
+
 const app = express()
 app.get('/restart/:attempt', restart)
-app.listen(8001, () => console.log('Listening on 8001'))
+app.listen(8001, () => logger.debug('Listening on 8001'))
 
 const { RABBITMQ_URL, FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 const Transaction = require('./tx')
@@ -21,9 +23,9 @@ let nextAttempt = null
 let cancelled
 
 async function main () {
-  console.log('Connecting to RabbitMQ server')
+  logger.info('Connecting to RabbitMQ server')
   const connection = await connectRabbit(RABBITMQ_URL)
-  console.log('Connecting to signature events queue')
+  logger.info('Connecting to signature events queue')
   const channel = await connection.createChannel()
   const signQueue = await channel.assertQueue('signQueue')
 
@@ -31,27 +33,26 @@ async function main () {
   channel.consume(signQueue.queue, async msg => {
     const data = JSON.parse(msg.content)
 
-    console.log('Consumed sign event')
-    console.log(data)
+    logger.info('Consumed sign event: %o', data)
     const { recipient, value, nonce, epoch, newEpoch, parties, threshold } = data
 
     const keysFile = `/keys/keys${epoch}.store`
     const { address: from, publicKey } = getAccountFromFile(keysFile)
     if (from === '') {
-      console.log('Acking message')
+      logger.info('No keys found, acking message')
       channel.ack(msg)
       return
     }
     const account = await getAccount(from)
 
-    console.log('Writing params')
+    logger.debug('Writing params')
     fs.writeFileSync('./params', JSON.stringify({ parties: parties.toString(), threshold: threshold.toString() }))
 
     attempt = 1
 
     if (recipient && account.sequence <= nonce) {
       while (true) {
-        console.log(`Building corresponding transfer transaction, nonce ${nonce}, recipient ${recipient}`)
+        logger.info(`Building corresponding transfer transaction, nonce ${nonce}, recipient ${recipient}`)
         const tx = new Transaction({
           from,
           accountNumber: account.account_number,
@@ -63,14 +64,14 @@ async function main () {
         })
 
         const hash = crypto.createHash('sha256').update(tx.getSignBytes()).digest('hex')
-        console.log(`Starting signature generation for transaction hash ${hash}`)
+        logger.info(`Starting signature generation for transaction hash ${hash}`)
         const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
 
         if (done) {
           break
         }
         attempt = nextAttempt ? nextAttempt : attempt + 1
-        console.log(`Sign failed, starting next attempt ${attempt}`)
+        logger.warn(`Sign failed, starting next attempt ${attempt}`)
         nextAttempt = null
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
@@ -79,7 +80,7 @@ async function main () {
       const { address: to } = getAccountFromFile(newKeysFile)
 
       while (to !== '') {
-        console.log(`Building corresponding transaction for transferring all funds, nonce ${nonce}, recipient ${to}`)
+        logger.info(`Building corresponding transaction for transferring all funds, nonce ${nonce}, recipient ${to}`)
         const tx = new Transaction({
           from,
           accountNumber: account.account_number,
@@ -92,7 +93,7 @@ async function main () {
         })
 
         const hash = crypto.createHash('sha256').update(tx.getSignBytes()).digest('hex')
-        console.log(`Starting signature generation for transaction hash ${hash}`)
+        logger.info(`Starting signature generation for transaction hash ${hash}`)
         const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
 
         if (done) {
@@ -100,14 +101,14 @@ async function main () {
           break
         }
         attempt = nextAttempt ? nextAttempt : attempt + 1
-        console.log(`Sign failed, starting next attempt ${attempt}`)
+        logger.warn(`Sign failed, starting next attempt ${attempt}`)
         nextAttempt = null
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
     } else {
-      console.log('Tx has been already sent')
+      logger.debug('Tx has been already sent')
     }
-    console.log('Acking message')
+    logger.info('Acking message')
     channel.ack(msg)
   })
 }
@@ -118,31 +119,31 @@ function sign (keysFile, hash, tx, publicKey) {
   return new Promise(resolve => {
     const cmd = exec.execFile('./sign-entrypoint.sh', [ PROXY_URL, keysFile, hash ], async (error) => {
       if (fs.existsSync('signature')) {
-        console.log('Finished signature generation')
+        logger.info('Finished signature generation')
         const signature = JSON.parse(fs.readFileSync('signature'))
-        console.log(signature)
+        logger.debug('%o', signature)
 
-        console.log('Building signed transaction')
+        logger.info('Building signed transaction')
         const signedTx = tx.addSignature(publicKey, { r: signature[1], s: signature[3] })
 
-        console.log('Sending transaction')
-        console.log(signedTx)
+        logger.info('Sending transaction')
+        logger.debug(signedTx)
         await sendTx(signedTx)
         resolve(true)
       } else if (error === null || error.code === 0) {
         resolve(true)
       } else {
-        console.log('Sign failed')
+        logger.warn('Sign failed')
         resolve(false)
       }
     })
-    cmd.stdout.on('data', data => console.log(data.toString()))
-    cmd.stderr.on('data', data => console.error(data.toString()))
+    cmd.stdout.on('data', data => logger.debug(data.toString()))
+    cmd.stderr.on('data', data => logger.debug(data.toString()))
   })
 }
 
 function restart (req, res) {
-  console.log('Cancelling current sign')
+  logger.info('Cancelling current sign')
   nextAttempt = req.params.attempt
   exec.execSync('pkill gg18_sign || true')
   cancelled = true
@@ -151,7 +152,7 @@ function restart (req, res) {
 
 function connectRabbit (url) {
   return amqp.connect(url).catch(() => {
-    console.log('Failed to connect, reconnecting')
+    logger.debug('Failed to connect, reconnecting')
     return new Promise(resolve =>
       setTimeout(() => resolve(connectRabbit(url)), 1000)
     )
@@ -163,9 +164,9 @@ function confirmFundsTransfer () {
 }
 
 function getAccountFromFile (file) {
-  console.log(`Reading ${file}`)
+  logger.debug(`Reading ${file}`)
   if (!fs.existsSync(file)) {
-    console.log('No keys found, skipping')
+    logger.debug('No keys found, skipping')
     return { address: '' }
   }
   const publicKey = JSON.parse(fs.readFileSync(file))[5]
@@ -177,25 +178,25 @@ function getAccountFromFile (file) {
 
 async function waitForAccountNonce (address, nonce) {
   cancelled = false
-  console.log(`Waiting for account ${address} to have nonce ${nonce}`)
+  logger.info(`Waiting for account ${address} to have nonce ${nonce}`)
   while (!cancelled) {
     const sequence = (await getAccount(address)).sequence
     if (sequence >= nonce)
       break
     await new Promise(resolve => setTimeout(resolve, 1000))
-    console.log('Waiting for needed account nonce')
+    logger.debug('Waiting for needed account nonce')
   }
-  console.log('Account nonce is OK')
+  logger.info('Account nonce is OK')
   return !cancelled
 }
 
 function getAccount (address) {
-  console.log(`Getting account ${address} data`)
+  logger.info(`Getting account ${address} data`)
   return httpClient
     .get(`/api/v1/account/${address}`)
     .then(res => res.data)
     .catch(() => {
-      console.log('Retrying')
+      logger.debug('Retrying')
       return getAccount(address)
     })
 }
@@ -209,10 +210,9 @@ function sendTx (tx) {
     })
     .catch(err => {
       if (err.response.data.message.includes('Tx already exists in cache'))
-        console.log('Tx already exists in cache')
+        logger.debug('Tx already exists in cache')
       else {
-        console.log(err.response)
-        console.log('Something failed, restarting')
+        logger.info('Something failed, restarting: %o', err.response)
         return new Promise(resolve => setTimeout(() => resolve(sendTx(tx)), 1000))
       }
     })

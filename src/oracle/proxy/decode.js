@@ -225,6 +225,5 @@ module.exports = function (isKeygen, round, value) {
   const roundNumber = parseInt(round[round.length - 1])
   const decoder = (isKeygen ? keygenDecoders : signDecoders)[roundNumber]
   const decoded = JSON.stringify(decoder(tokenizer))
-  console.log(decoded)
   return decoded
 }

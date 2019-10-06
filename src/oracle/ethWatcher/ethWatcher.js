@@ -8,8 +8,9 @@ const bech32 = require('bech32')
 
 const abiBridge = require('./contracts_data/Bridge.json').abi
 const abiToken = require('./contracts_data/IERC20.json').abi
+const logger = require('./logger')
 
-const { HOME_RPC_URL, HOME_CHAIN_ID, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
+const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
@@ -26,7 +27,7 @@ let redisTx
 
 async function connectRabbit (url) {
   return amqp.connect(url).catch(() => {
-    console.log('Failed to connect, reconnecting')
+    logger.debug('Failed to connect, reconnecting')
     return new Promise(resolve =>
       setTimeout(() => resolve(connectRabbit(url)), 1000)
     )
@@ -44,12 +45,12 @@ async function initialize () {
     fromBlock: 1
   })
   epoch = events.length ? events[events.length - 1].returnValues.epoch.toNumber() : 0
-  console.log(`Current epoch ${epoch}`)
+  logger.info(`Current epoch ${epoch}`)
   const epochStart = events.length ? events[events.length - 1].blockNumber : 1
   const saved = (parseInt(await redis.get('homeBlock')) + 1) || parseInt(HOME_START_BLOCK)
-  console.log(epochStart, saved)
+  logger.debug(epochStart, saved)
   if (epochStart > saved) {
-    console.log(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
+    logger.info(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
     blockNumber = epochStart
     await redis.multi()
       .set('homeBlock', blockNumber - 1)
@@ -57,16 +58,16 @@ async function initialize () {
       .exec()
     foreignNonce[epoch] = 0
   } else {
-    console.log('Restoring epoch and block number from local db')
+    logger.info('Restoring epoch and block number from local db')
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
 }
 
 async function main () {
-  console.log(`Watching events in block #${blockNumber}`)
+  logger.debug(`Watching events in block #${blockNumber}`)
   if (await web3Home.eth.getBlock(blockNumber) === null) {
-    console.log('No block')
+    logger.debug('No block')
     await new Promise(r => setTimeout(r, 1000))
     return
   }
@@ -91,7 +92,7 @@ async function main () {
         break
       case 'EpochStart':
         epoch = event.returnValues.epoch.toNumber()
-        console.log(`Epoch ${epoch} started`)
+        logger.info(`Epoch ${epoch} started`)
         foreignNonce[epoch] = 0
         break
     }
@@ -129,7 +130,7 @@ async function sendKeygen (event) {
   })), {
     persistent: true
   })
-  console.log('Sent keygen start event')
+  logger.debug('Sent keygen start event')
 }
 
 function sendKeygenCancelation (event) {
@@ -139,7 +140,7 @@ function sendKeygenCancelation (event) {
   })), {
     persistent: true
   })
-  console.log('Sent keygen cancellation event')
+  logger.debug('Sent keygen cancellation event')
 }
 
 async function sendSignFundsTransfer (event) {
@@ -154,7 +155,7 @@ async function sendSignFundsTransfer (event) {
   })), {
     persistent: true
   })
-  console.log('Sent sign funds transfer event')
+  logger.debug('Sent sign funds transfer event')
   foreignNonce[oldEpoch]++
   redisTx.incr(`foreignNonce${oldEpoch}`)
 }
@@ -187,8 +188,7 @@ async function sendSign (event) {
   channel.sendToQueue(signQueue.queue, Buffer.from(msgToQueue), {
     persistent: true
   })
-  console.log('Sent new sign event')
-  console.log(msgToQueue)
+  logger.debug('Sent new sign event: %o', msgToQueue)
 
   redisTx.incr(`foreignNonce${epoch}`)
   foreignNonce[epoch]++
