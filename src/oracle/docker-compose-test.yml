@@ -58,6 +58,8 @@ services:
   rabbitmq:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
+    environment:
+      RABBITMQ_LOGS: 'false'
     volumes:
       - '${PWD}/${TARGET_NETWORK}/queue:/var/lib/rabbitmq/mnesia'
     networks:
