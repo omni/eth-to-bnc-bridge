@@ -182,17 +182,75 @@ The public Binance Chain testnet will keep a BEP2 token.
       ```
     * Check the balances of the test account on both sides of the bridge to see that the funds were transferred properly. 
 7. Bridge supports changing the list of validators and required voting threshold via voting process, and then keys regeneration.
-    * Obtain information about current epoch, current list validators, upcoming epoch information, bridge state via:
+    * (7.0) Obtain information about current epoch, current list validators, upcoming epoch information, bridge state via:
       ```
       ./curl http://localhost:$PORT/info
       ```
       Where `$PORT` is specific port for some validator oracle.
-    * Start voting process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startVoting` url. Bridge 
+      The response object contains lots of useful information about current bridge state.
+      ```json5
+        {
+          // current epoch number, in which bridge is operating
+          "epoch": 2, 
+      
+          // next epoch number, for which votes and keygen operations are applied
+          "nextEpoch": 3,
+      
+          // threshold number for current epoch, 
+          // threshold + 1 votes are required for any changes in next epoch
+          "threshold": 1, 
+      
+          // threshold number for next epoch
+          "nextThreshold": 1,
+      
+          // current bridge addresses in home and foreign networks
+          "homeBridgeAddress": "0x44c158FE850821ae69DaF37AADF5c539e9d0025B",
+          "foreignBridgeAddress": "tbnb19z22khee969yj05dckg9usvmwndkucpyl543xk",
+      
+          // current set of validators
+          "validators": [
+            "0x99Eb3D86663c6Db090eFFdBC20510Ca9f836DCE3",
+            "0x6352e3e6038e05b9da00C84AE851308f9774F883"
+          ],
+      
+          // set of validators for the next epoch
+          "nextValidators": [
+            "0x99Eb3D86663c6Db090eFFdBC20510Ca9f836DCE3",
+            "0x6352e3e6038e05b9da00C84AE851308f9774F883",
+            "0xAa006899B0EC407De930bA8A166DEfe59bBfd3DC"
+          ],
+      
+          // balances of bridge in both networks
+          "homeBalance": 50,
+          "foreignBalanceTokens": 100,
+          "foreignBalanceNative": 0.0994,
+      
+          // current bridge status, can be one of: ready, voting, keygen, funds_transfer
+          "bridgeStatus": "ready",
+      
+          // current votes count for starting voting, starting/cancelling keygen
+          // -1 means that enough confirmations are already collected
+          "votesForVoting": 0,
+          "votesForKeygen": 0,
+          "votesForCancelKeygen": 0,
+      
+          // collected confirmations for changing epoch to nextEpoch
+          // -1 means that enough confirmations are already collected
+          "confirmationsForFundsTransfer": 0
+        }
+      ``` 
+    * (7.1) Start voting process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startVoting` url. Bridge 
       state should be successfully changed to `voting`.
-    * Add / remove validator in next validators list, via sending `$THRESHOLD + 1` requests to 
-      `/vote/addValidator/$ADDRESS` / `/vote/removeValidator/$ADDRESS`.
-    * Start keygen process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startKeygen` url. Bridge 
+    * 7.2 Changing next epoch bridge validators / threshold
+        * (7.2.1) Add / remove validator in next validators list, via sending `$THRESHOLD + 1` requests to 
+          `/vote/addValidator/$ADDRESS` / `/vote/removeValidator/$ADDRESS`.
+        * (7.2.2) Change threshold for the next epoch, via sending `$THRESHOLD + 1` requests to `/vote/changeThreshold/$THRESHOLD`.
+    * (7.3) Start keygen process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startKeygen` url. Bridge 
       state should be successfully changed to `keygen`, and in some time to `funds_transfer`, and then to `ready`.
+    * (7.4) If keygen process at some state was stopped(i. e. one validator turned of his oracle), 
+      it can be cancelled via via sending `$THRESHOLD + 1` requests to `/vote/cancelKeygen` url. After
+      keygen cancellation, bridge state will return to `voting`, and later it can be restarted manually 
+      once again.
 
 ### Finish demo
 
