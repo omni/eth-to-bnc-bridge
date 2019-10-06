@@ -9,6 +9,6 @@ COPY ./ethWatcher/package.json /watcher/
 
 RUN npm install
 
-COPY ./ethWatcher/ethWatcher.js ./ethWatcher/db.js /watcher/
+COPY ./ethWatcher/ethWatcher.js ./shared/db.js /watcher/
 
 ENTRYPOINT ["node", "ethWatcher.js"]
