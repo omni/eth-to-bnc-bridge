@@ -16,7 +16,7 @@ const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
 async function initialize () {
   if (await redis.get('foreignTime') === null) {
     logger.info('Set default foreign time')
-    await redis.set('foreignTime', 1562306990672)
+    await redis.set('foreignTime', Date.now() - 2 * 30 * 24 * 60 * 60 * 1000)
   }
 }
 
@@ -61,7 +61,7 @@ function getTx(hash) {
 async function fetchNewTransactions () {
   logger.debug('Fetching new transactions')
   const startTime = parseInt(await redis.get('foreignTime')) + 1
-  const address = await getLastForeignAddress()
+  const address = getLastForeignAddress()
   if (address === null)
     return null
   logger.debug('Sending api transactions request')
