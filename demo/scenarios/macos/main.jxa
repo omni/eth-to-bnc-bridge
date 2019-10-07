@@ -1,73 +1,135 @@
 ObjC.import('stdlib')
 
 const terminal = Application('Terminal')
+const curApp = Application.currentApplication()
+curApp.includeStandardAdditions = true;
+
 const windows = terminal.windows()
 
 const wins = []
 
-function closeOldWindows() {
-	for (let i in windows) {
-		if (windows[i].name().includes("Validator")) {
-			windows[i].close()
-		}
+function closeOldWindows () {
+  for (let i in windows) {
+    try {
+      windows[i].selectedTab()
+
+      if (windows[i].selectedTab().customTitle().startsWith('Validator') || windows[i].selectedTab().customTitle() === 'Services') {
+        windows[i].close()
+      }
+    } catch (e) {
+    }
+
+  }
+}
+
+function apiRequest(url) {
+	const response = curApp.doShellScript(`curl -X GET "${url}"`)
+	try {
+		return JSON.parse(response)
+	} catch (e) {
+		return response
 	}
 }
 
-function openNewWindows() {
-	for (let i = 0; i < 3; i++) {
-		// open new terminal
-		const tab = terminal.doScript()
-		// get opened window
-		const winId = terminal.windows[0].id()
-		wins[i] = terminal.windows.byId(winId)
-		tab.customTitle = `Validator ${i + 1}`
-		wins[i].bounds = {x: 560 * i, y: 0, width: 560, height: 1080}
-	}
-	terminal.activate()
-	delay(0.5)
+function openNewWindows () {
+  for (let i = 0; i < 3; i++) {
+    // open new terminal
+    const tab = terminal.doScript()
+    // get opened window
+    const winId = terminal.windows[0].id()
+    wins[i] = terminal.windows.byId(winId)
+    tab.customTitle = `Validator ${i + 1}`
+  }
+  wins[0].bounds = { x: 0, y: 23, width: 558, height: 1027 }
+  wins[1].bounds = { x: 559, y: 374, width: 560, height: 676 }
+  wins[2].bounds = { x: 1120, y: 374, width: 560, height: 676 }
+  // open new terminal
+  const tab = terminal.doScript()
+  // get opened window
+  const winId = terminal.windows[0].id()
+  wins[3] = terminal.windows.byId(winId)
+  tab.customTitle = `Services`
+  wins[3].bounds = { x: 559, y: 23, width: 1120, height: 350 }
+
+  terminal.activate()
+  delay(0.5)
 }
 
-function exec(n, script) {
-	terminal.doScript(script, {in: wins[n - 1]})
+function exec (n, script) {
+  terminal.doScript(script, { in: wins[n - 1] })
 }
 
-function wait(n) {
-	while (wins[n - 1].selectedTab().busy()) {
-		delay(0.3)
-	}
+function wait (n) {
+  while (wins[n - 1].selectedTab().busy()) {
+    delay(0.3)
+  }
 }
 
 function waitAll () {
-	wait(1)
-	wait(2)
-	wait(3)
+  wait(1)
+  wait(2)
+  wait(3)
+  wait(4)
 }
 
-function run() {
-	closeOldWindows()
+function waitLog (n, log) {
+  do {
+    const s = wins[n - 1].selectedTab().contents().split('\n').find(x => x.includes(log))
+    if (s) {
+      return s
+    }
+    delay(0.3)
+  } while (true)
+}
 
-	openNewWindows()
+function waitApi (n, url, check) {
+	do {
+		const res = apiRequest(`http://localhost:500${n}${url}`)
+		const checkerRes = check(res)
+		if (checkerRes)
+			return checkerRes
+		delay(0.3)
+	} while (true)
 
-	const cwd = $.getenv('PWD')
+}
 
-	exec(1, `cd "${cwd}"`)
-	exec(2, `cd "${cwd}"`)
-	exec(3, `cd "${cwd}"`)
-	waitAll()
+function run () {
+  closeOldWindows()
 
-	exec(1, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
-	wait(1)
-	exec(1, `./demo/clean.sh`)
-	wait(1)
-	exec(1, `./demo/start-environment.sh`)
-	wait(1)
+  openNewWindows()
 
-	exec(1, `clear`)
-	exec(2, `clear`)
-	exec(3, `clear`)
-	waitAll()
+  const cwd = $.getenv('PWD')
 
-	exec(1, `N=1 ./demo/validator-demo.sh`)
-	exec(2, `N=2 ./demo/validator-demo.sh`)
-	exec(3, `N=3 ./demo/validator-demo.sh`)
+  exec(1, `cd "${cwd}"`)
+  exec(2, `cd "${cwd}"`)
+  exec(3, `cd "${cwd}"`)
+  exec(4, `cd "${cwd}"`)
+  waitAll()
+
+  exec(4, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
+  wait(4)
+  exec(4, `docker kill ganache_side ganache_home > /dev/null 2>&1 || true`)
+  wait(4)
+  exec(4, `./demo/clean.sh`)
+  wait(4)
+  exec(4, `./demo/start-environment.sh`)
+  wait(4)
+
+  exec(1, `clear`)
+  exec(2, `clear`)
+  exec(3, `clear`)
+  waitAll()
+
+  exec(1, `N=1 ./demo/validator-demo.sh`)
+  exec(2, `N=2 ./demo/validator-demo.sh`)
+  exec(3, `N=3 ./demo/validator-demo.sh`)
+
+  let log = waitLog(1, 'Generated multisig account in binance chain')
+  const bncAddress = /tbnb\w+/.exec(log)[0]
+
+  exec(4, `./src/test-scripts/binanceSend/run.sh ${bncAddress} 100 0.1`)
+  wait(4)
+	waitApi(1, '/info', res => res.foreignBalanceTokens === 100)
+  exec(4, `curl -X GET http://localhost:5001/info`)
+  wait(4)
 }
