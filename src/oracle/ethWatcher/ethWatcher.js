@@ -1,12 +1,11 @@
 const Web3 = require('web3')
-const crypto = require('crypto')
 const utils = require('ethers').utils
 const BN = require('bignumber.js')
-const bech32 = require('bech32')
 
 const logger = require('./logger')
 const redis = require('./db')
 const { connectRabbit, assertQueue } = require('./amqp')
+const { publicKeyToAddress } = require('./crypto')
 
 const abiToken = require('./contracts_data/IERC20.json').abi
 const abiBridge = require('./contracts_data/Bridge.json').abi
@@ -76,7 +75,7 @@ async function main () {
         await sendKeygen(event)
         break
       case 'NewEpochCancelled':
-        sendKeygenCancelation(event)
+        sendKeygenCancellation(event)
         break
       case 'NewFundsTransfer':
         await sendSignFundsTransfer(event)
@@ -122,7 +121,7 @@ async function sendKeygen (event) {
   logger.debug('Sent keygen start event')
 }
 
-function sendKeygenCancelation (event) {
+function sendKeygenCancellation (event) {
   const epoch = event.returnValues.epoch.toNumber()
   cancelKeygenQueue.send({ epoch })
   logger.debug('Sent keygen cancellation event')
@@ -173,18 +172,4 @@ async function sendSign (event) {
 
   redisTx.incr(`foreignNonce${epoch}`)
   foreignNonce[epoch]++
-}
-
-function publicKeyToAddress ({ x, y }) {
-  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
-  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
-  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
-  return bech32.encode('tbnb', words)
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
 }

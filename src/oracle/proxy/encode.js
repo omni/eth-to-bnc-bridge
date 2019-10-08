@@ -1,10 +1,6 @@
 const BN = require('bignumber.js')
 
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
-}
+const { padZeros } = require('./crypto')
 
 function makeBuffer (value, length = 32, base = 16) {
   return Buffer.from(padZeros(new BN(value, base).toString(16), length * 2), 'hex')

@@ -1,12 +1,11 @@
-const redis = require('./db')
 const axios = require('axios')
-const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const fs = require('fs')
-const crypto = require('crypto')
 const { computeAddress } = require('ethers').utils
 
 const logger = require('./logger')
+const redis = require('./db')
+const { publicKeyToAddress } = require('./crypto')
 
 const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
@@ -87,20 +86,6 @@ function getLastForeignAddress () {
   const keysFile = `/keys/keys${epoch}.store`
   const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
   return publicKeyToAddress(publicKey)
-}
-
-function publicKeyToAddress ({ x, y }) {
-  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
-  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
-  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
-  return bech32.encode('tbnb', words)
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
 }
 
 initialize().then(async () => {

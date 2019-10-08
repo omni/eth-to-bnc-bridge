@@ -1,12 +1,11 @@
 const exec = require('child_process')
 const fs = require('fs')
-const crypto = require('crypto')
-const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const express = require('express')
 
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
+const { publicKeyToAddress, sha256 } = require('./crypto')
 
 const app = express()
 app.get('/restart/:attempt', restart)
@@ -62,7 +61,7 @@ async function main () {
           memo: `Attempt ${attempt}`
         })
 
-        const hash = crypto.createHash('sha256').update(tx.getSignBytes()).digest('hex')
+        const hash = sha256(tx.getSignBytes())
         logger.info(`Starting signature generation for transaction hash ${hash}`)
         const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
 
@@ -91,7 +90,7 @@ async function main () {
           memo: `Attempt ${attempt}`
         })
 
-        const hash = crypto.createHash('sha256').update(tx.getSignBytes()).digest('hex')
+        const hash = sha256(tx.getSignBytes())
         logger.info(`Starting signature generation for transaction hash ${hash}`)
         const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
 
@@ -206,18 +205,4 @@ function sendTx (tx) {
         return new Promise(resolve => setTimeout(() => resolve(sendTx(tx)), 1000))
       }
     })
-}
-
-function publicKeyToAddress ({ x, y }) {
-  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
-  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
-  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
-  return bech32.encode('tbnb', words)
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
 }

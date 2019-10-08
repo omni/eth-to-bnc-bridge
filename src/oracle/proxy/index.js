@@ -1,8 +1,6 @@
 const express = require('express')
 const Web3 = require('web3')
 const AsyncLock = require('async-lock')
-const crypto = require('crypto')
-const bech32 = require('bech32')
 const axios = require('axios')
 const BN = require('bignumber.js')
 const { utils } = require('ethers')
@@ -10,6 +8,7 @@ const { utils } = require('ethers')
 const encode = require('./encode')
 const decode = require('./decode')
 const logger = require('./logger')
+const { publicKeyToAddress } = require('./crypto')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY, HOME_CHAIN_ID,
@@ -273,7 +272,7 @@ function parseError (message) {
   return result ? result[0] : ''
 }
 
-async function sendVote(query, req, res) {
+async function sendVote (query, req, res) {
   try {
     if (await homeSendQuery(query)) {
       res.send('Voted\n')
@@ -409,19 +408,3 @@ function getForeignBalances (address) {
     }, {}))
     .catch(err => ({}))
 }
-
-function publicKeyToAddress ({ x, y }) {
-  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
-  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
-  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
-  return bech32.encode('tbnb', words)
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
-}
-
-

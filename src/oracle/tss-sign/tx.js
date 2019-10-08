@@ -3,6 +3,7 @@ const { crypto } = require('@binance-chain/javascript-sdk')
 const BN = require('bignumber.js')
 
 const logger = require('./logger')
+const { padZeros } = require('./crypto')
 
 const { FOREIGN_CHAIN_ID } = process.env
 
@@ -30,26 +31,26 @@ class Transaction {
     coins.sort((a, b) => a.denom > b.denom)
 
     const msg = {
-      inputs: [{
+      inputs: [ {
         address: accCode,
         coins
-      }],
-      outputs: [{
+      } ],
+      outputs: [ {
         address: toAccCode,
         coins
-      }],
+      } ],
       msgType: 'MsgSend'
     }
 
     this.signMsg = {
-      inputs: [{
+      inputs: [ {
         address: from,
         coins
-      }],
-      outputs: [{
+      } ],
+      outputs: [ {
         address: to,
         coins
-      }]
+      } ]
     }
 
     this.tx = new TransactionBnc({
@@ -75,20 +76,14 @@ class Transaction {
       signature.s = n.minus(s).toString(16)
     }
     const publicKeyEncoded = Buffer.from('eb5ae98721' + (yLast % 2 ? '03' : '02') + padZeros(publicKey.x, 64), 'hex')
-    this.tx.signatures = [{
+    this.tx.signatures = [ {
       pub_key: publicKeyEncoded,
       signature: Buffer.from(padZeros(signature.r, 64) + padZeros(signature.s, 64), 'hex'),
       account_number: this.tx.account_number,
       sequence: this.tx.sequence,
-    }]
+    } ]
     return this.tx.serialize()
   }
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
 }
 
 module.exports = Transaction
