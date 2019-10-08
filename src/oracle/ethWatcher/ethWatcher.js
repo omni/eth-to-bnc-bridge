@@ -1,14 +1,15 @@
-const amqp = require('amqplib')
 const Web3 = require('web3')
-const redis = require('./db')
 const crypto = require('crypto')
 const utils = require('ethers').utils
 const BN = require('bignumber.js')
 const bech32 = require('bech32')
 
-const abiBridge = require('./contracts_data/Bridge.json').abi
-const abiToken = require('./contracts_data/IERC20.json').abi
 const logger = require('./logger')
+const redis = require('./db')
+const { connectRabbit, assertQueue } = require('./amqp')
+
+const abiToken = require('./contracts_data/IERC20.json').abi
+const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
 
@@ -25,21 +26,11 @@ let foreignNonce = []
 let epoch
 let redisTx
 
-async function connectRabbit (url) {
-  return amqp.connect(url).catch(() => {
-    logger.debug('Failed to connect, reconnecting')
-    return new Promise(resolve =>
-      setTimeout(() => resolve(connectRabbit(url)), 1000)
-    )
-  })
-}
-
 async function initialize () {
-  const connection = await connectRabbit(RABBITMQ_URL)
-  channel = await connection.createChannel()
-  signQueue = await channel.assertQueue('signQueue')
-  keygenQueue = await channel.assertQueue('keygenQueue')
-  cancelKeygenQueue = await channel.assertQueue('cancelKeygenQueue')
+  channel = await connectRabbit(RABBITMQ_URL)
+  signQueue = await assertQueue(channel, 'signQueue')
+  keygenQueue = await assertQueue(channel, 'keygenQueue')
+  cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
 
   const events = await bridge.getPastEvents('EpochStart', {
     fromBlock: 1
@@ -123,37 +114,29 @@ initialize().then(async () => {
 
 async function sendKeygen (event) {
   const newEpoch = event.returnValues.newEpoch.toNumber()
-  channel.sendToQueue(keygenQueue.queue, Buffer.from(JSON.stringify({
+  keygenQueue.send({
     epoch: newEpoch,
     threshold: (await bridge.methods.getThreshold(newEpoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(newEpoch).call()).toNumber()
-  })), {
-    persistent: true
   })
   logger.debug('Sent keygen start event')
 }
 
 function sendKeygenCancelation (event) {
   const epoch = event.returnValues.epoch.toNumber()
-  channel.sendToQueue(cancelKeygenQueue.queue, Buffer.from(JSON.stringify({
-    epoch
-  })), {
-    persistent: true
-  })
+  cancelKeygenQueue.send({ epoch })
   logger.debug('Sent keygen cancellation event')
 }
 
 async function sendSignFundsTransfer (event) {
   const newEpoch = event.returnValues.newEpoch.toNumber()
   const oldEpoch = event.returnValues.oldEpoch.toNumber()
-  channel.sendToQueue(signQueue.queue, Buffer.from(JSON.stringify({
+  signQueue.send({
     epoch: oldEpoch,
     newEpoch,
     nonce: foreignNonce[oldEpoch],
     threshold: (await bridge.methods.getThreshold(oldEpoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(oldEpoch).call()).toNumber()
-  })), {
-    persistent: true
   })
   logger.debug('Sent sign funds transfer event')
   foreignNonce[oldEpoch]++
@@ -173,7 +156,7 @@ async function sendSign (event) {
   })
   const hash = web3Home.utils.sha3(msg)
   const publicKey = utils.recoverPublicKey(hash, { r: tx.r, s: tx.s, v: tx.v })
-  const msgToQueue = JSON.stringify({
+  const msgToQueue = {
     recipient: publicKeyToAddress({
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
@@ -183,11 +166,9 @@ async function sendSign (event) {
     nonce: foreignNonce[epoch],
     threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(epoch).call()).toNumber()
-  })
+  }
 
-  channel.sendToQueue(signQueue.queue, Buffer.from(msgToQueue), {
-    persistent: true
-  })
+  signQueue.send(msgToQueue)
   logger.debug('Sent new sign event: %o', msgToQueue)
 
   redisTx.incr(`foreignNonce${epoch}`)

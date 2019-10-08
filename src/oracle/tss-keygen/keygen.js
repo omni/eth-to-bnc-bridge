@@ -2,9 +2,9 @@ const exec = require('child_process')
 const fs = require('fs')
 const crypto = require('crypto')
 const bech32 = require('bech32')
-const amqp = require('amqplib')
 
 const logger = require('./logger')
+const { connectRabbit, assertQueue } = require('./amqp')
 
 const { RABBITMQ_URL, PROXY_URL } = process.env
 
@@ -12,14 +12,13 @@ let currentKeygenEpoch = null
 
 async function main () {
   logger.info('Connecting to RabbitMQ server')
-  const connection = await connectRabbit(RABBITMQ_URL)
+  const channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to epoch events queue')
-  const channel = await connection.createChannel()
-  const keygenQueue = await channel.assertQueue('keygenQueue')
-  const cancelKeygenQueue = await channel.assertQueue('cancelKeygenQueue')
+  const keygenQueue = await assertQueue(channel, 'keygenQueue')
+  const cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
 
   channel.prefetch(1)
-  channel.consume(keygenQueue.queue, msg => {
+  keygenQueue.consume(msg => {
     const { epoch, parties, threshold } = JSON.parse(msg.content)
     logger.info(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
 
@@ -30,7 +29,7 @@ async function main () {
 
     logger.debug('Writing params')
     fs.writeFileSync('./params', JSON.stringify({ parties: parties.toString(), threshold: threshold.toString() }))
-    const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
+    const cmd = exec.execFile('./keygen-entrypoint.sh', [ PROXY_URL, keysFile ], async () => {
       currentKeygenEpoch = null
       if (fs.existsSync(keysFile)) {
         logger.info(`Finished keygen for epoch ${epoch}`)
@@ -49,7 +48,7 @@ async function main () {
     cmd.stderr.on('data', data => logger.debug(data.toString()))
   })
 
-  channel.consume(cancelKeygenQueue.queue, async msg => {
+  cancelKeygenQueue.consume(async msg => {
     const { epoch } = JSON.parse(msg.content)
     logger.info(`Consumed new cancel event for epoch ${epoch} keygen`)
     if (currentKeygenEpoch === epoch) {
@@ -61,15 +60,6 @@ async function main () {
 }
 
 main()
-
-async function connectRabbit (url) {
-  return amqp.connect(url).catch(() => {
-    logger.debug('Failed to connect, reconnecting')
-    return new Promise(resolve =>
-      setTimeout(() => resolve(connectRabbit(url)), 1000)
-    )
-  })
-}
 
 async function confirmKeygen (keysFile) {
   exec.execSync(`curl -X POST -H "Content-Type: application/json" -d @"${keysFile}" "${PROXY_URL}/confirmKeygen"`, { stdio: 'pipe' })

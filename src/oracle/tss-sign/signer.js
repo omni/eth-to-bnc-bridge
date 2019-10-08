@@ -1,12 +1,12 @@
 const exec = require('child_process')
 const fs = require('fs')
-const amqp = require('amqplib')
 const crypto = require('crypto')
 const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const express = require('express')
 
 const logger = require('./logger')
+const { connectRabbit, assertQueue } = require('./amqp')
 
 const app = express()
 app.get('/restart/:attempt', restart)
@@ -24,13 +24,12 @@ let cancelled
 
 async function main () {
   logger.info('Connecting to RabbitMQ server')
-  const connection = await connectRabbit(RABBITMQ_URL)
+  const channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to signature events queue')
-  const channel = await connection.createChannel()
-  const signQueue = await channel.assertQueue('signQueue')
+  const signQueue = await assertQueue(channel, 'signQueue')
 
   channel.prefetch(1)
-  channel.consume(signQueue.queue, async msg => {
+  signQueue.consume(async msg => {
     const data = JSON.parse(msg.content)
 
     logger.info('Consumed sign event: %o', data)
@@ -148,15 +147,6 @@ function restart (req, res) {
   exec.execSync('pkill gg18_sign || true')
   cancelled = true
   res.send('Cancelled')
-}
-
-function connectRabbit (url) {
-  return amqp.connect(url).catch(() => {
-    logger.debug('Failed to connect, reconnecting')
-    return new Promise(resolve =>
-      setTimeout(() => resolve(connectRabbit(url)), 1000)
-    )
-  })
 }
 
 function confirmFundsTransfer () {
