@@ -1,5 +1,5 @@
 {
-  "name": "ethereum-send",
+  "name": "side-prefund",
   "version": "0.0.1",
   "dependencies": {
   	"bignumber.js": "9.0.0",
