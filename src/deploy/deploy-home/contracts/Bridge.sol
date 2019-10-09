@@ -3,6 +3,7 @@ pragma solidity ^0.5.0;
 import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 
 contract Bridge {
+    event ExchangeRequest(uint value);
     event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
     event NewEpochCancelled(uint indexed epoch);
     event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
@@ -91,6 +92,13 @@ contract Bridge {
     modifier currentValidator {
         require(getPartyId() != 0, "Not a current validator");
         _;
+    }
+
+    function exchange(uint value) public ready {
+        require(value >= 10 ** 10);
+
+        tokenContract.transferFrom(msg.sender, address(this), value);
+        emit ExchangeRequest(value);
     }
 
     function transfer(bytes32 hash, address to, uint value) public readyOrVoting currentValidator {

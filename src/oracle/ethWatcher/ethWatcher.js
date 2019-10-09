@@ -7,14 +7,12 @@ const redis = require('./db')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress } = require('./crypto')
 
-const abiToken = require('./contracts_data/IERC20.json').abi
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
-const token = new web3Home.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 
 let channel
 let signQueue
@@ -80,24 +78,15 @@ async function main () {
       case 'NewFundsTransfer':
         await sendSignFundsTransfer(event)
         break
+      case 'ExchangeRequest':
+        await sendSign(event)
+        break
       case 'EpochStart':
         epoch = event.returnValues.epoch.toNumber()
         logger.info(`Epoch ${epoch} started`)
         foreignNonce[epoch] = 0
         break
     }
-  }
-
-  const transferEvents = await token.getPastEvents('Transfer', {
-    filter: {
-      to: HOME_BRIDGE_ADDRESS
-    },
-    fromBlock: blockNumber,
-    toBlock: blockNumber
-  })
-
-  for (const event of transferEvents) {
-    await sendSign(event)
   }
 
   blockNumber++
