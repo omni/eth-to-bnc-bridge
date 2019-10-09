@@ -1,6 +1,7 @@
 ObjC.import('stdlib')
 
 const terminal = Application('Terminal')
+const system = Application('System Events')
 const curApp = Application.currentApplication()
 curApp.includeStandardAdditions = true
 
@@ -26,6 +27,15 @@ function closeOldWindows () {
       }
     } catch (e) {
     }
+  }
+}
+
+function killValidators () {
+  terminal.activate()
+  for (let i = 0; i < 3; i++) {
+    wins[i].frontmost = true
+    delay(0.5)
+    system.keystroke('c', { using: 'control down' })
   }
 }
 
@@ -147,11 +157,15 @@ function initCwd() {
   waitAll()
 }
 
-function clean() {
+function killDockerContainers() {
   exec(4, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
   wait(4)
   exec(4, `docker kill ganache_side ganache_home > /dev/null 2>&1 || true`)
   wait(4)
+}
+
+function clean() {
+  killDockerContainers()
   exec(4, `./demo/clean.sh`)
   wait(4)
 
@@ -320,4 +334,8 @@ function run () {
   testBncToEth()
 
   console.log('PASSED ALL TESTS')
+
+  killValidators()
+
+  killDockerContainers()
 }
