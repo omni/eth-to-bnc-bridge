@@ -47,7 +47,10 @@ contract Bridge {
     uint public epoch;
     uint public nextEpoch;
 
-    constructor(uint threshold, address[] memory validators, address _tokenContract) public {
+    uint minTxLimit;
+    uint maxTxLimit;
+
+    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits) public {
         require(validators.length > 0);
         require(threshold < validators.length);
 
@@ -58,6 +61,9 @@ contract Bridge {
         nextEpoch = 1;
 
         states[1] = State(validators, threshold, 0, 0);
+
+        minTxLimit = limits[0];
+        maxTxLimit = limits[1];
 
         emit NewEpoch(0, 1);
     }
@@ -95,7 +101,7 @@ contract Bridge {
     }
 
     function exchange(uint value) public ready {
-        require(value >= 10 ** 10);
+        require(value >= minTxLimit && value >= 10 ** 10 && value <= maxTxLimit);
 
         tokenContract.transferFrom(msg.sender, address(this), value);
         emit ExchangeRequest(value);

@@ -5,7 +5,7 @@ const addresses = Object.entries(process.env)
   .map(([ , value ]) => value)
 
 const {
-  THRESHOLD, HOME_TOKEN_ADDRESS
+  THRESHOLD, HOME_TOKEN_ADDRESS, MIN_TX_LIMIT, MAX_TX_LIMIT
 } = process.env
 
 module.exports = deployer => {
@@ -13,6 +13,7 @@ module.exports = deployer => {
     Bridge,
     THRESHOLD,
     addresses,
-    HOME_TOKEN_ADDRESS
+    HOME_TOKEN_ADDRESS,
+    [ MIN_TX_LIMIT, MAX_TX_LIMIT ]
   )
 }
