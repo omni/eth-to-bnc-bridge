@@ -12,8 +12,8 @@ echo "Resetting block in redis"
 docker network create redis_net > /dev/null 2>&1 || true
 docker kill redis > /dev/null 2>&1 || true
 docker rm redis > /dev/null 2>&1 || true
-docker run --rm --network redis_net -d --name redis -v "$PWD/validator$N/$TARGET_NETWORK/db:/data" redis:5.0.5-alpine
+docker run --rm --network redis_net -d --name redis -v "$PWD/validator$N/$TARGET_NETWORK/db:/data" redis:5.0.5-alpine > /dev/null 2>&1 || true
 
 ../src/oracle/scripts/resetToBlock/run.sh redis_net $1
 
-docker kill redis
+docker kill redis > /dev/null 2>&1 || true
