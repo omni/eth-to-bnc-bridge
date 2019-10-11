@@ -1,5 +1,6 @@
 const exec = require('child_process')
 const fs = require('fs')
+const express = require('express')
 
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
@@ -7,7 +8,16 @@ const { publicKeyToAddress } = require('./crypto')
 
 const { RABBITMQ_URL, PROXY_URL } = process.env
 
+const app = express()
+app.get('/start', (req, res) => {
+  logger.info('Ready to start')
+  ready = true
+  res.send()
+})
+app.listen(8001, () => logger.debug('Listening on 8001'))
+
 let currentKeygenEpoch = null
+let ready = false
 
 async function main () {
   logger.info('Connecting to RabbitMQ server')
@@ -15,6 +25,10 @@ async function main () {
   logger.info('Connecting to epoch events queue')
   const keygenQueue = await assertQueue(channel, 'keygenQueue')
   const cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
+
+  while (!ready) {
+    await new Promise(res => setTimeout(res, 1000))
+  }
 
   channel.prefetch(1)
   keygenQueue.consume(msg => {

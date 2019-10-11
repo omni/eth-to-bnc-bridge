@@ -1,6 +1,7 @@
 const Web3 = require('web3')
 const utils = require('ethers').utils
 const BN = require('bignumber.js')
+const axios = require('axios')
 
 const logger = require('./logger')
 const redis = require('./db')
@@ -9,7 +10,7 @@ const { publicKeyToAddress } = require('./crypto')
 
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
-const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_TOKEN_ADDRESS, HOME_START_BLOCK } = process.env
+const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK } = process.env
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
@@ -22,6 +23,42 @@ let blockNumber
 let foreignNonce = []
 let epoch
 let redisTx
+
+async function resetFutureMessages (queue) {
+  logger.debug(`Resetting future messages in queue ${queue.name}`)
+  const { messageCount } = await channel.checkQueue(queue.name)
+  if (messageCount) {
+    logger.info(`Filtering ${messageCount} reloaded messages from queue ${queue.name}`)
+    const backup = await assertQueue(channel, `${queue.name}.backup`)
+    do {
+      const message = await queue.get()
+      if (message === false)
+        break
+      const data = JSON.parse(message.content)
+      if (data.blockNumber < blockNumber) {
+        logger.debug('Saving message %o', data)
+        backup.send(data)
+      } else {
+        logger.debug('Dropping message %o', data)
+      }
+      channel.ack(message)
+    } while (true)
+
+    logger.debug('Dropped messages came from future')
+
+    do {
+      const message = await backup.get()
+      if (message === false)
+        break
+      const data = JSON.parse(message.content)
+      logger.debug('Requeuing message %o', data)
+      queue.send(data)
+      channel.ack(message)
+    } while (true)
+
+    logger.debug('Redirected messages back to initial queue')
+  }
+}
 
 async function initialize () {
   channel = await connectRabbit(RABBITMQ_URL)
@@ -50,6 +87,13 @@ async function initialize () {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
+
+  await resetFutureMessages(keygenQueue)
+  await resetFutureMessages(cancelKeygenQueue)
+  await resetFutureMessages(signQueue)
+  logger.debug(`Sending start commands`)
+  await axios.get('http://keygen:8001/start')
+  await axios.get('http://signer:8001/start')
 }
 
 async function main () {
@@ -92,6 +136,7 @@ async function main () {
   blockNumber++
   // Exec redis tx
   await redisTx.incr('homeBlock').exec()
+  await redis.save()
 }
 
 initialize().then(async () => {
@@ -104,6 +149,7 @@ async function sendKeygen (event) {
   const newEpoch = event.returnValues.newEpoch.toNumber()
   keygenQueue.send({
     epoch: newEpoch,
+    blockNumber,
     threshold: (await bridge.methods.getThreshold(newEpoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(newEpoch).call()).toNumber()
   })
@@ -112,7 +158,10 @@ async function sendKeygen (event) {
 
 function sendKeygenCancellation (event) {
   const epoch = event.returnValues.epoch.toNumber()
-  cancelKeygenQueue.send({ epoch })
+  cancelKeygenQueue.send({
+    epoch,
+    blockNumber
+  })
   logger.debug('Sent keygen cancellation event')
 }
 
@@ -121,6 +170,7 @@ async function sendSignFundsTransfer (event) {
   const oldEpoch = event.returnValues.oldEpoch.toNumber()
   signQueue.send({
     epoch: oldEpoch,
+    blockNumber,
     newEpoch,
     nonce: foreignNonce[oldEpoch],
     threshold: (await bridge.methods.getThreshold(oldEpoch).call()).toNumber(),
@@ -145,12 +195,13 @@ async function sendSign (event) {
   const hash = web3Home.utils.sha3(msg)
   const publicKey = utils.recoverPublicKey(hash, { r: tx.r, s: tx.s, v: tx.v })
   const msgToQueue = {
+    epoch,
+    blockNumber,
     recipient: publicKeyToAddress({
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
     value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3),
-    epoch,
     nonce: foreignNonce[epoch],
     threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(epoch).call()).toNumber()

@@ -9,6 +9,11 @@ const { publicKeyToAddress, sha256 } = require('./crypto')
 
 const app = express()
 app.get('/restart/:attempt', restart)
+app.get('/start', (req, res) => {
+  logger.info('Ready to start')
+  ready = true
+  res.send()
+})
 app.listen(8001, () => logger.debug('Listening on 8001'))
 
 const { RABBITMQ_URL, FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
@@ -20,12 +25,17 @@ const httpClient = axios.create({ baseURL: FOREIGN_URL })
 let attempt
 let nextAttempt = null
 let cancelled
+let ready = false
 
 async function main () {
   logger.info('Connecting to RabbitMQ server')
   const channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to signature events queue')
   const signQueue = await assertQueue(channel, 'signQueue')
+
+  while (!ready) {
+    await new Promise(res => setTimeout(res, 1000))
+  }
 
   channel.prefetch(1)
   signQueue.consume(async msg => {
