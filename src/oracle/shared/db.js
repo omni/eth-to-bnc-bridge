@@ -14,8 +14,8 @@ redis.on('connect', () => {
   logger.info('Connected to redis')
 })
 
-redis.on('error', () => {
-  logger.warn('Redis error')
+redis.on('error', e => {
+  logger.warn('Redis error %o', e)
 })
 
 module.exports = redis
