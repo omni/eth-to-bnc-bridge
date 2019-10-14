@@ -26,11 +26,14 @@ let attempt
 let nextAttempt = null
 let cancelled
 let ready = false
+let exchangeQueue
+let channel
 
 async function main () {
   logger.info('Connecting to RabbitMQ server')
-  const channel = await connectRabbit(RABBITMQ_URL)
+  channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to signature events queue')
+  exchangeQueue = await assertQueue(channel, 'exchangeQueue')
   const signQueue = await assertQueue(channel, 'signQueue')
 
   while (!ready) {
@@ -42,7 +45,7 @@ async function main () {
     const data = JSON.parse(msg.content)
 
     logger.info('Consumed sign event: %o', data)
-    const { recipient, value, nonce, epoch, newEpoch, parties, threshold } = data
+    const { nonce, epoch, newEpoch, startBlock, endBlock, parties, threshold } = data
 
     const keysFile = `/keys/keys${epoch}.store`
     const { address: from, publicKey } = getAccountFromFile(keysFile)
@@ -58,15 +61,17 @@ async function main () {
 
     attempt = 1
 
-    if (recipient && account.sequence <= nonce) {
+    if (!newEpoch && account.sequence <= nonce) {
       while (true) {
-        logger.info(`Building corresponding transfer transaction, nonce ${nonce}, recipient ${recipient}`)
+        logger.info(`Building corresponding transfer transaction, nonce ${nonce}`)
+
+        const exchanges = await getExchangeMessages(startBlock, endBlock)
+        const exchangesData = exchanges.map(msg => JSON.parse(msg.content))
         const tx = new Transaction({
           from,
           accountNumber: account.account_number,
           sequence: nonce,
-          to: recipient,
-          tokens: value,
+          recipients: exchangesData.map(({ value, recipient }) => ({ to: recipient, tokens: value })),
           asset: FOREIGN_ASSET,
           memo: `Attempt ${attempt}`
         })
@@ -76,6 +81,7 @@ async function main () {
         const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
 
         if (done) {
+          exchanges.forEach(msg => channel.ack(msg))
           break
         }
         attempt = nextAttempt ? nextAttempt : attempt + 1
@@ -93,10 +99,12 @@ async function main () {
           from,
           accountNumber: account.account_number,
           sequence: nonce,
-          to,
-          tokens: account.balances.find(x => x.symbol === FOREIGN_ASSET).free,
+          recipients: [{
+            to,
+            tokens: account.balances.find(x => x.symbol === FOREIGN_ASSET).free,
+            bnbs: new BN(account.balances.find(x => x.symbol === 'BNB').free).minus(new BN(60000).div(10 ** 8)),
+          }],
           asset: FOREIGN_ASSET,
-          bnbs: new BN(account.balances.find(x => x.symbol === 'BNB').free).minus(new BN(60000).div(10 ** 8)),
           memo: `Attempt ${attempt}`
         })
 
@@ -122,6 +130,27 @@ async function main () {
 }
 
 main()
+
+async function getExchangeMessages(startBlock, endBlock) {
+  logger.debug('Getting exchange messages')
+  const messages = []
+  do {
+    const msg = await exchangeQueue.get()
+    if (msg === false) {
+      break;
+    }
+    const data = JSON.parse(msg.content)
+    logger.debug('Got message %o', data)
+    if (data.blockNumber > endBlock) {
+      channel.ack(msg)
+      break;
+    }
+    if (data.blockNumber >= startBlock)
+      messages.push(msg)
+  } while (true)
+  logger.debug('Found %d messages', messages.length)
+  return messages
+}
 
 function sign (keysFile, hash, tx, publicKey) {
   return new Promise(resolve => {

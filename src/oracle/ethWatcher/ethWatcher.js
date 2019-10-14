@@ -11,18 +11,24 @@ const { publicKeyToAddress } = require('./crypto')
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK } = process.env
+const BLOCKS_RANGE_SIZE = parseInt(process.env.BLOCKS_RANGE_SIZE)
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
 
 let channel
+let exchangeQueue
 let signQueue
 let keygenQueue
 let cancelKeygenQueue
 let blockNumber
 let foreignNonce = []
 let epoch
+let epochStart
+let rangeStart
+let rangeEnd
 let redisTx
+let lastTransactionBlockNumber
 
 async function resetFutureMessages (queue) {
   logger.debug(`Resetting future messages in queue ${queue.name}`)
@@ -62,6 +68,7 @@ async function resetFutureMessages (queue) {
 
 async function initialize () {
   channel = await connectRabbit(RABBITMQ_URL)
+  exchangeQueue = await assertQueue(channel, 'exchangeQueue')
   signQueue = await assertQueue(channel, 'signQueue')
   keygenQueue = await assertQueue(channel, 'keygenQueue')
   cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
@@ -71,7 +78,7 @@ async function initialize () {
   })
   epoch = events.length ? events[events.length - 1].returnValues.epoch.toNumber() : 0
   logger.info(`Current epoch ${epoch}`)
-  const epochStart = events.length ? events[events.length - 1].blockNumber : 1
+  epochStart = events.length ? events[events.length - 1].blockNumber : 1
   const saved = (parseInt(await redis.get('homeBlock')) + 1) || parseInt(HOME_START_BLOCK)
   logger.debug(epochStart, saved)
   if (epochStart > saved) {
@@ -88,8 +95,14 @@ async function initialize () {
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
 
+  rangeStart = blockNumber - (blockNumber - epochStart) % BLOCKS_RANGE_SIZE
+  rangeEnd = rangeStart + BLOCKS_RANGE_SIZE - 1
+
+  logger.info('Initialized sign range range, [%d-%d]', rangeStart, rangeEnd)
+
   await resetFutureMessages(keygenQueue)
   await resetFutureMessages(cancelKeygenQueue)
+  await resetFutureMessages(exchangeQueue)
   await resetFutureMessages(signQueue)
   logger.debug(`Sending start commands`)
   await axios.get('http://keygen:8001/start')
@@ -128,9 +141,23 @@ async function main () {
       case 'EpochStart':
         epoch = event.returnValues.epoch.toNumber()
         logger.info(`Epoch ${epoch} started`)
+        rangeStart = blockNumber
+        rangeEnd = blockNumber + BLOCKS_RANGE_SIZE - 1
+        logger.info('Updated sign range range, [%d-%d]', rangeStart, rangeEnd)
         foreignNonce[epoch] = 0
         break
     }
+  }
+
+  if (blockNumber === rangeEnd) {
+    logger.info('Reached end of the current block range')
+    if (lastTransactionBlockNumber >= rangeStart) {
+      logger.info('Sending message to start signature generation for the ended range')
+      await sendStartSign()
+    }
+    rangeStart = rangeEnd + 1
+    rangeEnd = rangeEnd + BLOCKS_RANGE_SIZE
+    logger.info('Updated sign range range, [%d-%d]', rangeStart, rangeEnd)
   }
 
   blockNumber++
@@ -201,15 +228,26 @@ async function sendSign (event) {
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3),
-    nonce: foreignNonce[epoch],
-    threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
-    parties: (await bridge.methods.getParties(epoch).call()).toNumber()
+    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3)
   }
 
-  signQueue.send(msgToQueue)
+  exchangeQueue.send(msgToQueue)
   logger.debug('Sent new sign event: %o', msgToQueue)
 
+  lastTransactionBlockNumber = blockNumber
+  redisTx.set('lastTransactionBlockNumber', blockNumber)
+  logger.debug('Set lastTransactionBlockNumber to %d', blockNumber)
+}
+
+async function sendStartSign() {
   redisTx.incr(`foreignNonce${epoch}`)
-  foreignNonce[epoch]++
+  signQueue.send({
+    epoch,
+    blockNumber,
+    nonce: foreignNonce[epoch]++,
+    startBlock: rangeStart,
+    endBlock: rangeEnd,
+    threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
+    parties: (await bridge.methods.getParties(epoch).call()).toNumber()
+  })
 }

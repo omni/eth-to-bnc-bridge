@@ -22,7 +22,7 @@ start_dev_blockchain_networks() {
   docker network create blockchain_side > /dev/null 2>&1 || true
   docker run -d --network blockchain_side --rm --name ganache_side -v "$SIDE_GANACHE_DB:/app/db" \
       trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db -b 1
+      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
 
   echo "Starting home test blockchain"
 
@@ -30,7 +30,7 @@ start_dev_blockchain_networks() {
   docker network create blockchain_home > /dev/null 2>&1 || true
   docker run -d --network blockchain_home --rm --name ganache_home -v "$HOME_GANACHE_DB:/app/db" \
       trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db -b 1
+      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
 
   sleep 4
 }

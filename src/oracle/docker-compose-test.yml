@@ -16,7 +16,7 @@ services:
       - VALIDATOR_PRIVATE_KEY
       - FOREIGN_URL
       - FOREIGN_ASSET
-      - 'LOG_LEVEL=info'
+      - LOG_LEVEL
     volumes:
       - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
       - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
@@ -35,7 +35,7 @@ services:
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
-      - 'LOG_LEVEL=info'
+      - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
@@ -51,7 +51,7 @@ services:
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
       - FOREIGN_ASSET
-      - 'LOG_LEVEL=info'
+      - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     ports:
@@ -86,8 +86,9 @@ services:
       - HOME_TOKEN_ADDRESS
       - HOME_CHAIN_ID
       - HOME_START_BLOCK
+      - BLOCKS_RANGE_SIZE
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'LOG_LEVEL=info'
+      - LOG_LEVEL
     volumes:
       - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
     networks:
@@ -103,7 +104,7 @@ services:
       - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
-      - 'LOG_LEVEL=info'
+      - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:

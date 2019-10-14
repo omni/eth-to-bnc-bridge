@@ -5,11 +5,27 @@ const system = Application('System Events')
 const curApp = Application.currentApplication()
 curApp.includeStandardAdditions = true
 
-const ethReceiver = '0x9072708Cf98a0e7962cd3420e5bdb1c9A3898f0a'
-const bncReceiver = 'tbnb1300mwrkuhxtzdqahlyqfqx246p7jt6kfcst5vd'
 const validator1 = '0x99Eb3D86663c6Db090eFFdBC20510Ca9f836DCE3'
 const validator2 = '0xAa006899B0EC407De930bA8A166DEfe59bBfd3DC'
 const validator3 = '0x6352e3e6038e05b9da00C84AE851308f9774F883'
+
+const userAccounts = [
+  {
+    privateKey: '7ed93ad7753e00b52265a73dfbbcd2296256772965323fcb9a6320b5cd084b89',
+    ethAddress: '0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa',
+    bncAddress: 'tbnb14r3z8xk7qsar3vwj05w8cd8gqwk7g6gfurlt5l'
+  },
+  {
+    privateKey: '2ad6e3a232ad3ea058b61352302118a99085600ff8b6eec4ccf0066a33756231',
+    ethAddress: '0xf7ca4aed1795e424433498cef43f6a3825c88731',
+    bncAddress: 'tbnb1efjg7xt98t67ql2cmwjc5860lgayet9l8m55ym'
+  },
+  {
+    privateKey: 'eb6dd328677b3fa2822fb8e834507e569bda52e8ffa49266df0f2de239c4ec98',
+    ethAddress: '0xad6c8127143032d843a260c5d379d8d9b3d51f15',
+    bncAddress: 'tbnb12epcy4p7ktas0nlyrfuektcyh0e83dwzuq73f4'
+  }
+]
 
 let bridgeBncAddress
 
@@ -82,6 +98,11 @@ function wait (n) {
   }
 }
 
+function execSync(n, script) {
+  exec(n, script)
+  wait(n)
+}
+
 function waitAll () {
   wait(1)
   wait(2)
@@ -109,6 +130,27 @@ function waitApi (n, url, check) {
   } while (true)
 }
 
+function prefundEthAddresses () {
+  for (let { ethAddress } of userAccounts) {
+    exec(4, `./src/test-services/ethereumSend/run.sh ${ethAddress} 100`)
+    wait(4)
+  }
+}
+
+function prefundBncAddresses () {
+  for (let { bncAddress } of userAccounts) {
+    exec(4, `./src/test-services/binanceSend/run.sh ${bncAddress} 100 0.1`)
+    wait(4)
+  }
+}
+
+function initBalances () {
+  userAccounts.forEach(account => {
+    account.ethBalance = getEthTokenBalance(account.ethAddress)
+    account.bncBalance = getBncTokenBalance(account.bncAddress)
+  })
+}
+
 function getBncTokenBalance (address) {
   const res = curApp.doShellScript(`./src/test-services/binanceBalance/run.sh ${address}`)
   return parseFloat(/KFT-94F: [0-9.]+/.exec(res)[0].split(' ')[1])
@@ -118,7 +160,7 @@ function waitBncTokenBalance (address, balance) {
   do {
     const newBalance = getBncTokenBalance(address)
     if (Math.abs(newBalance - balance) < 0.0001)
-      return true
+      return newBalance
     delay(0.3)
   } while (true)
 }
@@ -132,23 +174,21 @@ function waitEthTokenBalance (address, balance) {
   do {
     const newBalance = getEthTokenBalance(address)
     if (Math.abs(newBalance - balance) < 0.0001)
-      return true
+      return newBalance
     delay(0.3)
   } while (true)
 }
 
-function apiRequest(n, url, suffix) {
-  exec(4, `curl -s -X GET http://localhost:500${n}${url} ${suffix ? suffix : ''}`)
-  wait(4)
+function apiRequest (n, url, suffix) {
+  execSync(4, `curl -s -X GET http://localhost:500${n}${url} ${suffix ? suffix : ''}`)
 }
 
 function printState (msg) {
-  exec(4, `echo "${msg}"`)
-  wait(4)
+  execSync(4, `echo "${msg}"`)
   apiRequest(1, '/info', '| jq .')
 }
 
-function initCwd() {
+function initCwd () {
   const cwd = $.getenv('PWD')
 
   for (let i = 1; i <= 4; i++) {
@@ -157,17 +197,14 @@ function initCwd() {
   waitAll()
 }
 
-function killDockerContainers() {
-  exec(4, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
-  wait(4)
-  exec(4, `docker kill ganache_side ganache_home > /dev/null 2>&1 || true`)
-  wait(4)
+function killDockerContainers () {
+  execSync(4, `docker kill $(docker ps | grep validator | awk '{print $1}') > /dev/null 2>&1 || true`)
+  execSync(4, `docker kill ganache_side ganache_home > /dev/null 2>&1 || true`)
 }
 
-function clean() {
+function clean () {
   killDockerContainers()
-  exec(4, `./demo/clean.sh`)
-  wait(4)
+  execSync(4, `./demo/clean.sh`)
 
   exec(1, `clear`)
   exec(2, `clear`)
@@ -175,10 +212,9 @@ function clean() {
   waitAll()
 }
 
-function testEthToBnc() {
+function testEthToBnc () {
   console.log('Testing eth => bnc')
   // try token transfer in eth => bnc direction
-  const prevBncBalance = getBncTokenBalance(bncReceiver)
   let prevBridgeHomeBalance
   let prevBridgeForeignBalance
   waitApi(1, '/info', res => {
@@ -187,20 +223,25 @@ function testEthToBnc() {
     return true
   })
 
-  exec(4, `./src/test-services/ethereumSend/run.sh bridge 5`)
-  wait(4)
+  userAccounts.forEach(({ privateKey }, i) => {
+    exec(4, `PRIVATE_KEY=${privateKey} ./src/test-services/ethereumSend/run.sh bridge ${5 + i}`)
+    wait(4)
+  })
 
-  waitApi(1, '/info', res => res.homeBalance === prevBridgeHomeBalance + 5 && res.foreignBalanceTokens === prevBridgeForeignBalance - 5)
-  waitBncTokenBalance(bncReceiver, prevBncBalance + 5)
+  const delta = (9 + userAccounts.length) * userAccounts.length / 2
+  waitApi(1, '/info', res => res.homeBalance === prevBridgeHomeBalance + delta && res.foreignBalanceTokens === prevBridgeForeignBalance - delta)
+
+  userAccounts.forEach((account, i) => {
+    account.bncBalance = waitBncTokenBalance(account.bncAddress, account.bncBalance + 5 + i)
+  })
 
   printState(`Token transfer in eth => bnc direction succeed`)
   console.log('Testing eth => bnc is OK')
 }
 
-function testBncToEth() {
+function testBncToEth () {
   console.log('Testing bnc => eth')
   // try token transfer in bnc => eth direction
-  const prevEthBalance = getEthTokenBalance(ethReceiver)
   let prevBridgeHomeBalance
   let prevBridgeForeignBalance
   waitApi(1, '/info', res => {
@@ -209,17 +250,24 @@ function testBncToEth() {
     return true
   })
 
-  exec(4, `./src/test-services/binanceSend/run.sh ${bridgeBncAddress} 3`)
-  wait(4)
+  userAccounts.forEach(({ privateKey }, i) => {
+    exec(4, `PRIVATE_KEY=${privateKey} ./src/test-services/binanceSend/run.sh ${bridgeBncAddress} ${3 + i}`)
+    wait(4)
+  })
 
-  waitApi(1, '/info', res => res.homeBalance === prevBridgeHomeBalance - 3 && res.foreignBalanceTokens === prevBridgeForeignBalance + 3)
-  waitEthTokenBalance(ethReceiver, prevEthBalance + 3)
+  const delta = (5 + userAccounts.length) * userAccounts.length / 2
+
+  waitApi(1, '/info', res => res.homeBalance === prevBridgeHomeBalance - delta && res.foreignBalanceTokens === prevBridgeForeignBalance + delta)
+
+  userAccounts.forEach((account, i) => {
+    account.ethBalance = waitEthTokenBalance(account.ethAddress, account.ethBalance + 3 + i)
+  })
 
   printState(`Token transfer in bnc => eth direction succeed`)
   console.log('Testing bnc => eth is OK')
 }
 
-function testRemoveValidator() {
+function testRemoveValidator () {
   console.log('Testing removing validator')
   apiRequest(1, '/vote/startVoting')
   apiRequest(2, '/vote/startVoting')
@@ -240,7 +288,7 @@ function testRemoveValidator() {
   console.log('Testing removing validator is OK')
 }
 
-function testAddValidator() {
+function testAddValidator () {
   console.log('Testing adding validator')
   apiRequest(1, '/vote/startVoting')
   apiRequest(3, '/vote/startVoting')
@@ -261,7 +309,7 @@ function testAddValidator() {
   console.log('Testing adding validator is OK')
 }
 
-function testChangeThreshold() {
+function testChangeThreshold () {
   console.log('Testing changing threshold')
   apiRequest(1, '/vote/startVoting')
   apiRequest(3, '/vote/startVoting')
@@ -291,8 +339,12 @@ function run () {
 
   clean()
 
-  exec(4, `./demo/start-environment.sh`)
-  wait(4)
+  execSync(4, `./demo/start-environment.sh`)
+
+  prefundEthAddresses()
+  prefundBncAddresses()
+
+  initBalances()
 
   exec(1, `N=1 ./demo/validator-demo.sh`)
   exec(2, `N=2 ./demo/validator-demo.sh`)
@@ -303,8 +355,7 @@ function run () {
   bridgeBncAddress = /tbnb\w+/.exec(log)[0]
 
   // prefund binance account
-  exec(4, `./src/test-services/binanceSend/run.sh ${bridgeBncAddress} 100 0.1`)
-  wait(4)
+  execSync(4, `./src/test-services/binanceSend/run.sh ${bridgeBncAddress} 100 0.1`)
 
   // wait until binance prefund transaction will be processed
   waitApi(1, '/info', res => res.foreignBalanceTokens === 100)

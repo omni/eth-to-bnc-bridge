@@ -7,50 +7,63 @@ const { padZeros } = require('./crypto')
 
 const { FOREIGN_CHAIN_ID } = process.env
 
+const BNB_ASSET = 'BNB'
+
 class Transaction {
   constructor (options) {
-    const { from, accountNumber, sequence, to, tokens, asset, bnbs, memo = '' } = options
-    const accCode = crypto.decodeAddress(from)
-    const toAccCode = crypto.decodeAddress(to)
+    const { from, accountNumber, sequence, recipients, asset, memo = '' } = options
 
-    const coins = []
-
-    if (tokens && tokens !== '0' && asset) {
-      coins.push({
+    const totalTokens = recipients.reduce((sum, { tokens }) => sum.plus(new BN(tokens || 0)), new BN(0))
+    const totalBnbs = recipients.reduce((sum, { bnbs }) => sum.plus(new BN(bnbs || 0)), new BN(0))
+    const senderCoins = []
+    if (asset && totalTokens.isGreaterThan(0)) {
+      senderCoins.push({
         denom: asset,
-        amount: new BN(tokens).multipliedBy(10 ** 8).toNumber(),
+        amount: totalTokens.multipliedBy(10 ** 8).toNumber(),
       })
     }
-    if (bnbs && bnbs !== '0') {
-      coins.push({
-        denom: 'BNB',
-        amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber(),
+    if (totalBnbs.isGreaterThan(0)) {
+      senderCoins.push({
+        denom: BNB_ASSET,
+        amount: totalBnbs.multipliedBy(10 ** 8).toNumber(),
       })
     }
+    senderCoins.sort((a, b) => a.denom > b.denom)
 
-    coins.sort((a, b) => a.denom > b.denom)
+    const inputs = [ {
+      address: from,
+      coins: senderCoins
+    } ]
+    const outputs = recipients.map(({ to, tokens, bnbs }) => {
+      const receiverCoins = []
+      if (asset && tokens) {
+        receiverCoins.push({
+          denom: asset,
+          amount: new BN(tokens).multipliedBy(10 ** 8).toNumber(),
+        })
+      }
+      if (bnbs) {
+        receiverCoins.push({
+          denom: BNB_ASSET,
+          amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber(),
+        })
+      }
+      receiverCoins.sort((a, b) => a.denom > b.denom)
+      return {
+        address: to,
+        coins: receiverCoins
+      }
+    })
 
     const msg = {
-      inputs: [ {
-        address: accCode,
-        coins
-      } ],
-      outputs: [ {
-        address: toAccCode,
-        coins
-      } ],
+      inputs: inputs.map((x) => ({...x, address: crypto.decodeAddress(x.address)})),
+      outputs: outputs.map((x) => ({...x, address: crypto.decodeAddress(x.address)})),
       msgType: 'MsgSend'
     }
 
     this.signMsg = {
-      inputs: [ {
-        address: from,
-        coins
-      } ],
-      outputs: [ {
-        address: to,
-        coins
-      } ]
+      inputs,
+      outputs
     }
 
     this.tx = new TransactionBnc({
