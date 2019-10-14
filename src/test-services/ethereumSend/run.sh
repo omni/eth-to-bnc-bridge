@@ -9,4 +9,4 @@ TARGET_NETWORK=${TARGET_NETWORK:=development}
 
 docker build -t ethereum-send . > /dev/null
 
-docker run --network blockchain_home --rm --env-file ".env.$TARGET_NETWORK" --env-file "../.keys.$TARGET_NETWORK" ethereum-send $@
+docker run --network blockchain_home --rm --env-file ".env.$TARGET_NETWORK" --env-file "../.keys.$TARGET_NETWORK" -e "PRIVATE_KEY=$PRIVATE_KEY" ethereum-send $@
