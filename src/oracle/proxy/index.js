@@ -74,7 +74,7 @@ async function main () {
   })
 
   votesProxyApp.listen(8002, () => {
-    logger.debug('Votes proxy is listening on port 8001')
+    logger.debug('Votes proxy is listening on port 8002')
   })
 }
 
@@ -285,51 +285,55 @@ function decodeStatus (status) {
 
 async function info (req, res) {
   logger.debug('Info start')
-  const [ x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status ] = await Promise.all([
-    bridge.methods.getX().call().then(x => new BN(x).toString(16)),
-    bridge.methods.getY().call().then(x => new BN(x).toString(16)),
-    bridge.methods.epoch().call().then(x => x.toNumber()),
-    bridge.methods.nextEpoch().call().then(x => x.toNumber()),
-    bridge.methods.getThreshold().call().then(x => x.toNumber()),
-    bridge.methods.getNextThreshold().call().then(x => x.toNumber()),
-    bridge.methods.getValidators().call(),
-    bridge.methods.getNextValidators().call(),
-    token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
-    bridge.methods.status().call()
-  ])
-  const boundX = x => {
-    try {
-      return x.toNumber()
-    } catch (e) {
-      return -1
+  try {
+    const [ x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status ] = await Promise.all([
+      bridge.methods.getX().call().then(x => new BN(x).toString(16)),
+      bridge.methods.getY().call().then(x => new BN(x).toString(16)),
+      bridge.methods.epoch().call().then(x => x.toNumber()),
+      bridge.methods.nextEpoch().call().then(x => x.toNumber()),
+      bridge.methods.getThreshold().call().then(x => x.toNumber()),
+      bridge.methods.getNextThreshold().call().then(x => x.toNumber()),
+      bridge.methods.getValidators().call(),
+      bridge.methods.getNextValidators().call(),
+      token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
+      bridge.methods.status().call()
+    ])
+    const boundX = x => {
+      try {
+        return x.toNumber()
+      } catch (e) {
+        return -1
+      }
     }
+    const [ confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen ] = await Promise.all([
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(boundX),
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(boundX),
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(boundX),
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(boundX)
+    ])
+    const foreignAddress = publicKeyToAddress({ x, y })
+    const balances = await getForeignBalances(foreignAddress)
+    res.send({
+      epoch,
+      nextEpoch,
+      threshold,
+      nextThreshold,
+      homeBridgeAddress: HOME_BRIDGE_ADDRESS,
+      foreignBridgeAddress: foreignAddress,
+      validators,
+      nextValidators,
+      homeBalance,
+      foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
+      foreignBalanceNative: parseFloat(balances['BNB']) || 0,
+      bridgeStatus: decodeStatus(status),
+      votesForVoting,
+      votesForKeygen,
+      votesForCancelKeygen,
+      confirmationsForFundsTransfer
+    })
+  } catch (e) {
+    res.send({message: 'Something went wrong, resend request'})
   }
-  const [ confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen ] = await Promise.all([
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(boundX),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(boundX),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(boundX),
-    bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(boundX)
-  ])
-  const foreignAddress = publicKeyToAddress({ x, y })
-  const balances = await getForeignBalances(foreignAddress)
-  res.send({
-    epoch,
-    nextEpoch,
-    threshold,
-    nextThreshold,
-    homeBridgeAddress: HOME_BRIDGE_ADDRESS,
-    foreignBridgeAddress: foreignAddress,
-    validators,
-    nextValidators,
-    homeBalance,
-    foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
-    foreignBalanceNative: parseFloat(balances['BNB']) || 0,
-    bridgeStatus: decodeStatus(status),
-    votesForVoting,
-    votesForKeygen,
-    votesForCancelKeygen,
-    confirmationsForFundsTransfer
-  })
   logger.debug('Info end')
 }
 
