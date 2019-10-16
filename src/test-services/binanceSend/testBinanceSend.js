@@ -2,11 +2,13 @@ const Bnc = require('@binance-chain/javascript-sdk')
 
 const { FOREIGN_URL, FOREIGN_ASSET, FOREIGN_PRIVATE_KEY } = process.env
 
+const PRIVATE_KEY = process.env.PRIVATE_KEY || FOREIGN_PRIVATE_KEY
+
 const client = new Bnc(FOREIGN_URL)
 
 async function main () {
   client.chooseNetwork('testnet')
-  await client.setPrivateKey(FOREIGN_PRIVATE_KEY)
+  await client.setPrivateKey(PRIVATE_KEY)
 
   await client.initChain()
 
