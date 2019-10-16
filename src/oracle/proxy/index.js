@@ -7,6 +7,7 @@ const { utils } = require('ethers')
 
 const encode = require('./encode')
 const decode = require('./decode')
+const { createSender, waitForReceipt } = require('./sendTx')
 const logger = require('./logger')
 const { publicKeyToAddress } = require('./crypto')
 
@@ -31,8 +32,8 @@ const lock = new AsyncLock()
 
 let homeValidatorNonce
 let sideValidatorNonce
-let homeBlockGasLimit
-let sideBlockGasLimit
+let homeSender
+let sideSender
 
 const app = express()
 app.use(express.json())
@@ -63,8 +64,8 @@ async function main () {
   homeValidatorNonce = await homeWeb3.eth.getTransactionCount(validatorAddress)
   sideValidatorNonce = await sideWeb3.eth.getTransactionCount(validatorAddress)
 
-  homeBlockGasLimit = (await homeWeb3.eth.getBlock('latest', false)).gasLimit
-  sideBlockGasLimit = (await sideWeb3.eth.getBlock('latest', false)).gasLimit
+  homeSender = await createSender(HOME_RPC_URL, VALIDATOR_PRIVATE_KEY)
+  sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
 
   logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
 
@@ -151,10 +152,11 @@ async function signupSign (req, res) {
   logger.debug('SignupSign call')
   const hash = sideWeb3.utils.sha3(`0x${req.body.third}`)
   const query = sharedDb.methods.signupSign(hash)
-  const receipt = await sideSendQuery(query)
+  const txHash = await sideSendQuery(query)
+  const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
 
   // Already have signup
-  if (receipt === false) {
+  if (receipt.status === false) {
     res.send(Ok({ uuid: hash, number: 0 }))
     logger.debug('Already have signup')
     return
@@ -185,81 +187,27 @@ async function confirmFundsTransfer (req, res) {
 }
 
 function sideSendQuery (query) {
-  return lock.acquire('side', async () => {
-    logger.debug('Sending query')
+  return lock.acquire('home', async () => {
+    logger.debug('Sending side query')
     const encodedABI = query.encodeABI()
-    const tx = {
+    return await sideSender({
       data: encodedABI,
-      from: validatorAddress,
       to: SIDE_SHARED_DB_ADDRESS,
-      nonce: sideValidatorNonce++,
-      chainId: await sideWeb3.eth.net.getId()
-    }
-    tx.gas = Math.min(Math.ceil(await query.estimateGas({
-      from: validatorAddress
-    }) * 1.5), sideBlockGasLimit)
-    const signedTx = await sideWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
-
-    return sideWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
-      .catch(e => {
-        const error = parseError(e.message)
-        const reason = parseReason(e.message)
-        if (error === 'revert' && reason.length) {
-          logger.debug(reason)
-          return false
-        } else if (error === 'out of gas') {
-          logger.debug('Out of gas, retrying')
-          return true
-        } else {
-          logger.debug('Side tx failed, retrying, %o', e.message)
-          return true
-        }
-      })
-  })
-    .then(result => {
-      if (result === true)
-        return sideSendQuery(query)
-      return result !== false
+      nonce: sideValidatorNonce++
     })
+  })
 }
 
 function homeSendQuery (query) {
   return lock.acquire('home', async () => {
-    logger.debug('Sending query')
+    logger.debug('Sending home query')
     const encodedABI = query.encodeABI()
-    const tx = {
+    return await homeSender({
       data: encodedABI,
-      from: validatorAddress,
       to: HOME_BRIDGE_ADDRESS,
-      nonce: homeValidatorNonce++,
-      chainId: await homeWeb3.eth.net.getId()
-    }
-    tx.gas = Math.min(Math.ceil(await query.estimateGas({
-      from: validatorAddress
-    }) * 1.5), homeBlockGasLimit)
-    const signedTx = await homeWeb3.eth.accounts.signTransaction(tx, VALIDATOR_PRIVATE_KEY)
-
-    return homeWeb3.eth.sendSignedTransaction(signedTx.rawTransaction)
-      .catch(e => {
-        const error = parseError(e.message)
-        const reason = parseReason(e.message)
-        if (error === 'revert' && reason.length) {
-          logger.debug(reason)
-          return false
-        } else if (error === 'out of gas') {
-          logger.debug('Out of gas, retrying')
-          return true
-        } else {
-          logger.debug('Home tx failed, retrying, %o', e.message)
-          return true
-        }
-      })
-  })
-    .then(result => {
-      if (result === true)
-        return homeSendQuery(query)
-      return result !== false
+      nonce: homeValidatorNonce++
     })
+  })
 }
 
 function parseReason (message) {
