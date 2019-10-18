@@ -10,12 +10,13 @@ ENV PATH=/root/.cargo/bin:$PATH
 WORKDIR /tss
 
 COPY ./multi-party-ecdsa/Cargo.toml /tss/
+COPY ./multi-party-ecdsa/Cargo.lock /tss/
 COPY ./multi-party-ecdsa/src/lib.rs /tss/src/lib.rs
 
-RUN cargo build --release || true
+RUN cargo build --locked --release || true
 
 COPY ./multi-party-ecdsa /tss/
 
-RUN cargo build --release
+RUN cargo build --locked --release
 
 CMD echo Done
