@@ -62,11 +62,8 @@ async function main () {
     attempt = 1
 
     if (!newEpoch) {
-      const exchanges = await getExchangeMessages()
+      const exchanges = await getExchangeMessages(nonce)
       const exchangesData = exchanges.map(msg => JSON.parse(msg.content))
-      if (exchangesData.some(ex => ex.nonce !== nonce)) {
-        logger.warn('Nonce is different, should not reach this point')
-      }
 
       if (exchanges.length > 0 && account.sequence <= nonce) {
         const recipients = exchangesData.map(({ value, recipient }) => ({ to: recipient, tokens: value }))
@@ -139,24 +136,23 @@ async function main () {
 
 main()
 
-async function getExchangeMessages () {
+async function getExchangeMessages (nonce) {
   logger.debug('Getting exchange messages')
   const messages = []
   do {
     const msg = await exchangeQueue.get()
     if (msg === false) {
-      logger.warn('Reached the end of exchange queue, should not reach this point')
       break
     }
     const data = JSON.parse(msg.content)
     logger.debug('Got message %o', data)
-    if (data.stub) {
-      channel.ack(msg)
+    if (data.nonce !== nonce) {
+      channel.nack(msg, false, true)
       break
     }
     messages.push(msg)
   } while (true)
-  logger.debug('Found %d messages', messages.length)
+  logger.debug(`Found ${messages.length} messages`)
   return messages
 }
 

@@ -89,6 +89,7 @@ services:
       - HOME_CHAIN_ID
       - HOME_START_BLOCK
       - BLOCKS_RANGE_SIZE
+      - VALIDATOR_PRIVATE_KEY
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
     volumes:
