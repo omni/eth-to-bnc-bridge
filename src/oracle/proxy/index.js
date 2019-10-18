@@ -152,7 +152,7 @@ async function signupSign (req, res) {
   logger.debug('SignupSign call')
   const hash = sideWeb3.utils.sha3(`0x${req.body.third}`)
   const query = sharedDb.methods.signupSign(hash)
-  const txHash = await sideSendQuery(query)
+  const { txHash } = await sideSendQuery(query)
   const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
 
   // Already have signup
@@ -220,9 +220,26 @@ function parseError (message) {
   return result ? result[0] : ''
 }
 
-async function sendVote (query, req, res) {
+async function sendVote (query, req, res, waitFlag = false) {
   try {
-    if (await homeSendQuery(query)) {
+    let { txHash, gasLimit } = await homeSendQuery(query)
+    if (txHash) {
+      while (waitFlag) {
+        const { status, gasUsed } = await waitForReceipt(HOME_RPC_URL, txHash)
+        if (status === '0x1') {
+          logger.debug('Receipt status is OK')
+          break
+        }
+        if (gasLimit === gasUsed) {
+          logger.info('Sending vote failed due to out of gas revert, retrying with more gas')
+          const nexTx = await homeSendQuery(query)
+          txHash = nexTx.txHash
+          gasLimit = nexTx.gasLimit
+        } else {
+          logger.warn(`Vote tx was reverted, txHash ${txHash}`)
+          break
+        }
+      }
       res.send('Voted\n')
       logger.info('Voted successfully')
     } else {
@@ -237,7 +254,7 @@ async function sendVote (query, req, res) {
 async function voteStartVoting (req, res) {
   logger.info('Voting for starting new epoch voting process')
   const query = bridge.methods.startVoting()
-  sendVote(query, req, res)
+  sendVote(query, req, res, true)
 }
 
 async function voteStartKeygen (req, res) {
@@ -267,7 +284,7 @@ async function voteChangeThreshold (req, res) {
 async function voteRemoveValidator (req, res) {
   logger.info('Voting for removing validator')
   const query = bridge.methods.voteRemoveValidator(req.params.validator)
-  sendVote(query, req, res)
+  sendVote(query, req, res, true)
 }
 
 function decodeStatus (status) {
@@ -283,43 +300,53 @@ function decodeStatus (status) {
   }
 }
 
+
+function boundX(x) {
+  try {
+    return x.toNumber()
+  } catch (e) {
+    return -1
+  }
+}
+
 async function info (req, res) {
   logger.debug('Info start')
   try {
-    const [ x, y, epoch, nextEpoch, threshold, nextThreshold, validators, nextValidators, homeBalance, status ] = await Promise.all([
+    const [ x, y, epoch, rangeSize, nextRangeSize, epochStartBlock, foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, status, homeBalance ] = await Promise.all([
       bridge.methods.getX().call().then(x => new BN(x).toString(16)),
       bridge.methods.getY().call().then(x => new BN(x).toString(16)),
       bridge.methods.epoch().call().then(x => x.toNumber()),
+      bridge.methods.getRangeSize().call().then(x => x.toNumber()),
+      bridge.methods.getNextRangeSize().call().then(x => x.toNumber()),
+      bridge.methods.getStartBlock().call().then(x => x.toNumber()),
+      bridge.methods.getNonce().call().then(boundX),
       bridge.methods.nextEpoch().call().then(x => x.toNumber()),
       bridge.methods.getThreshold().call().then(x => x.toNumber()),
       bridge.methods.getNextThreshold().call().then(x => x.toNumber()),
       bridge.methods.getValidators().call(),
       bridge.methods.getNextValidators().call(),
-      token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3))),
-      bridge.methods.status().call()
+      bridge.methods.status().call(),
+      token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call().then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
-    const boundX = x => {
-      try {
-        return x.toNumber()
-      } catch (e) {
-        return -1
-      }
-    }
     const [ confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen ] = await Promise.all([
       bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 1, nextEpoch ]))).call().then(boundX),
       bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 2, nextEpoch ]))).call().then(boundX),
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 6, nextEpoch ]))).call().then(boundX),
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(boundX)
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 7, nextEpoch ]))).call().then(boundX),
+      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack([ 'uint8', 'uint256' ], [ 8, nextEpoch ]))).call().then(boundX)
     ])
     const foreignAddress = publicKeyToAddress({ x, y })
     const balances = await getForeignBalances(foreignAddress)
     res.send({
       epoch,
+      rangeSize,
+      nextRangeSize,
+      epochStartBlock,
       nextEpoch,
       threshold,
       nextThreshold,
       homeBridgeAddress: HOME_BRIDGE_ADDRESS,
       foreignBridgeAddress: foreignAddress,
+      foreignNonce,
       validators,
       nextValidators,
       homeBalance,
@@ -332,7 +359,7 @@ async function info (req, res) {
       confirmationsForFundsTransfer
     })
   } catch (e) {
-    res.send({message: 'Something went wrong, resend request'})
+    res.send({ message: 'Something went wrong, resend request', error: e })
   }
   logger.debug('Info end')
 }
@@ -344,8 +371,6 @@ async function transfer (req, res) {
     logger.info(`Calling transfer to ${to}, ${value} tokens`)
     const query = bridge.methods.transfer(hash, to, '0x' + (new BN(value).toString(16)))
     await homeSendQuery(query)
-  } else {
-    // return funds ?
   }
   res.send()
   logger.info('Transfer end')

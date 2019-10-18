@@ -11,7 +11,6 @@ const { publicKeyToAddress } = require('./crypto')
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK } = process.env
-const BLOCKS_RANGE_SIZE = parseInt(process.env.BLOCKS_RANGE_SIZE)
 
 const web3Home = new Web3(HOME_RPC_URL)
 const bridge = new web3Home.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
@@ -25,9 +24,8 @@ let blockNumber
 let foreignNonce = []
 let epoch
 let epochStart
-let rangeStart
-let rangeEnd
 let redisTx
+let rangeSize
 let lastTransactionBlockNumber
 
 async function resetFutureMessages (queue) {
@@ -84,6 +82,7 @@ async function initialize () {
   if (epochStart > saved) {
     logger.info(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
     blockNumber = epochStart
+    rangeSize = (await bridge.methods.getRangeSize().call()).toNumber()
     await redis.multi()
       .set('homeBlock', blockNumber - 1)
       .set(`foreignNonce${epoch}`, 0)
@@ -94,11 +93,6 @@ async function initialize () {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
-
-  rangeStart = blockNumber - (blockNumber - epochStart) % BLOCKS_RANGE_SIZE
-  rangeEnd = rangeStart + BLOCKS_RANGE_SIZE - 1
-
-  logger.info('Initialized sign range range, [%d-%d]', rangeStart, rangeEnd)
 
   await resetFutureMessages(keygenQueue)
   await resetFutureMessages(cancelKeygenQueue)
@@ -140,24 +134,22 @@ async function main () {
         break
       case 'EpochStart':
         epoch = event.returnValues.epoch.toNumber()
+        epochStart = blockNumber
         logger.info(`Epoch ${epoch} started`)
-        rangeStart = blockNumber
-        rangeEnd = blockNumber + BLOCKS_RANGE_SIZE - 1
-        logger.info('Updated sign range range, [%d-%d]', rangeStart, rangeEnd)
+        rangeSize = (await bridge.methods.getRangeSize().call()).toNumber()
+        logger.info(`Updated range size to ${rangeSize}`)
         foreignNonce[epoch] = 0
         break
     }
   }
 
-  if (blockNumber === rangeEnd) {
+  if ((blockNumber + 1 - epochStart) % rangeSize === 0) {
     logger.info('Reached end of the current block range')
-    if (lastTransactionBlockNumber >= rangeStart) {
+
+    if (lastTransactionBlockNumber > blockNumber - rangeSize) {
       logger.info('Sending message to start signature generation for the ended range')
       await sendStartSign()
     }
-    rangeStart = rangeEnd + 1
-    rangeEnd = rangeEnd + BLOCKS_RANGE_SIZE
-    logger.info('Updated sign range range, [%d-%d]', rangeStart, rangeEnd)
   }
 
   blockNumber++
@@ -228,7 +220,8 @@ async function sendSign (event) {
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3)
+    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3),
+    nonce: event.returnValues.nonce.toNumber()
   }
 
   exchangeQueue.send(msgToQueue)
@@ -239,14 +232,15 @@ async function sendSign (event) {
   logger.debug('Set lastTransactionBlockNumber to %d', blockNumber)
 }
 
-async function sendStartSign() {
+async function sendStartSign () {
   redisTx.incr(`foreignNonce${epoch}`)
+  exchangeQueue.send({
+    stub: true
+  })
   signQueue.send({
     epoch,
     blockNumber,
     nonce: foreignNonce[epoch]++,
-    startBlock: rangeStart,
-    endBlock: rangeEnd,
     threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
     parties: (await bridge.methods.getParties(epoch).call()).toNumber()
   })

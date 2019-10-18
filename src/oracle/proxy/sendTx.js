@@ -68,7 +68,7 @@ async function createSender (url, privateKey) {
         return false
       }
 
-      return result
+      return { txHash: result, gasLimit: tx.gasLimit }
     } catch (e) {
       logger.warn('Something failed, %o', e)
       return false
@@ -80,7 +80,7 @@ async function waitForReceipt (url, txHash) {
   while (true) {
     const { result, error } = await sendRpcRequest(url, 'eth_getTransactionReceipt', [ txHash ])
 
-    if(result === null || error) {
+    if (result === null || error) {
       await new Promise(res => setTimeout(res, 1000))
     } else {
       return result

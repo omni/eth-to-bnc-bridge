@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 
 contract Bridge {
-    event ExchangeRequest(uint value);
+    event ExchangeRequest(uint value, uint nonce);
     event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
     event NewEpochCancelled(uint indexed epoch);
     event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
@@ -12,6 +12,9 @@ contract Bridge {
     struct State {
         address[] validators;
         uint threshold;
+        uint rangeSize;
+        uint startBlock;
+        uint nonce;
         uint x;
         uint y;
     }
@@ -30,6 +33,7 @@ contract Bridge {
         ADD_VALIDATOR,
         REMOVE_VALIDATOR,
         CHANGE_THRESHOLD,
+        CHANGE_RANGE_SIZE,
         START_KEYGEN,
         CANCEL_KEYGEN,
         TRANSFER
@@ -41,6 +45,7 @@ contract Bridge {
     mapping(bytes32 => bool) public dbTransfer;
     mapping(bytes32 => uint) public votesCount;
     mapping(bytes32 => bool) public votes;
+    mapping(bytes32 => bool) public usedRange;
 
     Status public status;
 
@@ -50,7 +55,7 @@ contract Bridge {
     uint minTxLimit;
     uint maxTxLimit;
 
-    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits) public {
+    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits, uint rangeSize) public {
         require(validators.length > 0);
         require(threshold < validators.length);
 
@@ -60,7 +65,7 @@ contract Bridge {
         status = Status.KEYGEN;
         nextEpoch = 1;
 
-        states[1] = State(validators, threshold, 0, 0);
+        states[nextEpoch] = State(validators, threshold, rangeSize, 0, uint(-1), 0, 0);
 
         minTxLimit = limits[0];
         maxTxLimit = limits[1];
@@ -103,8 +108,14 @@ contract Bridge {
     function exchange(uint value) public ready {
         require(value >= minTxLimit && value >= 10 ** 10 && value <= maxTxLimit);
 
+        uint txRange = (block.number - getStartBlock()) / getRangeSize();
+        if (!usedRange[keccak256(abi.encodePacked(txRange, epoch))]) {
+            usedRange[keccak256(abi.encodePacked(txRange, epoch))] = true;
+            states[epoch].nonce++;
+        }
+
         tokenContract.transferFrom(msg.sender, address(this), value);
-        emit ExchangeRequest(value);
+        emit ExchangeRequest(value, getNonce());
     }
 
     function transfer(bytes32 hash, address to, uint value) public readyOrVoting currentValidator {
@@ -121,6 +132,8 @@ contract Bridge {
             states[nextEpoch].y = y;
             if (nextEpoch == 1) {
                 status = Status.READY;
+                states[nextEpoch].startBlock = block.number;
+                states[nextEpoch].nonce = uint(-1);
                 epoch = nextEpoch;
                 emit EpochStart(epoch, x, y);
             }
@@ -136,8 +149,10 @@ contract Bridge {
 
         if (tryConfirm(Vote.CONFIRM_FUNDS_TRANSFER)) {
             status = Status.READY;
+            states[nextEpoch].startBlock = block.number;
+            states[nextEpoch].nonce = uint(-1);
             epoch = nextEpoch;
-            emit EpochStart(epoch, states[epoch].x, states[epoch].y);
+            emit EpochStart(epoch, getX(), getY());
         }
     }
 
@@ -163,6 +178,34 @@ contract Bridge {
 
     function getThreshold(uint _epoch) view public returns (uint) {
         return states[_epoch].threshold;
+    }
+
+    function getStartBlock() view public returns (uint) {
+        return getStartBlock(epoch);
+    }
+
+    function getStartBlock(uint _epoch) view public returns (uint) {
+        return states[_epoch].startBlock;
+    }
+
+    function getRangeSize() view public returns (uint) {
+        return getRangeSize(epoch);
+    }
+
+    function getNextRangeSize() view public returns (uint) {
+        return getRangeSize(nextEpoch);
+    }
+
+    function getRangeSize(uint _epoch) view public returns (uint) {
+        return states[_epoch].rangeSize;
+    }
+
+    function getNonce() view public returns (uint) {
+        return getNonce(epoch);
+    }
+
+    function getNonce(uint _epoch) view public returns (uint) {
+        return states[_epoch].nonce;
     }
 
     function getX() view public returns (uint) {
@@ -203,8 +246,9 @@ contract Bridge {
         if (tryVote(Vote.START_VOTING)) {
             nextEpoch++;
             status = Status.VOTING;
-            states[nextEpoch].threshold = states[epoch].threshold;
-            states[nextEpoch].validators = states[epoch].validators;
+            states[nextEpoch].threshold = getThreshold();
+            states[nextEpoch].validators = getValidators();
+            states[nextEpoch].rangeSize = getRangeSize();
         }
     }
 
@@ -227,7 +271,7 @@ contract Bridge {
     function _removeValidator(address validator) private {
         for (uint i = 0; i < getNextParties() - 1; i++) {
             if (states[nextEpoch].validators[i] == validator) {
-                states[nextEpoch].validators[i] = states[nextEpoch].validators[getNextParties() - 1];
+                states[nextEpoch].validators[i] = getNextValidators()[getNextParties() - 1];
                 break;
             }
         }
@@ -238,6 +282,12 @@ contract Bridge {
     function voteChangeThreshold(uint threshold) public voting currentValidator {
         if (tryVote(Vote.CHANGE_THRESHOLD, threshold)) {
             states[nextEpoch].threshold = threshold;
+        }
+    }
+
+    function voteChangeRangeSize(uint rangeSize) public voting currentValidator {
+        if (tryVote(Vote.CHANGE_RANGE_SIZE, rangeSize)) {
+            states[nextEpoch].rangeSize = rangeSize;
         }
     }
 

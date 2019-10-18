@@ -45,7 +45,7 @@ async function main () {
     const data = JSON.parse(msg.content)
 
     logger.info('Consumed sign event: %o', data)
-    const { nonce, epoch, newEpoch, startBlock, endBlock, parties, threshold } = data
+    const { nonce, epoch, newEpoch, parties, threshold } = data
 
     const keysFile = `/keys/keys${epoch}.store`
     const { address: from, publicKey } = getAccountFromFile(keysFile)
@@ -61,33 +61,41 @@ async function main () {
 
     attempt = 1
 
-    if (!newEpoch && account.sequence <= nonce) {
-      while (true) {
-        logger.info(`Building corresponding transfer transaction, nonce ${nonce}`)
+    if (!newEpoch) {
+      const exchanges = await getExchangeMessages()
+      const exchangesData = exchanges.map(msg => JSON.parse(msg.content))
+      if (exchangesData.some(ex => ex.nonce !== nonce)) {
+        logger.warn('Nonce is different, should not reach this point')
+      }
 
-        const exchanges = await getExchangeMessages(startBlock, endBlock)
-        const exchangesData = exchanges.map(msg => JSON.parse(msg.content))
-        const tx = new Transaction({
-          from,
-          accountNumber: account.account_number,
-          sequence: nonce,
-          recipients: exchangesData.map(({ value, recipient }) => ({ to: recipient, tokens: value })),
-          asset: FOREIGN_ASSET,
-          memo: `Attempt ${attempt}`
-        })
+      if (exchanges.length > 0 && account.sequence <= nonce) {
+        const recipients = exchangesData.map(({ value, recipient }) => ({ to: recipient, tokens: value }))
 
-        const hash = sha256(tx.getSignBytes())
-        logger.info(`Starting signature generation for transaction hash ${hash}`)
-        const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
+        while (true) {
+          logger.info(`Building corresponding transfer transaction, nonce ${nonce}`)
 
-        if (done) {
-          exchanges.forEach(msg => channel.ack(msg))
-          break
+          const tx = new Transaction({
+            from,
+            accountNumber: account.account_number,
+            sequence: nonce,
+            recipients,
+            asset: FOREIGN_ASSET,
+            memo: `Attempt ${attempt}`
+          })
+
+          const hash = sha256(tx.getSignBytes())
+          logger.info(`Starting signature generation for transaction hash ${hash}`)
+          const done = await sign(keysFile, hash, tx, publicKey) && await waitForAccountNonce(from, nonce + 1)
+
+          if (done) {
+            exchanges.forEach(msg => channel.ack(msg))
+            break
+          }
+          attempt = nextAttempt ? nextAttempt : attempt + 1
+          logger.warn(`Sign failed, starting next attempt ${attempt}`)
+          nextAttempt = null
+          await new Promise(resolve => setTimeout(resolve, 1000))
         }
-        attempt = nextAttempt ? nextAttempt : attempt + 1
-        logger.warn(`Sign failed, starting next attempt ${attempt}`)
-        nextAttempt = null
-        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     } else if (account.sequence <= nonce) {
       const newKeysFile = `/keys/keys${newEpoch}.store`
@@ -99,11 +107,11 @@ async function main () {
           from,
           accountNumber: account.account_number,
           sequence: nonce,
-          recipients: [{
+          recipients: [ {
             to,
             tokens: account.balances.find(x => x.symbol === FOREIGN_ASSET).free,
             bnbs: new BN(account.balances.find(x => x.symbol === 'BNB').free).minus(new BN(60000).div(10 ** 8)),
-          }],
+          } ],
           asset: FOREIGN_ASSET,
           memo: `Attempt ${attempt}`
         })
@@ -131,22 +139,22 @@ async function main () {
 
 main()
 
-async function getExchangeMessages(startBlock, endBlock) {
+async function getExchangeMessages () {
   logger.debug('Getting exchange messages')
   const messages = []
   do {
     const msg = await exchangeQueue.get()
     if (msg === false) {
-      break;
+      logger.warn('Reached the end of exchange queue, should not reach this point')
+      break
     }
     const data = JSON.parse(msg.content)
     logger.debug('Got message %o', data)
-    if (data.blockNumber > endBlock) {
+    if (data.stub) {
       channel.ack(msg)
-      break;
+      break
     }
-    if (data.blockNumber >= startBlock)
-      messages.push(msg)
+    messages.push(msg)
   } while (true)
   logger.debug('Found %d messages', messages.length)
   return messages

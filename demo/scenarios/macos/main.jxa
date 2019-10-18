@@ -144,15 +144,13 @@ function waitApi (n, url, check) {
 
 function prefundEthAddresses () {
   for (let { ethAddress } of userAccounts) {
-    exec(4, `./src/test-services/ethereumSend/run.sh ${ethAddress} 100`)
-    wait(4)
+    execSync(4, `./src/test-services/ethereumSend/run.sh ${ethAddress} 100`)
   }
 }
 
 function prefundBncAddresses () {
   for (let { bncAddress } of userAccounts) {
-    exec(4, `./src/test-services/binanceSend/run.sh ${bncAddress} 100 0.1`)
-    wait(4)
+    execSync(4, `./src/test-services/binanceSend/run.sh ${bncAddress} 100 0.1`)
   }
 }
 
@@ -236,8 +234,7 @@ function testEthToBnc () {
   })
 
   userAccounts.forEach((account, i) => {
-    exec(4, `PRIVATE_KEY=${account.privateKey} ./src/test-services/ethereumSend/run.sh bridge ${5 + i}`)
-    wait(4)
+    execSync(4, `PRIVATE_KEY=${account.privateKey} ./src/test-services/ethereumSend/run.sh bridge ${5 + i}`)
     account.ethBalance -= 5 + i
   })
 
@@ -264,8 +261,7 @@ function testBncToEth () {
   })
 
   userAccounts.forEach((account , i) => {
-    exec(4, `PRIVATE_KEY=${account.privateKey} ./src/test-services/binanceSend/run.sh ${bridgeBncAddress} ${3 + i}`)
-    wait(4)
+    execSync(4, `PRIVATE_KEY=${account.privateKey} ./src/test-services/binanceSend/run.sh ${bridgeBncAddress} ${3 + i}`)
     account.bncBalance -= 3 + i
   })
 
