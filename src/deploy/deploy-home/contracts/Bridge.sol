@@ -3,6 +3,7 @@ pragma solidity ^0.5.0;
 import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 
 contract Bridge {
+    event ExchangeRequest(uint value, uint nonce);
     event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
     event NewEpochCancelled(uint indexed epoch);
     event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
@@ -11,38 +12,63 @@ contract Bridge {
     struct State {
         address[] validators;
         uint threshold;
+        uint rangeSize;
+        uint startBlock;
+        uint nonce;
         uint x;
         uint y;
     }
 
+    enum Status {
+        READY, // bridge is in ready to perform operations
+        VOTING, // voting for changing in next epoch, but still ready
+        KEYGEN, //keygen, can be cancelled
+        FUNDS_TRANSFER // funds transfer, cannot be cancelled
+    }
+
+    enum Vote {
+        CONFIRM_KEYGEN,
+        CONFIRM_FUNDS_TRANSFER,
+        START_VOTING,
+        ADD_VALIDATOR,
+        REMOVE_VALIDATOR,
+        CHANGE_THRESHOLD,
+        CHANGE_RANGE_SIZE,
+        START_KEYGEN,
+        CANCEL_KEYGEN,
+        TRANSFER
+    }
+
     mapping(uint => State) states;
 
-    mapping(bytes32 => uint) public confirmationsCount;
-    mapping(bytes32 => bool) public confirmations;
     mapping(bytes32 => uint) public dbTransferCount;
     mapping(bytes32 => bool) public dbTransfer;
     mapping(bytes32 => uint) public votesCount;
     mapping(bytes32 => bool) public votes;
+    mapping(bytes32 => bool) public usedRange;
 
-    // 0 - ready
-    // 1 - keygen, can be cancelled
-    // 2 - funds transfer, cannot be cancelled
-    uint public status;
+    Status public status;
 
     uint public epoch;
     uint public nextEpoch;
 
-    constructor(uint threshold, address[] memory validators, address _tokenContract) public {
+    uint minTxLimit;
+    uint maxTxLimit;
+
+    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits, uint rangeSize) public {
         require(validators.length > 0);
         require(threshold < validators.length);
 
         tokenContract = IERC20(_tokenContract);
 
         epoch = 0;
-        status = 1;
+        status = Status.KEYGEN;
         nextEpoch = 1;
 
-        states[1] = State(validators, threshold, 0, 0);
+        states[nextEpoch] = State(validators, threshold, rangeSize, 0, uint(-1), 0, 0);
+
+        minTxLimit = limits[0];
+        maxTxLimit = limits[1];
 
         emit NewEpoch(0, 1);
     }
@@ -50,17 +76,27 @@ contract Bridge {
     IERC20 public tokenContract;
 
     modifier ready {
-        require(status == 0, "Not in ready state");
+        require(status == Status.READY, "Not in ready state");
+        _;
+    }
+
+    modifier readyOrVoting {
+        require(status == Status.READY || status == Status.VOTING, "Not in ready or voting state");
+        _;
+    }
+
+    modifier voting {
+        require(status == Status.VOTING, "Not in voting state");
         _;
     }
 
     modifier keygen {
-        require(status == 1, "Not in keygen state");
+        require(status == Status.KEYGEN, "Not in keygen state");
         _;
     }
 
     modifier fundsTransfer {
-        require(status == 2, "Not in funds transfer state");
+        require(status == Status.FUNDS_TRANSFER, "Not in funds transfer state");
         _;
     }
 
@@ -69,32 +105,40 @@ contract Bridge {
         _;
     }
 
-    function transfer(bytes32 hash, address to, uint value) public ready currentValidator {
-        require(!dbTransfer[keccak256(abi.encodePacked(hash, msg.sender, to, value))], "Already voted");
+    function exchange(uint value) public ready {
+        require(value >= minTxLimit && value >= 10 ** 10 && value <= maxTxLimit);
 
-        dbTransfer[keccak256(abi.encodePacked(hash, msg.sender, to, value))] = true;
-        if (++dbTransferCount[keccak256(abi.encodePacked(hash, to, value))] == getThreshold() + 1) {
-            dbTransferCount[keccak256(abi.encodePacked(hash, to, value))] = 2 ** 255;
+        uint txRange = (block.number - getStartBlock()) / getRangeSize();
+        if (!usedRange[keccak256(abi.encodePacked(txRange, epoch))]) {
+            usedRange[keccak256(abi.encodePacked(txRange, epoch))] = true;
+            states[epoch].nonce++;
+        }
+
+        tokenContract.transferFrom(msg.sender, address(this), value);
+        emit ExchangeRequest(value, getNonce());
+    }
+
+    function transfer(bytes32 hash, address to, uint value) public readyOrVoting currentValidator {
+        if (tryVote(Vote.TRANSFER, hash, to, value)) {
             tokenContract.transfer(to, value);
         }
     }
 
     function confirmKeygen(uint x, uint y) public keygen {
         require(getNextPartyId(msg.sender) != 0, "Not a next validator");
-        require(!confirmations[keccak256(abi.encodePacked(uint(1), nextEpoch, msg.sender, x, y))], "Already confirmed");
 
-        confirmations[keccak256(abi.encodePacked(uint(1), nextEpoch, msg.sender, x, y))] = true;
-        if (++confirmationsCount[keccak256(abi.encodePacked(uint(1), nextEpoch, x, y))] == getNextThreshold() + 1) {
-            confirmationsCount[keccak256(abi.encodePacked(uint(1), nextEpoch, x, y))] = 2 ** 255;
+        if (tryConfirm(Vote.CONFIRM_KEYGEN, x, y)) {
             states[nextEpoch].x = x;
             states[nextEpoch].y = y;
             if (nextEpoch == 1) {
-                status = 0;
+                status = Status.READY;
+                states[nextEpoch].startBlock = block.number;
+                states[nextEpoch].nonce = uint(-1);
                 epoch = nextEpoch;
                 emit EpochStart(epoch, x, y);
             }
             else {
-                status = 2;
+                status = Status.FUNDS_TRANSFER;
                 emit NewFundsTransfer(epoch, nextEpoch);
             }
         }
@@ -102,14 +146,13 @@ contract Bridge {
 
     function confirmFundsTransfer() public fundsTransfer currentValidator {
         require(epoch > 0, "First epoch does not need funds transfer");
-        require(!confirmations[keccak256(abi.encodePacked(uint(2), nextEpoch, msg.sender))], "Already confirmed");
 
-        confirmations[keccak256(abi.encodePacked(uint(2), nextEpoch, msg.sender))] = true;
-        if (++confirmationsCount[keccak256(abi.encodePacked(uint(2), nextEpoch))] == getNextThreshold() + 1) {
-            confirmationsCount[keccak256(abi.encodePacked(uint(2), nextEpoch))] = 2 ** 255;
-            status = 0;
+        if (tryConfirm(Vote.CONFIRM_FUNDS_TRANSFER)) {
+            status = Status.READY;
+            states[nextEpoch].startBlock = block.number;
+            states[nextEpoch].nonce = uint(-1);
             epoch = nextEpoch;
-            emit EpochStart(epoch, states[epoch].x, states[epoch].y);
+            emit EpochStart(epoch, getX(), getY());
         }
     }
 
@@ -135,6 +178,34 @@ contract Bridge {
 
     function getThreshold(uint _epoch) view public returns (uint) {
         return states[_epoch].threshold;
+    }
+
+    function getStartBlock() view public returns (uint) {
+        return getStartBlock(epoch);
+    }
+
+    function getStartBlock(uint _epoch) view public returns (uint) {
+        return states[_epoch].startBlock;
+    }
+
+    function getRangeSize() view public returns (uint) {
+        return getRangeSize(epoch);
+    }
+
+    function getNextRangeSize() view public returns (uint) {
+        return getRangeSize(nextEpoch);
+    }
+
+    function getRangeSize(uint _epoch) view public returns (uint) {
+        return states[_epoch].rangeSize;
+    }
+
+    function getNonce() view public returns (uint) {
+        return getNonce(epoch);
+    }
+
+    function getNonce(uint _epoch) view public returns (uint) {
+        return states[_epoch].nonce;
     }
 
     function getX() view public returns (uint) {
@@ -171,22 +242,28 @@ contract Bridge {
         return states[nextEpoch].validators;
     }
 
-    function voteAddValidator(address validator) public ready currentValidator {
-        require(getNextPartyId(validator) == 0, "Already a validator");
-        require(!votes[keccak256(abi.encodePacked(uint(1), nextEpoch, msg.sender, validator))], "Already voted");
+    function startVoting() public readyOrVoting currentValidator {
+        if (tryVote(Vote.START_VOTING)) {
+            nextEpoch++;
+            status = Status.VOTING;
+            states[nextEpoch].threshold = getThreshold();
+            states[nextEpoch].validators = getValidators();
+            states[nextEpoch].rangeSize = getRangeSize();
+        }
+    }
 
-        votes[keccak256(abi.encodePacked(uint(1), nextEpoch, msg.sender, validator))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(1), nextEpoch, validator))] == getThreshold() + 1) {
+    function voteAddValidator(address validator) public voting currentValidator {
+        require(getNextPartyId(validator) == 0, "Already a validator");
+
+        if (tryVote(Vote.ADD_VALIDATOR, validator)) {
             states[nextEpoch].validators.push(validator);
         }
     }
 
-    function voteRemoveValidator(address validator) public ready currentValidator {
+    function voteRemoveValidator(address validator) public voting currentValidator {
         require(getNextPartyId(validator) != 0, "Already not a validator");
-        require(!votes[keccak256(abi.encodePacked(uint(2), nextEpoch, msg.sender, validator))], "Already voted");
 
-        votes[keccak256(abi.encodePacked(uint(2), nextEpoch, msg.sender, validator))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(2), nextEpoch, validator))] == getThreshold() + 1) {
+        if (tryVote(Vote.REMOVE_VALIDATOR, validator)) {
             _removeValidator(validator);
         }
     }
@@ -194,7 +271,7 @@ contract Bridge {
     function _removeValidator(address validator) private {
         for (uint i = 0; i < getNextParties() - 1; i++) {
             if (states[nextEpoch].validators[i] == validator) {
-                states[nextEpoch].validators[i] = states[nextEpoch].validators[getNextParties() - 1];
+                states[nextEpoch].validators[i] = getNextValidators()[getNextParties() - 1];
                 break;
             }
         }
@@ -202,36 +279,93 @@ contract Bridge {
         states[nextEpoch].validators.length--;
     }
 
-    function voteChangeThreshold(uint threshold) public ready currentValidator {
-        require(!votes[keccak256(abi.encodePacked(uint(3), nextEpoch, msg.sender, threshold))], "Already voted");
-
-        votes[keccak256(abi.encodePacked(uint(3), nextEpoch, msg.sender, threshold))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(3), nextEpoch, threshold))] == getThreshold() + 1) {
+    function voteChangeThreshold(uint threshold) public voting currentValidator {
+        if (tryVote(Vote.CHANGE_THRESHOLD, threshold)) {
             states[nextEpoch].threshold = threshold;
         }
     }
 
-    function voteStartKeygen() public ready currentValidator {
-        require(!votes[keccak256(abi.encodePacked(uint(4), nextEpoch + 1, msg.sender))], "Voted already");
+    function voteChangeRangeSize(uint rangeSize) public voting currentValidator {
+        if (tryVote(Vote.CHANGE_RANGE_SIZE, rangeSize)) {
+            states[nextEpoch].rangeSize = rangeSize;
+        }
+    }
 
-        votes[keccak256(abi.encodePacked(uint(4), nextEpoch + 1, msg.sender))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(4), nextEpoch + 1))] == getThreshold() + 1) {
-            status = 1;
+    function voteStartKeygen() public voting currentValidator {
+        if (tryVote(Vote.START_KEYGEN)) {
+            status = Status.KEYGEN;
 
-            nextEpoch++;
-            states[nextEpoch].validators = getValidators();
             emit NewEpoch(epoch, nextEpoch);
         }
     }
 
     function voteCancelKeygen() public keygen currentValidator {
-        require(!votes[keccak256(abi.encodePacked(uint(5), nextEpoch, msg.sender))], "Voted already");
-
-        votes[keccak256(abi.encodePacked(uint(5), nextEpoch, msg.sender))] = true;
-        if (++votesCount[keccak256(abi.encodePacked(uint(5), nextEpoch))] == getThreshold() + 1) {
-            status = 0;
+        if (tryVote(Vote.CANCEL_KEYGEN)) {
+            status = Status.VOTING;
 
             emit NewEpochCancelled(nextEpoch);
         }
+    }
+
+    function tryVote(Vote voteType) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, nextEpoch));
+        return putVote(vote);
+    }
+
+    function tryVote(Vote voteType, address addr) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, nextEpoch, addr));
+        return putVote(vote);
+    }
+
+    function tryVote(Vote voteType, uint num) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, nextEpoch, num));
+        return putVote(vote);
+    }
+
+    function tryVote(Vote voteType, bytes32 hash, address to, uint value) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, hash, to, value));
+        return putVote(vote);
+    }
+
+    function tryConfirm(Vote voteType) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, nextEpoch));
+        return putConfirm(vote);
+    }
+
+    function tryConfirm(Vote voteType, uint x, uint y) private returns (bool) {
+        bytes32 vote = keccak256(abi.encodePacked(voteType, nextEpoch, x, y));
+        return putConfirm(vote);
+    }
+
+    function putVote(bytes32 vote) private returns (bool) {
+        bytes32 personalVote = personalizeVote(vote);
+        require(!votes[personalVote], "Voted already");
+
+        votes[personalVote] = true;
+        if (votesCount[vote] == getThreshold()) {
+            votesCount[vote] = 2 ** 255;
+            return true;
+        } else {
+            votesCount[vote]++;
+            return false;
+        }
+    }
+
+    function putConfirm(bytes32 vote) private returns (bool) {
+        bytes32 personalVote = personalizeVote(vote);
+        require(!votes[personalVote], "Confirmed already");
+
+        votes[personalVote] = true;
+        if (votesCount[vote] == getNextThreshold()) {
+            votesCount[vote] = 2 ** 255;
+            return true;
+        } else {
+            votesCount[vote]++;
+            return false;
+        }
+    }
+
+    function personalizeVote(bytes32 vote) private view returns (bytes32) {
+        return keccak256(abi.encodePacked(vote, msg.sender));
     }
 }

@@ -1,0 +1,7 @@
+{
+  "name": "reset-to-block",
+  "version": "0.0.1",
+  "dependencies": {
+    "ioredis": "4.14.1"
+  }
+}

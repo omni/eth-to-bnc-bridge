@@ -1,10 +1,11 @@
-const redis = require('./db')
 const axios = require('axios')
-const bech32 = require('bech32')
 const BN = require('bignumber.js')
 const fs = require('fs')
-const crypto = require('crypto')
 const { computeAddress } = require('ethers').utils
+
+const logger = require('./logger')
+const redis = require('./db')
+const { publicKeyToAddress } = require('./crypto')
 
 const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
@@ -13,8 +14,8 @@ const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
 
 async function initialize () {
   if (await redis.get('foreignTime') === null) {
-    console.log('Set default foreign time')
-    await redis.set('foreignTime', 1562306990672)
+    logger.info('Set default foreign time')
+    await redis.set('foreignTime', Date.now() - 2 * 30 * 24 * 60 * 60 * 1000)
   }
 }
 
@@ -26,7 +27,10 @@ async function main () {
     return
   }
 
-  console.log(`Found ${newTransactions.length} new transactions`)
+  if (newTransactions.length)
+    logger.info(`Found ${newTransactions.length} new transactions`)
+  else
+    logger.debug(`Found 0 new transactions`)
 
   for (const tx of newTransactions.reverse()) {
     if (tx.memo !== 'funding') {
@@ -54,12 +58,12 @@ function getTx(hash) {
 }
 
 async function fetchNewTransactions () {
-  console.log('Fetching new transactions')
+  logger.debug('Fetching new transactions')
   const startTime = parseInt(await redis.get('foreignTime')) + 1
-  const address = await getLastForeignAddress()
+  const address = getLastForeignAddress()
   if (address === null)
     return null
-  console.log('Sending api transactions request')
+  logger.debug('Sending api transactions request')
   return foreignHttpClient
     .get('/api/v1/transactions', {
       params: {
@@ -82,20 +86,6 @@ function getLastForeignAddress () {
   const keysFile = `/keys/keys${epoch}.store`
   const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
   return publicKeyToAddress(publicKey)
-}
-
-function publicKeyToAddress ({ x, y }) {
-  const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
-  const sha256Hash = crypto.createHash('sha256').update(Buffer.from(compact, 'hex')).digest('hex')
-  const hash = crypto.createHash('ripemd160').update(Buffer.from(sha256Hash, 'hex')).digest('hex')
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
-  return bech32.encode('tbnb', words)
-}
-
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
 }
 
 initialize().then(async () => {

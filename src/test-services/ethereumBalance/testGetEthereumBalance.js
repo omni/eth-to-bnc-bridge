@@ -1,4 +1,5 @@
 const Web3 = require('web3')
+const BN = require('bignumber.js')
 
 const { HOME_RPC_URL, HOME_TOKEN_ADDRESS } = process.env
 
@@ -9,6 +10,9 @@ const token = new web3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 
 const address = process.argv[2]
 
+web3.eth.getBalance(address).then(x => console.log(`${x.toString()} wei`))
+
 token.methods.balanceOf(address).call()
-  .then(x => console.log(x.toString()))
-  .catch(() => console.log(0))
+  .then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3)))
+  .then(x => console.log(`${x.toString()} tokens`))
+  .catch(() => console.log('0 tokens'))

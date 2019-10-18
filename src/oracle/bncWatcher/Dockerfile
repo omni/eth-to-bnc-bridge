@@ -5,10 +5,10 @@ WORKDIR /watcher
 RUN apk update && \
     apk add libssl1.1 libressl-dev curl
 
-COPY package.json /watcher/
+COPY ./bncWatcher/package.json /watcher/
 
 RUN npm install
 
-COPY bncWatcher.js db.js /watcher/
+COPY ./bncWatcher/bncWatcher.js ./shared/db.js ./shared/logger.js ./shared/crypto.js /watcher/
 
 ENTRYPOINT ["node", "bncWatcher.js"]

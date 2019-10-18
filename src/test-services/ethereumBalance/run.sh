@@ -4,6 +4,9 @@ set -e
 
 cd $(dirname "$0")
 
-docker build -t ethreum-balance . > /dev/null
+# either development or staging
+TARGET_NETWORK=${TARGET_NETWORK:=development}
 
-docker run --network blockchain_home --rm --env-file .env ethreum-balance $@
+docker build -t ethereum-balance . > /dev/null
+
+docker run --network blockchain_home --rm --env-file ".env.$TARGET_NETWORK" ethereum-balance $@

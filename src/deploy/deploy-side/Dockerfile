@@ -26,4 +26,4 @@ RUN truffle compile
 COPY truffle-config.js /build/truffle-config.js
 COPY migrations /build/migrations
 
-ENTRYPOINT truffle deploy
+ENTRYPOINT ["truffle", "deploy"]

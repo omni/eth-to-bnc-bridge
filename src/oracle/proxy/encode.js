@@ -1,10 +1,6 @@
 const BN = require('bignumber.js')
 
-function padZeros (s, len) {
-  while (s.length < len)
-    s = '0' + s
-  return s
-}
+const { padZeros } = require('./crypto')
 
 function makeBuffer (value, length = 32, base = 16) {
   return Buffer.from(padZeros(new BN(value, base).toString(16), length * 2), 'hex')
@@ -137,11 +133,5 @@ module.exports = function (isKeygen, round, value) {
       break
     buffers.push(next.value)
   }
-  const encoded = Buffer.concat(buffers)
-  console.log(`Raw data: ${value.length} bytes, encoded data: ${encoded.length} bytes`)
-  return encoded
+  return Buffer.concat(buffers)
 }
-
-
-module.exports(true, 'round2', '{"blind_factor":"11223344556677889900", "y_i":{"x":"00112233445566778899", "y":"00112233445566778899"}}')
-

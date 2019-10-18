@@ -5,10 +5,10 @@ WORKDIR /watcher
 RUN apk update && \
     apk add libssl1.1 libressl-dev curl
 
-COPY package.json /watcher/
+COPY ./ethWatcher/package.json /watcher/
 
 RUN npm install
 
-COPY ethWatcher.js db.js /watcher/
+COPY ./ethWatcher/ethWatcher.js ./shared/db.js ./shared/logger.js ./shared/amqp.js ./shared/crypto.js /watcher/
 
 ENTRYPOINT ["node", "ethWatcher.js"]

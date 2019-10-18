@@ -1,23 +1,20 @@
 const Bridge = artifacts.require('Bridge')
 
+const addresses = Object.entries(process.env)
+  .filter(([ key ]) => key.startsWith('VALIDATOR_ADDRESS'))
+  .map(([ , value ]) => value)
+
 const {
-  THRESHOLD, PARTIES, VALIDATOR_ADDRESS_1, VALIDATOR_ADDRESS_2, VALIDATOR_ADDRESS_3, VALIDATOR_ADDRESS_4,
-  VALIDATOR_ADDRESS_5, VALIDATOR_ADDRESS_6, TOKEN_ADDRESS
+  THRESHOLD, HOME_TOKEN_ADDRESS, MIN_TX_LIMIT, MAX_TX_LIMIT, BLOCKS_RANGE_SIZE
 } = process.env
 
 module.exports = deployer => {
   deployer.deploy(
     Bridge,
     THRESHOLD,
-    //PARTIES,
-    [
-      VALIDATOR_ADDRESS_1,
-      VALIDATOR_ADDRESS_2,
-      VALIDATOR_ADDRESS_3,
-      //VALIDATOR_ADDRESS_4,
-      //VALIDATOR_ADDRESS_5,
-      //VALIDATOR_ADDRESS_6
-    ],
-    TOKEN_ADDRESS
+    addresses,
+    HOME_TOKEN_ADDRESS,
+    [ MIN_TX_LIMIT, MAX_TX_LIMIT ],
+    BLOCKS_RANGE_SIZE
   )
 }

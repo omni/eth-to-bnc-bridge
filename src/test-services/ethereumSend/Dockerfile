@@ -6,6 +6,6 @@ COPY package.json /test/
 
 RUN npm install
 
-COPY testEthereumSend.js IERC20.json /test/
+COPY testEthereumSend.js IERC20.json Bridge.json /test/
 
 ENTRYPOINT ["node", "testEthereumSend.js"]

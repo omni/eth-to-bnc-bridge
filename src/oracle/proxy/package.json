@@ -8,6 +8,9 @@
     "async-lock": "1.2.0",
     "axios": "0.19.0",
     "bignumber.js": "9.0.0",
-    "bn.js": "5.0.0"
+    "bn.js": "5.0.0",
+    "ethers": "4.0.37",
+    "pino": "5.13.4",
+    "pino-pretty": "3.2.1"
   }
 }

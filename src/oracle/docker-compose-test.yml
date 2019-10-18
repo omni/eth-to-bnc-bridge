@@ -2,7 +2,9 @@ version: '3.7'
 services:
   proxy:
     image: blockchain-proxy
-    build: ./proxy
+    build:
+      dockerfile: proxy/Dockerfile
+      context: .
     environment:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
@@ -14,6 +16,9 @@ services:
       - VALIDATOR_PRIVATE_KEY
       - FOREIGN_URL
       - FOREIGN_ASSET
+      - LOG_LEVEL
+      - "GAS_LIMIT_FACTOR=3"
+      - "MAX_GAS_LIMIT=6000000"
     volumes:
       - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
       - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
@@ -26,25 +31,31 @@ services:
       - blockchain_side
   keygen:
     image: keygen-client
-    build: ./tss-keygen
+    build:
+      dockerfile: tss-keygen/Dockerfile
+      context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
+      - LOG_LEVEL
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - test_network
   signer:
     image: sign-client
-    build: ./tss-sign
+    build:
+      dockerfile: tss-sign/Dockerfile
+      context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
       - FOREIGN_ASSET
+      - LOG_LEVEL
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     ports:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
@@ -52,41 +63,53 @@ services:
   redis:
     image: redis:5.0.5-alpine
     volumes:
-      - '${PWD}/db:/data'
+      - '${PWD}/${TARGET_NETWORK}/db:/data'
+      - './configs/redis.conf:/usr/local/etc/redis/redis.conf'
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     networks:
       - test_network
   rabbitmq:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
+    environment:
+      RABBITMQ_LOGS: 'false'
     volumes:
-      - '${PWD}/queue:/var/lib/rabbitmq/mnesia'
+      - '${PWD}/${TARGET_NETWORK}/queue:/var/lib/rabbitmq/mnesia'
     networks:
       - test_network
   eth-watcher:
-    build: ethWatcher
+    build:
+      dockerfile: ethWatcher/Dockerfile
+      context: .
     image: eth-watcher
     environment:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
       - HOME_CHAIN_ID
+      - HOME_START_BLOCK
+      - BLOCKS_RANGE_SIZE
+      - VALIDATOR_PRIVATE_KEY
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - LOG_LEVEL
     volumes:
       - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
-      - '../deploy/deploy-test/build/contracts/IERC20.json:/watcher/contracts_data/IERC20.json'
     networks:
       - test_network
       - blockchain_home
   bnc-watcher:
-    build: bncWatcher
+    build:
+      dockerfile: bncWatcher/Dockerfile
+      context: .
     image: bnc-watcher
     environment:
       - FOREIGN_URL
       - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
+      - LOG_LEVEL
     volumes:
-      - '${PWD}/keys:/keys'
+      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - test_network
 networks:

@@ -1,16 +1,12 @@
 const PrivateKeyProvider = require('truffle-hdwallet-provider')
 
-const { RPC_URL, PRIVATE_KEY, RPC_URL_DEV, PRIVATE_KEY_DEV } = process.env
+const { SIDE_RPC_URL, SIDE_PRIVATE_KEY } = process.env
 
 module.exports = {
   networks: {
-    development: {
-      provider: new PrivateKeyProvider(PRIVATE_KEY_DEV, RPC_URL_DEV),
-      network_id: '33'
-    },
-    staging: {
-      provider: new PrivateKeyProvider(PRIVATE_KEY, RPC_URL),
-      network_id: '77'
+    side: {
+      provider: new PrivateKeyProvider(SIDE_PRIVATE_KEY, SIDE_RPC_URL),
+      network_id: '*'
     }
   },
   compilers: {

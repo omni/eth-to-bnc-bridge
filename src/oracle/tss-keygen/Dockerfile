@@ -5,11 +5,11 @@ WORKDIR /tss
 RUN apt-get update && \
     apt-get install -y libssl1.1 libssl-dev curl procps
 
-COPY package.json /tss/
+COPY ./tss-keygen/package.json /tss/
 
 RUN npm install
 
-COPY keygen-entrypoint.sh keygen.js /tss/
+COPY ./tss-keygen/keygen-entrypoint.sh ./tss-keygen/keygen.js ./shared/logger.js ./shared/amqp.js ./shared/crypto.js /tss/
 
 COPY --from=tss /tss/target/release/gg18_keygen_client /tss/
 
