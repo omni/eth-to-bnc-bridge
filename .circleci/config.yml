@@ -8,33 +8,40 @@ orbs:
         environment:
           TARGET_NETWORK: development
 jobs:
-  prepare_test_environment:
-    executor: bridge/node-dev
-    steps:
-      - checkout
-      - run: git submodule update --init
-      - setup_remote_docker
-      - run: ./demo/start-environment.sh
-      - run: ./src/test-services/ethereumSend/run.sh 0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa 100
-      - run: ./src/test-services/ethereumSend/run.sh 0xf7ca4aed1795e424433498cef43f6a3825c88731 100
-      - run: ./src/test-services/ethereumSend/run.sh 0xad6c8127143032d843a260c5d379d8d9b3d51f15 100
-      - run: docker kill ganache_side ganache_home
-      - persist_to_workspace:
-          root: .
-          paths:
-            ./demo/ganache_home_db
-            ./demo/ganache_side_db
   run_tests:
     executor: bridge/node-dev
     steps:
       - checkout
       - run: git submodule update --init
       - setup_remote_docker
-      - attach_workspace:
-          at: .
-      - ls ./demo/ganache_side_db
+      - run: touch ./src/deploy/.keys.$TARGET_NETWORK
+      - run: ./demo/start-environment.sh
+      - run: touch ./src/test-services/.keys.$TARGET_NETWORK
+      - run: ./src/test-services/ethereumSend/run.sh 0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa 100
+      - run: ./src/test-services/ethereumSend/run.sh 0xf7ca4aed1795e424433498cef43f6a3825c88731 100
+      - run: ./src/test-services/ethereumSend/run.sh 0xad6c8127143032d843a260c5d379d8d9b3d51f15 100
+      - run: ./src/test-services/binanceSend/run.sh tbnb14r3z8xk7qsar3vwj05w8cd8gqwk7g6gfurlt5l 100 0.1
+      - run: ./src/test-services/binanceSend/run.sh tbnb1efjg7xt98t67ql2cmwjc5860lgayet9l8m55ym 100 0.1
+      - run: ./src/test-services/binanceSend/run.sh tbnb12epcy4p7ktas0nlyrfuektcyh0e83dwzuq73f4 100 0.1
+      - run:
+          command: ./demo/validator-demo.sh -d
+          environment:
+            N: 1
+      - run:
+          command: ./demo/validator-demo.sh -d
+          environment:
+            N: 2
+      - run:
+          command: ./demo/validator-demo.sh -d
+          environment:
+            N: 3
+      - run: sleep 10
+      - run:
+          command: ./tests/run.sh
+          environment:
+            HOME_RPC_URL: 'http://ganache_home:8545'
 workflows:
   version: 2
   main:
     jobs:
-      - prepare_test_environment
+      - run_tests
