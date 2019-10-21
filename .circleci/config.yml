@@ -1,0 +1,40 @@
+version: 2.1
+orbs:
+  bridge:
+    executors:
+      node-dev:
+        docker:
+          - image: circleci/node:10.15
+        environment:
+          TARGET_NETWORK: development
+jobs:
+  prepare_test_environment:
+    executor: bridge/node-dev
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - setup_remote_docker
+      - run: ./demo/start-environment.sh
+      - run: ./src/test-services/ethereumSend/run.sh 0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa 100
+      - run: ./src/test-services/ethereumSend/run.sh 0xf7ca4aed1795e424433498cef43f6a3825c88731 100
+      - run: ./src/test-services/ethereumSend/run.sh 0xad6c8127143032d843a260c5d379d8d9b3d51f15 100
+      - run: docker kill ganache_side ganache_home
+      - persist_to_workspace:
+          root: .
+          paths:
+            ./demo/ganache_home_db
+            ./demo/ganache_side_db
+  run_tests:
+    executor: bridge/node-dev
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - setup_remote_docker
+      - attach_workspace:
+          at: .
+      - ls ./demo/ganache_side_db
+workflows:
+  version: 2
+  main:
+    jobs:
+      - prepare_test_environment
