@@ -2,9 +2,7 @@
 
 set -e
 
-ls .
-ls ./src/tss
-ls ./src/tss/multi-party-ecdsa
+cat ./src/tss/multi-party-ecdsa/Cargo.toml
 
 docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
 ./demo/start-environment.sh

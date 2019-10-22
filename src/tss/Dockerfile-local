@@ -12,9 +12,9 @@ WORKDIR /tss
 COPY ./multi-party-ecdsa/Cargo.toml /tss/
 COPY ./multi-party-ecdsa/src/lib.rs /tss/src/lib.rs
 
-RUN ls /
 RUN ls /tss
-RUN ls /tss/src
+RUN cat /tss/Cargo.toml
+RUN cargo check
 
 RUN cargo build --release || true
 
