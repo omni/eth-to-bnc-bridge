@@ -13,7 +13,8 @@ jobs:
     steps:
       - checkout
       - run: git submodule update --init
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 18.09.3
       - run: ./tests/init.sh
       - run:
           command: ./tests/run.sh
