@@ -2,6 +2,10 @@
 
 set -e
 
+ls .
+ls ./src/tss
+ls ./src/tss/multi-party-ecdsa
+
 docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
 ./demo/start-environment.sh
 echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
