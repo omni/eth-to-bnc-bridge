@@ -8,20 +8,42 @@ orbs:
         environment:
           TARGET_NETWORK: development
 jobs:
-  run_tests:
+  init:
     executor: bridge/node-dev
     steps:
       - checkout
       - run: git submodule update --init
       - setup_remote_docker:
           version: 18.09.3
-      - run: ./tests/init.sh
+          docker_layer_caching: true
+      - run: docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
+      - run: docker save -o /home/tss.tar tss
+      - persist_to_workspace:
+          root: /home
+          paths:
+            - tss.tar
+
+  run_tests:
+    executor: bridge/node-dev
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - attach_workspace:
+          at: /home
+      - setup_remote_docker:
+          version: 18.09.3
+          docker_layer_caching: true
+      - run: docker load -i /home/tss.tar
+      - run: docker images
       - run:
-          command: ./tests/run.sh
+          command: ./tests/init.sh
           environment:
             HOME_RPC_URL: 'http://ganache_home:8545'
 workflows:
   version: 2
   main:
     jobs:
-      - run_tests
+      - init
+      - run_tests:
+          requires:
+            - init
