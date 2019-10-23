@@ -1,21 +1,17 @@
-FROM ubuntu:19.10
+FROM rustlang/rust:nightly
 
 RUN apt-get update && \
     apt-get install -y curl build-essential git openssl pkg-config libssl-dev libgmp3-dev
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
-
-ENV PATH=/root/.cargo/bin:$PATH
 
 WORKDIR /tss
 
 COPY ./multi-party-ecdsa/Cargo.toml /tss/
 COPY ./multi-party-ecdsa/src/lib.rs /tss/src/lib.rs
 
-RUN cargo build --manifest-path /tss/Cargo.toml --release || true
+RUN cargo build --manifest-path /tss/Cargo.toml -vv --release || true
 
 COPY ./multi-party-ecdsa /tss/
 
-RUN cargo build --manifest-path /tss/Cargo.toml --release
+RUN cargo build --manifest-path /tss/Cargo.toml -vv --release
 
 CMD echo Done
