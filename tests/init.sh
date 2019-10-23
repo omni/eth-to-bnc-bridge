@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -v
 
 docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
 ./demo/start-environment.sh
