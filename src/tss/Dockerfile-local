@@ -13,8 +13,8 @@ COPY ./multi-party-ecdsa/Cargo.toml /tss/
 COPY ./multi-party-ecdsa/src/lib.rs /tss/src/lib.rs
 
 RUN ls /tss
-RUN cat /tss/Cargo.toml
-RUN cargo check
+RUN ls .
+RUN pwd
 
 RUN cargo build --release || true
 
