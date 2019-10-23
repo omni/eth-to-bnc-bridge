@@ -1,12 +1,15 @@
 FROM rustlang/rust:nightly
 
-RUN apt-get update && \
+RUN cargo --version && \
+    apt-get update && \
     apt-get install -y curl build-essential git openssl pkg-config libssl-dev libgmp3-dev
 
 WORKDIR /tss
 
 COPY ./multi-party-ecdsa/Cargo.toml /tss/
 COPY ./multi-party-ecdsa/src/lib.rs /tss/src/lib.rs
+
+RUN chmod 777 /tss/Cargo.toml
 
 RUN cargo build --manifest-path /tss/Cargo.toml -vv --release || true
 
