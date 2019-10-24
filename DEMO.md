@@ -72,7 +72,7 @@ The public Binance Chain testnet will keep a BEP2 token.
       ```
     * (1.10) Build TSS to be used in the bridge oracles:
       ```
-      docker build -t tss -f ./src/tss/Dockerfile-local ./src/tss
+      docker build -t tss ./src/tss
       ```
 2. Run test environment
     * 2.1 Running in development mode (using local ganache networks):
