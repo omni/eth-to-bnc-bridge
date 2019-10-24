@@ -10,10 +10,8 @@ TARGET_NETWORK=${TARGET_NETWORK:=development}
 echo "Cleaning $TARGET_NETWORK network"
 
 if [[ "$TARGET_NETWORK" == "development" ]]; then
-  rm -rf ganache_side_db
-  rm -rf ganache_home_db
-  mkdir ganache_side_db
-  mkdir ganache_home_db
+  docker volume rm ganache_side_data > /dev/null 2>&1 || true
+  docker volume rm ganache_home_data > /dev/null 2>&1 || true
 fi
 
 for (( I = 1; I < 4; ++I )); do

@@ -17,6 +17,7 @@ jobs:
           version: 18.09.3
           docker_layer_caching: true
       - run: docker build -t tss ./src/tss
+      - run: mkdir ./workspace
       - run: docker save tss | gzip ./workspace/tss.tar.gz
       - persist_to_workspace:
           root: ./workspace
@@ -38,6 +39,7 @@ jobs:
       - run: ./src/test-services/ethereumSend/run.sh 0xad6c8127143032d843a260c5d379d8d9b3d51f15 100
       - run: docker kill ganache_side ganache_home
       - run: docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -d --name tmp alpine:3.9.4
+      - run: mkdir ./workspace
       - run: docker cp "tmp:/ganache_side_data" "./workspace/ganache_side_data"
       - run: docker cp "tmp:/ganache_home_data" "./workspace/ganache_home_data"
       - run: docker kill tmp
@@ -59,6 +61,8 @@ jobs:
           docker_layer_caching: true
       - run: docker load -i ./workspace/tss.tar.gz
       - run: docker images
+      - run: docker volume create ganache_side_data
+      - run: docker volume create ganache_home_data
       - run: docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -d --name tmp alpine:3.9.4
       - run: docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
       - run: docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"

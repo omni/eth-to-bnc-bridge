@@ -12,15 +12,13 @@ DEPLOY_DIR="`pwd`/src/deploy"
 TEST_SERVICES_DIR="`pwd`/src/test-services"
 DEMO_DIR="`pwd`/demo"
 
-SIDE_GANACHE_DB="$DEMO_DIR/ganache_side_db"
-HOME_GANACHE_DB="$DEMO_DIR/ganache_home_db"
-
 start_dev_blockchain_networks() {
   echo "Starting side test blockchain"
 
   docker kill ganache_side > /dev/null 2>&1 || true
   docker network create blockchain_side > /dev/null 2>&1 || true
-  docker run -d --network blockchain_side --rm --name ganache_side -v "ganache_side_data:/app/db" -v "$SIDE_GANACHE_DB:/app/db" \
+  docker volume create ganache_side_data > /dev/null 2>&1 || true
+  docker run -d --network blockchain_side --rm --name ganache_side -v "ganache_side_data:/app/db" \
       -p "7545:8545" \
       trufflesuite/ganache-cli:latest \
       -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
@@ -29,7 +27,8 @@ start_dev_blockchain_networks() {
 
   docker kill ganache_home > /dev/null 2>&1 || true
   docker network create blockchain_home > /dev/null 2>&1 || true
-  docker run -d --network blockchain_home --rm --name ganache_home -v "ganache_home_data:/app/db" -v "$HOME_GANACHE_DB:/app/db" \
+  docker volume create ganache_home_data > /dev/null 2>&1 || true
+  docker run -d --network blockchain_home --rm --name ganache_home -v "ganache_home_data:/app/db" \
       -p "8545:8545" \
       trufflesuite/ganache-cli:latest \
       -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
@@ -135,20 +134,12 @@ deploy_all() {
 
 
 if [[ "$TARGET_NETWORK" == "development" ]]; then
-  if [[ ! -d "$SIDE_GANACHE_DB" ]]; then
-    mkdir "$SIDE_GANACHE_DB"
-  fi
 
-  if [[ ! -d "$HOME_GANACHE_DB" ]]; then
-    mkdir "$HOME_GANACHE_DB"
-  fi
-
-
-  if [[ -z "$(ls -A "$SIDE_GANACHE_DB")" ]] || [[ -z "$(ls -A "$HOME_GANACHE_DB")" ]]; then
+  if [[ "$(docker volume ls | grep ganache_side_db)" ]] || [[ "$(docker volume ls | grep ganache_home_db)" ]]; then
+    echo "Restarting dev blockchain networks"
+  else
     echo "Starting dev blockchain networks and deploying contracts"
     need_to_deploy=true
-  else
-    echo "Restarting dev blockchain networks"
   fi
 
   start_dev_blockchain_networks
