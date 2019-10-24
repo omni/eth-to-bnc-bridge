@@ -7,70 +7,129 @@ orbs:
           - image: circleci/node:10.15
         environment:
           TARGET_NETWORK: development
+    commands:
+      fetch_repo:
+        description: "Checkout and init submodules"
+        steps:
+          - checkout
+          - run:
+              name: "Initializing submodules"
+              command: git submodule update --init
+      setup_docker:
+        description: "Set up remote docker engine"
+        steps:
+          - setup_remote_docker:
+              version: 18.09.3
+              docker_layer_caching: true
+      save_ganache_data:
+        description: "Save dev environment in workspace"
+        steps:
+          - run:
+              name: "Backup blockchains data using temporary container"
+              command: |
+                mkdir ./workspace
+                docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
+                docker cp "tmp:/ganache_side_data" "./workspace/ganache_side_data"
+                docker cp "tmp:/ganache_home_data" "./workspace/ganache_home_data"
+                docker kill tmp
+          - persist_to_workspace:
+              root: ./workspace
+              paths:
+                - ganache_side_data
+                - ganache_home_data
+      restore_ganache_data:
+        description: "Restore dev environment from workspace"
+        steps:
+          - run:
+              name: "Restore blockchains data from backup using temporary container"
+              command: |
+                docker volume create ganache_side_data
+                docker volume create ganache_home_data
+                docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
+                docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
+                docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"
+                docker kill tmp
+      save_tss:
+        description: "Save tss image to workspace"
+        steps:
+          - run:
+              name: "Save tss image to archive"
+              command: |
+                mkdir ./workspace
+                docker save tss | gzip > ./workspace/tss.tar.gz
+          - persist_to_workspace:
+              root: ./workspace
+              paths:
+                - tss.tar.gz
+      load_tss:
+        description: "Load tss image from workspace"
+        steps:
+          - run:
+              name: "Load tss image from archive"
+              command: docker load -i ./workspace/tss.tar.gz
 jobs:
   init_tss:
     executor: bridge/node-dev
     steps:
-      - checkout
-      - run: git submodule update --init
-      - setup_remote_docker:
-          version: 18.09.3
-          docker_layer_caching: true
-      - run: docker build -t tss ./src/tss
-      - run: mkdir ./workspace
-      - run: docker save tss | gzip > ./workspace/tss.tar.gz
-      - persist_to_workspace:
-          root: ./workspace
-          paths:
-            - tss.tar.gz
-
+      - bridge/fetch_repo
+      - bridge/setup_docker
+      - run:
+          name: "Build tss image"
+          command: docker build -t tss ./src/tss
+      - bridge/save_tss
   init_blockchains:
     executor: bridge/node-dev
     steps:
-      - checkout
-      - run: git submodule update --init
-      - setup_remote_docker:
-          version: 18.09.3
-          docker_layer_caching: true
-      - run: ./demo/start-environment.sh
-      - run: touch ./src/test-services/.keys.$TARGET_NETWORK
-      - run: ./src/test-services/ethereumSend/run.sh 0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa 100
-      - run: ./src/test-services/ethereumSend/run.sh 0xf7ca4aed1795e424433498cef43f6a3825c88731 100
-      - run: ./src/test-services/ethereumSend/run.sh 0xad6c8127143032d843a260c5d379d8d9b3d51f15 100
-      - run: docker kill ganache_side ganache_home
-      - run: docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
-      - run: mkdir ./workspace
-      - run: docker cp "tmp:/ganache_side_data" "./workspace/ganache_side_data"
-      - run: docker cp "tmp:/ganache_home_data" "./workspace/ganache_home_data"
-      - run: docker kill tmp
-      - persist_to_workspace:
-          root: ./workspace
-          paths:
-              - ganache_side_data
-              - ganache_home_data
-
+      - bridge/fetch_repo
+      - bridge/setup_docker
+      - run:
+          name: "Stub .keys file"
+          command: touch ./src/test-services/.keys.$TARGET_NETWORK
+      - run:
+          name: "Run dev environment, deploy contracts, prefund accounts"
+          command: |
+            ./demo/start-environment.sh
+            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
+      - run:
+          name: "Stop dev environment"
+          command: docker kill ganache_side ganache_home
+      - bridge/save_ganache_data
   run_tests:
     executor: bridge/node-dev
     steps:
-      - checkout
-      - run: git submodule update --init
+      - bridge/fetch_repo
+      - bridge/setup_docker
       - attach_workspace:
           at: ./workspace
-      - setup_remote_docker:
-          version: 18.09.3
-          docker_layer_caching: true
-      - run: docker load -i ./workspace/tss.tar.gz
-      - run: docker images
-      - run: docker volume create ganache_side_data
-      - run: docker volume create ganache_home_data
-      - run: docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -d --name tmp alpine:3.9.4
-      - run: docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
-      - run: docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"
-      - run: docker kill tmp
+      - bridge/load_tss
+      - bridge/restore_ganache_data
       - run:
-          command: ./tests/init.sh
+          name: "Init tests environment"
+          command: |
+            ./demo/start-environment.sh
+            echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
+            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
+            N=1 ./demo/validator-demo.sh -d
+            N=2 ./demo/validator-demo.sh -d
+            N=3 ./demo/validator-demo.sh -d
+      - run:
+          name: "Wait until validator nodes are ready"
+          command: |
+            until curl -X GET http://localhost:5001 > /dev/null 2>&1; do sleep 1; done
+            until curl -X GET http://localhost:5002 > /dev/null 2>&1; do sleep 1; done
+            until curl -X GET http://localhost:5003 > /dev/null 2>&1; do sleep 1; done
+      - run:
+          name: "Build and prepare tests container"
+          command: |
+            docker build -t tests ./tests
+            docker create --rm -e HOME_RPC_URL --name tests tests $@
+            docker network connect blockchain_side tests
+            docker network connect blockchain_home tests
           environment:
             HOME_RPC_URL: 'http://ganache_home:8545'
+      - run:
+          name: "Run tests"
+          command: docker start tests
 workflows:
   version: 2
   main:
