@@ -1,11 +1,11 @@
 #!/bin/bash
 
 set -e
+set -v
 
 ./demo/start-environment.sh
 
-echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
-
+cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
 cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
 
 N=1 ./demo/validator-demo.sh -d

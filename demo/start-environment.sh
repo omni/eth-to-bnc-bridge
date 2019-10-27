@@ -135,7 +135,7 @@ deploy_all() {
 
 if [[ "$TARGET_NETWORK" == "development" ]]; then
 
-  if [[ "$(docker volume ls | grep ganache_side_db)" ]] || [[ "$(docker volume ls | grep ganache_home_db)" ]]; then
+  if [[ "$(docker volume ls | grep ganache_side_data)" ]] || [[ "$(docker volume ls | grep ganache_home_data)" ]]; then
     echo "Restarting dev blockchain networks"
   else
     echo "Starting dev blockchain networks and deploying contracts"

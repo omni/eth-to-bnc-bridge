@@ -1,12 +1,32 @@
-const Web3 = require('web3')
-const { users } = require('../config')
+const createController = require('./utils/proxyController')
+const createUser = require('./utils/user')
+const { waitPromise } = require('./utils/wait')
 
-const web3 = new Web3(process.env.HOME_RPC_URL)
+const testEthToBnc = require('./ethToBnc')
 
-describe('check balance', function () {
-  it('should have correct balance', async function () {
-    const balance = await web3.eth.getBalance(users[0].ethAddress)
-    console.log(balance.toNumber())
-    return 0
+const { FOREIGN_PRIVATE_KEY } = process.env
+
+let user
+
+let { getInfo } = createController(1)
+
+let info
+
+describe('generates initial epoch keys', function () {
+  before(async function () {
+    this.timeout(60000)
+    user = await createUser(FOREIGN_PRIVATE_KEY)
+  })
+
+  it('should generate keys in 2 min', async function () {
+    this.timeout(120000)
+    info = await waitPromise(getInfo, info => info.epoch === 1)
+  })
+
+  after(async function () {
+    this.timeout(60000)
+    await user.transferBnc(info.foreignBridgeAddress, 50, 0.1)
   })
 })
+
+testEthToBnc(() => info.foreignBridgeAddress)

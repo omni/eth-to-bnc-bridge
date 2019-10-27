@@ -94,6 +94,11 @@ jobs:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home
       - bridge/save_ganache_data
+      - run:
+          name: "Prefund bnc addresses"
+          command: |
+            echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
+            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
   run_tests:
     executor: bridge/node-dev
     steps:
@@ -107,17 +112,15 @@ jobs:
           name: "Init tests environment"
           command: |
             ./demo/start-environment.sh
-            echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
-            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
             N=1 ./demo/validator-demo.sh -d
             N=2 ./demo/validator-demo.sh -d
             N=3 ./demo/validator-demo.sh -d
       - run:
           name: "Wait until validator nodes are ready"
           command: |
-            until curl -X GET http://localhost:5001 > /dev/null 2>&1; do sleep 1; done
-            until curl -X GET http://localhost:5002 > /dev/null 2>&1; do sleep 1; done
-            until curl -X GET http://localhost:5003 > /dev/null 2>&1; do sleep 1; done
+            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
       - run:
           name: "Build and prepare tests container"
           command: |
@@ -125,11 +128,16 @@ jobs:
             docker create --rm -e HOME_RPC_URL --name tests tests $@
             docker network connect blockchain_side tests
             docker network connect blockchain_home tests
+            docker network connect validator1_test_network tests
+            docker network connect validator2_test_network tests
+            docker network connect validator3_test_network tests
           environment:
             HOME_RPC_URL: 'http://ganache_home:8545'
       - run:
           name: "Run tests"
-          command: docker start tests
+          command: |
+            docker start -a tests
+            docker cp "tests:/tests/results.xml" "./tests/results.xml"
 workflows:
   version: 2
   main:

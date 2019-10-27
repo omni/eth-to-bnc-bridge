@@ -1,0 +1,3 @@
+reporter: spec
+reporter-option:
+  - mochaFile=./results.xml
