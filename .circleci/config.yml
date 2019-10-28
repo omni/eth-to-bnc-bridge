@@ -27,7 +27,7 @@ orbs:
           - run:
               name: "Backup blockchains data using temporary container"
               command: |
-                mkdir ./workspace
+                mkdir -p ./workspace
                 docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
                 docker cp "tmp:/ganache_side_data" "./workspace/ganache_side_data"
                 docker cp "tmp:/ganache_home_data" "./workspace/ganache_home_data"
@@ -55,13 +55,14 @@ orbs:
           - restore_cache:
               name: "Restore tss image from cache"
               key: "tss-v1-{{ .Branch }}"
+          - load_tss
       save_tss:
         description: "Save tss image to workspace"
         steps:
           - run:
               name: "Save tss image to archive"
               command: |
-                mkdir ./workspace
+                mkdir -p ./workspace
                 docker save tss | gzip > ./workspace/tss.tar.gz
           - persist_to_workspace:
               name: "Save tss image to workspace"
