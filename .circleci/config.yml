@@ -67,6 +67,22 @@ orbs:
           - run:
               name: "Load tss image from archive"
               command: docker load -i ./workspace/tss.tar.gz
+      save_docker_logs:
+        description: "A very simple command for demonstration purposes"
+        parameters:
+          validator:
+            type: integer
+            default: 1
+        steps:
+          - run: |
+              mkdir -p ./artifacts/logs/validator<< parameters.validator >>
+              docker logs validator<< parameters.validator >>_rabbitmq_1 ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
+              docker logs validator<< parameters.validator >>_redis_1 ./artifacts/logs/validator<< parameters.validator >>/redis.log
+              docker logs validator<< parameters.validator >>_proxy_1 ./artifacts/logs/validator<< parameters.validator >>/proxy.log
+              docker logs validator<< parameters.validator >>_eth-watcher_1 ./artifacts/logs/validator<< parameters.validator >>/eth-watcher.log
+              docker logs validator<< parameters.validator >>_bnc-watcher_1 ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
+              docker logs validator<< parameters.validator >>_signer_1 ./artifacts/logs/validator<< parameters.validator >>/signer.log
+              docker logs validator<< parameters.validator >>_keygen_1 ./artifacts/logs/validator<< parameters.validator >>/keygen.log
 jobs:
   init_tss:
     executor: bridge/node-dev
@@ -88,7 +104,7 @@ jobs:
       - run:
           name: "Run dev environment, deploy contracts, prefund accounts"
           command: |
-            ./demo/start-environment.sh
+            BLOCK_TIME=1 ./demo/start-environment.sh
             cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
       - run:
           name: "Stop dev environment"
@@ -111,7 +127,7 @@ jobs:
       - run:
           name: "Init tests environment"
           command: |
-            ./demo/start-environment.sh
+            BLOCK_TIME=3 ./demo/start-environment.sh
             N=1 ./demo/validator-demo.sh -d
             N=2 ./demo/validator-demo.sh -d
             N=3 ./demo/validator-demo.sh -d
@@ -125,7 +141,7 @@ jobs:
           name: "Build and prepare tests container"
           command: |
             docker build -t tests ./tests
-            docker create --rm -e HOME_RPC_URL --name tests tests $@
+            docker create --rm --env-file ./tests/.env -e FOREIGN_PRIVATE_KEY --name tests tests
             docker network connect blockchain_side tests
             docker network connect blockchain_home tests
             docker network connect validator1_test_network tests
@@ -135,9 +151,23 @@ jobs:
             HOME_RPC_URL: 'http://ganache_home:8545'
       - run:
           name: "Run tests"
+          command: docker start -a tests
+      - run:
+          name: "Save tests results"
           command: |
-            docker start -a tests
-            docker cp "tests:/tests/results.xml" "./tests/results.xml"
+            mkdir -p ./artifacts/test_results/mocha
+            docker cp "tests:/tests/results.xml" "./artifacts/test_results/mocha/results.xml"
+          when: always
+      - store_test_results:
+          path: ./artifacts/test_results/mocha
+      - bridge/save_docker_logs:
+          validator: 1
+      - bridge/save_docker_logs:
+          validator: 2
+      - bridge/save_docker_logs:
+          validator: 3
+      - store_artifacts:
+          path: ./artifacts
 workflows:
   version: 2
   main:

@@ -30,19 +30,12 @@ module.exports = async function (privateKey) {
       await tx.wait()
     },
     approveEth: async function (to, value) {
-      console.log('approving', to, value)
       const tx = await token.approve(to, '0x' + (new BN(value).multipliedBy(10 ** 18).toString(16)), txOptions)
-      console.log('sent', tx)
       await tx.wait()
-      console.log('done')
-      console.log(await token.allowance(ethAddress, to))
     },
     exchangeEth: async function (value) {
-      console.log(value)
       const tx = await bridge.exchange('0x' + (new BN(value).multipliedBy(10 ** 18).toString(16)), txOptions)
-      console.log(tx)
       await tx.wait()
-      console.log('done')
     },
     getBncBalance: async function () {
       const balance = await getBalance(bncAddress)

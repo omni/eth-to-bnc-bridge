@@ -18,3 +18,4 @@ src/deploy/.keys.staging
 src/test-services/.keys.staging
 src/test-services/.keys.development
 test.js
+tests/results.xml

@@ -1,3 +1,3 @@
-reporter: spec
+reporter: mocha-multi-reporters
 reporter-option:
-  - mochaFile=./results.xml
+  - configFile=./reportersConfig.json

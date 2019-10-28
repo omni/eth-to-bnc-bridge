@@ -7,6 +7,7 @@ cd ..
 
 # either development or staging
 TARGET_NETWORK=${TARGET_NETWORK:=development}
+BLOCK_TIME=${BLOCK_TIME:=3}
 
 DEPLOY_DIR="`pwd`/src/deploy"
 TEST_SERVICES_DIR="`pwd`/src/test-services"
@@ -21,7 +22,7 @@ start_dev_blockchain_networks() {
   docker run -d --network blockchain_side --rm --name ganache_side -v "ganache_side_data:/app/db" \
       -p "7545:8545" \
       trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
+      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 -q --db /app/db -b "$BLOCK_TIME" --noVMErrorsOnRPCResponse
 
   echo "Starting home test blockchain"
 
@@ -31,7 +32,7 @@ start_dev_blockchain_networks() {
   docker run -d --network blockchain_home --rm --name ganache_home -v "ganache_home_data:/app/db" \
       -p "8545:8545" \
       trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db -b 3 --noVMErrorsOnRPCResponse
+      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 -q --db /app/db -b "$BLOCK_TIME" --noVMErrorsOnRPCResponse
 
   sleep 4
 }
