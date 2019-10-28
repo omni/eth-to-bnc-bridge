@@ -19,10 +19,6 @@ services:
       - LOG_LEVEL
       - "GAS_LIMIT_FACTOR=3"
       - "MAX_GAS_LIMIT=6000000"
-    volumes:
-      - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
-      - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
-      - '../deploy/deploy-side/build/contracts/SharedDB.json:/proxy/contracts_data/SharedDB.json'
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
@@ -65,11 +61,12 @@ services:
       - rabbit-signer-net
       - redis-signer-net
   redis:
-    image: redis:5.0.5-alpine
+    image: redis
+    build:
+      dockerfile: redis/Dockerfile
+      context: .
     volumes:
       - '${PWD}/${TARGET_NETWORK}/db:/data'
-      - './configs/redis.conf:/usr/local/etc/redis/redis.conf'
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     networks:
       - redis-signer-net
       - redis-keygen-net
@@ -101,8 +98,6 @@ services:
       - VALIDATOR_PRIVATE_KEY
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
-    volumes:
-      - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
     networks:
       - rabbit-ethwatcher-net
       - redis-ethwatcher-net

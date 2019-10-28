@@ -92,7 +92,7 @@ orbs:
                 mkdir -p ./artifacts/logs/validator<< parameters.validator >>
                 docker logs validator<< parameters.validator >>_rabbitmq_1 > ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
                 docker logs validator<< parameters.validator >>_redis_1 > ./artifacts/logs/validator<< parameters.validator >>/redis.log
-                docker logs validator<< parameters.validator >>_proxy_1 >./artifacts/logs/validator<< parameters.validator >>/proxy.log
+                docker logs validator<< parameters.validator >>_proxy_1 > ./artifacts/logs/validator<< parameters.validator >>/proxy.log
                 docker logs validator<< parameters.validator >>_eth-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/eth-watcher.log
                 docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
                 docker logs validator<< parameters.validator >>_signer_1 > ./artifacts/logs/validator<< parameters.validator >>/signer.log
