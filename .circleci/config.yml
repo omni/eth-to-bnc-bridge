@@ -49,6 +49,12 @@ orbs:
                 docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
                 docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"
                 docker kill tmp
+      restore_tss_image:
+        description: "Restores tss image from cache"
+        steps:
+          - restore_cache:
+              name: "Restore tss image from cache"
+              key: "tss-v1-{{ .Branch }}"
       save_tss:
         description: "Save tss image to workspace"
         steps:
@@ -58,9 +64,15 @@ orbs:
                 mkdir ./workspace
                 docker save tss | gzip > ./workspace/tss.tar.gz
           - persist_to_workspace:
+              name: "Save tss image to workspace"
               root: ./workspace
               paths:
                 - tss.tar.gz
+          - save_cache:
+              name: "Save tss image to cache"
+              paths:
+                - ./workspace/tss.tar.gz
+              key: "tss-v1-{{ .Branch }}"
       load_tss:
         description: "Load tss image from workspace"
         steps:
@@ -104,6 +116,13 @@ orbs:
               validator: 2
           - save_docker_logs:
               validator: 3
+          - run:
+              name: "Save ganache logs"
+              command: |
+                mkdir -p ./artifacts/logs/ganache
+                docker logs ganache_home > ./artifacts/logs/ganache/home.log
+                docker logs ganache_side > ./artifacts/logs/ganache/side.log
+              when: always
           - store_artifacts:
               path: ./artifacts
               when: always
@@ -113,9 +132,10 @@ jobs:
     steps:
       - bridge/fetch_repo
       - bridge/setup_docker
+      - bridge/restore_tss_image
       - run:
           name: "Build tss image"
-          command: docker build -t tss ./src/tss
+          command: docker build --cache-from tss -t tss ./src/tss || docker build -t tss ./src/tss
       - bridge/save_tss
   init_blockchains:
     executor: bridge/node-dev
@@ -159,15 +179,10 @@ jobs:
       - run:
           name: "Wait until validator nodes are ready"
           command: |
-            mkdir ./clogs
-            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > ./clogs/clog1 2>&1; do sleep 1; done"
-            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > ./clogs/clog2 2>&1; do sleep 1; done"
-            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > ./clogs/clog3 2>&1; do sleep 1; done"
+            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
           no_output_timeout: 3m
-      - store_artifacts:
-          path: ./clogs
-          destination: curl-logs
-          when: always
       - run:
           name: "Build and prepare tests container"
           command: |
