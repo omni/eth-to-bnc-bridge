@@ -10,9 +10,12 @@ const { publicKeyToAddress } = require('./crypto')
 
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
-const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
+logger.debug('%o', abiBridge)
+setInterval(() => {
+  logger.debug("alive", 5000)
+})
 
-logger.debug('%o', process.env)
+const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
 
 const homeWeb3 = new Web3(HOME_RPC_URL)
 const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
