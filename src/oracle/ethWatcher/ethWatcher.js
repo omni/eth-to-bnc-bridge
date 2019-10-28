@@ -12,6 +12,8 @@ const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
 
+logger.debug('%o', process.env)
+
 const homeWeb3 = new Web3(HOME_RPC_URL)
 const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
 const validatorAddress = homeWeb3.eth.accounts.privateKeyToAccount(`0x${VALIDATOR_PRIVATE_KEY}`).address
@@ -94,6 +96,7 @@ async function initialize () {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
+  logger.debug('Checking if current validator')
   isCurrentValidator = (await bridge.methods.getValidators().call()).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)

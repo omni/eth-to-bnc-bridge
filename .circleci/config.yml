@@ -197,6 +197,10 @@ jobs:
       - run:
           name: "Run tests"
           command: docker start -a tests
+      - run:
+          name: "Check alive docker containers"
+          command: docker ps
+          when: always
       - bridge/save_artifacts
 workflows:
   version: 2
