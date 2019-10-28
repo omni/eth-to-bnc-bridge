@@ -12,8 +12,8 @@ const abiBridge = require('./contracts_data/Bridge.json').abi
 
 logger.debug('%o', abiBridge)
 setInterval(() => {
-  logger.debug("alive", 5000)
-})
+  logger.debug("alive")
+}, 5000)
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
 
