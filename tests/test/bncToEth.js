@@ -22,7 +22,7 @@ module.exports = (usersFunc, foreignBridgeAddressFunc) => {
           if (newEthBalance === ethBalances[i] + 3 + i) {
             break
           }
-          delay(500)
+          await delay(500)
         } while (true)
       }
     })

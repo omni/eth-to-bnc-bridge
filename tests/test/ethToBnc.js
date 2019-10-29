@@ -1,6 +1,6 @@
 const assert = require('assert')
 const { getSequence } = require('./utils/bncController')
-const { waitPromise } = require('./utils/wait')
+const { waitPromise, delay } = require('./utils/wait')
 
 const { HOME_BRIDGE_ADDRESS } = process.env
 
@@ -36,6 +36,7 @@ module.exports = (usersFunc, foreignBridgeAddressFunc) => {
     })
 
     it('should make correct exchange transaction', async function () {
+      await delay(10000)
       const newBncBalances = await Promise.all(users.map(user => user.getBncBalance()))
       for (let i = 0; i < 3; i++) {
         assert.strictEqual(newBncBalances[i], bncBalances[i] + 5 + i, `Balance of ${users[i].bncAddress} did not updated as expected`)
