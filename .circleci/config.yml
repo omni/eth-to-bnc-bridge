@@ -13,7 +13,7 @@ orbs:
         steps:
           - checkout
           - run:
-              name: "Initializing submodules"
+              name: "Initialize submodules"
               command: git submodule update --init
       setup_docker:
         description: "Set up remote docker engine"
@@ -189,7 +189,7 @@ jobs:
           name: "Build and prepare tests container"
           command: |
             docker build -t tests ./tests
-            docker create --rm --env-file ./tests/.env -e FOREIGN_PRIVATE_KEY --name tests tests
+            docker create --env-file ./tests/.env -e FOREIGN_PRIVATE_KEY --name tests tests
             docker network connect blockchain_side tests
             docker network connect blockchain_home tests
             docker network connect validator1_test_network tests
