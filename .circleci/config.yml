@@ -49,8 +49,6 @@ orbs:
                 docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
                 docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"
                 docker kill tmp
-                ls ./workspace/ganache_side_data
-                ls ./workspace/ganache_home_data
       restore_tss_image:
         description: "Restores tss image from cache"
         steps:

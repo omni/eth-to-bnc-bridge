@@ -1,3 +1,4 @@
+exit: true
 reporter: mocha-multi-reporters
 reporter-option:
   - configFile=./reportersConfig.json
