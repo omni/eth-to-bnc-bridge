@@ -10,12 +10,16 @@ const { publicKeyToAddress } = require('./crypto')
 
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
-logger.debug('%o', abiBridge)
-setInterval(() => {
-  logger.debug("alive")
-}, 5000)
-
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
+
+setInterval(() => {
+  axios.post(HOME_RPC_URL, {
+    jsonrpc: '2.0',
+    method: "eth_blockNumber",
+    params: [],
+    id: 1
+  }).then(console.log, console.log)
+}, 5000)
 
 const homeWeb3 = new Web3(HOME_RPC_URL)
 const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)

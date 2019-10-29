@@ -336,7 +336,7 @@ async function info (req, res) {
     ])
     const foreignAddress = publicKeyToAddress({ x, y })
     const balances = await getForeignBalances(foreignAddress)
-    res.send({
+    const msg = {
       epoch,
       rangeSize,
       nextRangeSize,
@@ -357,8 +357,11 @@ async function info (req, res) {
       votesForKeygen,
       votesForCancelKeygen,
       confirmationsForFundsTransfer
-    })
+    }
+    logger.debug('%o', msg)
+    res.send(msg)
   } catch (e) {
+    logger.debug('%o', { message: 'Something went wrong, resend request', error: e })
     res.send({ message: 'Something went wrong, resend request', error: e })
   }
   logger.debug('Info end')
