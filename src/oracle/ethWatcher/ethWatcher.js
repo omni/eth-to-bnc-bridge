@@ -103,16 +103,7 @@ async function initialize () {
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
   }
   logger.debug('Checking if current validator')
-  let currentValidators = []
-  try {
-    logger.debug('1')
-    currentValidators = await bridge.methods.getValidators().call()
-    logger.debug('2')
-    logger.debug('%o', currentValidators)
-  } catch (e) {
-    logger.debug('%o', e)
-  }
-  isCurrentValidator = (currentValidators).includes(validatorAddress)
+  isCurrentValidator = (await bridge.methods.getValidators().call()).includes(validatorAddress)
   logger.debug(`${isCurrentValidator}`)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
@@ -183,7 +174,7 @@ initialize().then(async () => {
   while (true) {
     await main()
   }
-})
+}, e => logger.warn('Initialization failed %o', e))
 
 async function sendKeygen (event) {
   const newEpoch = event.returnValues.newEpoch.toNumber()

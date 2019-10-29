@@ -358,10 +358,10 @@ async function info (req, res) {
       votesForCancelKeygen,
       confirmationsForFundsTransfer
     }
-    logger.debug('%o', msg)
+    logger.trace('%o', msg)
     res.send(msg)
   } catch (e) {
-    logger.debug('%o', { message: 'Something went wrong, resend request', error: e })
+    logger.debug('%o', e)
     res.send({ message: 'Something went wrong, resend request', error: e })
   }
   logger.debug('Info end')

@@ -27,15 +27,12 @@ orbs:
           - run:
               name: "Backup blockchains data using temporary container"
               command: |
-                mkdir -p ./workspace
+                mkdir -p ./workspace/ganache_side_data
+                mkdir -p ./workspace/ganache_home_data
                 docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
-                docker cp "tmp:/ganache_side_data" "./workspace/ganache_side_data"
-                docker cp "tmp:/ganache_home_data" "./workspace/ganache_home_data"
+                docker cp "tmp:/ganache_side_data/." "./workspace/ganache_side_data"
+                docker cp "tmp:/ganache_home_data/." "./workspace/ganache_home_data"
                 docker kill tmp
-                du -sh ./workspace/ganache_side_data
-                du -sh ./workspace/ganache_home_data
-                ls ./workspace/ganache_side_data
-                ls ./workspace/ganache_home_data
           - persist_to_workspace:
               root: ./workspace
               paths:
@@ -47,15 +44,11 @@ orbs:
           - run:
               name: "Restore blockchains data from backup using temporary container"
               command: |
-                du -sh ./workspace/ganache_side_data
-                du -sh ./workspace/ganache_home_data
-                ls ./workspace/ganache_side_data
-                ls ./workspace/ganache_home_data
                 docker volume create ganache_side_data
                 docker volume create ganache_home_data
                 docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
-                docker cp "./workspace/ganache_side_data" "tmp:/ganache_side_data"
-                docker cp "./workspace/ganache_home_data" "tmp:/ganache_home_data"
+                docker cp "./workspace/ganache_side_data/." "tmp:/ganache_side_data"
+                docker cp "./workspace/ganache_home_data/." "tmp:/ganache_home_data"
                 docker kill tmp
       restore_tss_image:
         description: "Restores tss image from cache"
@@ -160,9 +153,6 @@ jobs:
             BLOCK_TIME=3 ./demo/start-environment.sh
             cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
       - run:
-          name: "Get bridge deployed code"
-          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data \{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"0x44c158FE850821ae69DaF37AADF5c539e9d0025B\",\"latest\"],\"id\":1\} http://ganache_home:8545"
-      - run:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home
       - bridge/save_ganache_data
@@ -188,9 +178,6 @@ jobs:
             N=2 ./demo/validator-demo.sh -d
             N=3 ./demo/validator-demo.sh -d
             docker ps
-      - run:
-          name: "Get bridge deployed code"
-          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data \{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"0x44c158FE850821ae69DaF37AADF5c539e9d0025B\",\"latest\"],\"id\":1\} http://ganache_home:8545"
       - run:
           name: "Wait until validator nodes are ready"
           command: |
