@@ -12,6 +12,7 @@ const abiBridge = require('./contracts_data/Bridge.json').abi
 
 const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
 
+logger.debug(`${HOME_RPC_URL} ${HOME_BRIDGE_ADDRESS}`)
 axios.post(HOME_RPC_URL, {
   jsonrpc: '2.0',
   method: 'eth_getCode',
@@ -107,10 +108,12 @@ async function initialize () {
     logger.debug('1')
     currentValidators = await bridge.methods.getValidators().call()
     logger.debug('2')
+    logger.debug('%o', currentValidators)
   } catch (e) {
     logger.debug('%o', e)
   }
   isCurrentValidator = (currentValidators).includes(validatorAddress)
+  logger.debug(`${isCurrentValidator}`)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
