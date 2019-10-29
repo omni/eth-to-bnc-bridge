@@ -7,7 +7,6 @@ module.exports = (usersFunc, foreignBridgeAddressFunc) => {
     let ethBalances
 
     before(async function () {
-      this.timeout(60000)
       users = usersFunc()
       foreignBridgeAddress = foreignBridgeAddressFunc()
       ethBalances = await Promise.all(users.map(user => user.getEthBalance()))
@@ -16,7 +15,6 @@ module.exports = (usersFunc, foreignBridgeAddressFunc) => {
     })
 
     it('should make coorect exchange transactions on eth side', async function () {
-      this.timeout(60000)
       for (let i = 0; i < 3; i++) {
         do {
           const user = users[i]

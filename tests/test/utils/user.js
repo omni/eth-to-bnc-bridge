@@ -21,6 +21,8 @@ module.exports = async function (privateKey) {
   const bncClient = await createBncClient(privateKey)
 
   return {
+    ethAddress,
+    bncAddress,
     getEthBalance: async function () {
       const balance = await token.balanceOf(ethAddress)
       return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
