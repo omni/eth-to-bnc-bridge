@@ -161,7 +161,7 @@ jobs:
             cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
       - run:
           name: "Get bridge deployed code"
-          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["0x44c158FE850821ae69DaF37AADF5c539e9d0025B", "latest"],"id":1} http://ganache_home:8545"
+          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data \{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"0x44c158FE850821ae69DaF37AADF5c539e9d0025B\",\"latest\"],\"id\":1\} http://ganache_home:8545"
       - run:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home
@@ -190,7 +190,7 @@ jobs:
             docker ps
       - run:
           name: "Get bridge deployed code"
-          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["0x44c158FE850821ae69DaF37AADF5c539e9d0025B", "latest"],"id":1} http://ganache_home:8545"
+          command: docker run --network blockchain_home --entrypoint ash appropriate/curl:latest -c "curl -X POST --data \{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"0x44c158FE850821ae69DaF37AADF5c539e9d0025B\",\"latest\"],\"id\":1\} http://ganache_home:8545"
       - run:
           name: "Wait until validator nodes are ready"
           command: |
