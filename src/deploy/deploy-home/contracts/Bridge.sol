@@ -243,7 +243,7 @@ contract Bridge {
     }
 
     function startVoting() public readyOrVoting currentValidator {
-        if (tryVote(Vote.START_VOTING)) {
+        if (tryVote(Vote.START_VOTING, epoch)) {
             nextEpoch++;
             status = Status.VOTING;
             states[nextEpoch].threshold = getThreshold();
