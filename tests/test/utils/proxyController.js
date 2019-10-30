@@ -1,11 +1,11 @@
 const axios = require('axios')
 
-module.exports = function (validatorId) {
+function createController (validatorId) {
   const url = `http://validator${validatorId}_proxy_1:8002/`
 
   const proxy = axios.create({
     baseURL: url,
-    timeout: 5000
+    timeout: 10000
   })
 
   return {
@@ -28,4 +28,10 @@ module.exports = function (validatorId) {
       return (await proxy.get(`/vote/changeThreshold/${threshold}`)).data
     }
   }
+}
+
+module.exports = {
+  controller1: createController(1),
+  controller2: createController(2),
+  controller3: createController(3)
 }

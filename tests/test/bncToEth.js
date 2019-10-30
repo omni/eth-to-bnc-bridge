@@ -1,17 +1,19 @@
 const { delay } = require('./utils/wait')
 
-module.exports = (usersFunc, foreignBridgeAddressFunc) => {
+const { controller1 } = require('./utils/proxyController')
+
+module.exports = usersFunc => {
   describe('exchange of tokens in bnc => eth direction', function () {
     let users
-    let foreignBridgeAddress
+    let info
     let ethBalances
 
     before(async function () {
       users = usersFunc()
-      foreignBridgeAddress = foreignBridgeAddressFunc()
+      info = await controller1.getInfo()
       ethBalances = await Promise.all(users.map(user => user.getEthBalance()))
 
-      await Promise.all(users.map((user, i) => user.exchangeBnc(foreignBridgeAddress, 3 + i)))
+      await Promise.all(users.map((user, i) => user.exchangeBnc(info.foreignBridgeAddress, 3 + i)))
     })
 
     it('should make coorect exchange transactions on eth side', async function () {

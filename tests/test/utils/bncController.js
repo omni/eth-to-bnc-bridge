@@ -4,7 +4,7 @@ const { FOREIGN_URL, FOREIGN_ASSET } = process.env
 
 const bnc = axios.create({
   baseURL: FOREIGN_URL,
-  timeout: 5000
+  timeout: 15000
 })
 
 module.exports = {
