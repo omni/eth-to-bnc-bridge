@@ -17,6 +17,7 @@ module.exports = usersFunc => {
     })
 
     it('should make coorect exchange transactions on eth side', async function () {
+      this.timeout(180000)
       for (let i = 0; i < 3; i++) {
         do {
           const user = users[i]
