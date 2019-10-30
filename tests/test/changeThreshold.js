@@ -46,11 +46,10 @@ module.exports = newThreshold => {
       assert.deepStrictEqual(info.nextThreshold, initialInfo.threshold, 'Next threshold is not set correctly')
 
       await controller2.voteChangeThreshold(newThreshold)
-      info = await waitPromise(controller1.getInfo, info => info.nextValidators.length === nextValidators.length)
+      info = await waitPromise(controller1.getInfo, info => info.nextThreshold === newThreshold)
       assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Next validators are not set correctly')
       assert.deepStrictEqual(info.threshold, initialInfo.threshold, 'Threshold not set correctly')
-      assert.deepStrictEqual(info.nextThreshold, newThreshold, 'Next threshold is not set correctly')
 
       await controller3.voteChangeThreshold(newThreshold)
       await delay(5000)
