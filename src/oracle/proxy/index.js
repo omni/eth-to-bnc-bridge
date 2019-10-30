@@ -190,11 +190,15 @@ function sideSendQuery (query) {
   return lock.acquire('home', async () => {
     logger.debug('Sending side query')
     const encodedABI = query.encodeABI()
-    return await sideSender({
+    const senderResponse = await sideSender({
       data: encodedABI,
       to: SIDE_SHARED_DB_ADDRESS,
-      nonce: sideValidatorNonce++
+      nonce: sideValidatorNonce
     })
+    if (senderResponse !== true) {
+      sideValidatorNonce++
+    }
+    return senderResponse
   })
 }
 
@@ -202,11 +206,15 @@ function homeSendQuery (query) {
   return lock.acquire('home', async () => {
     logger.debug('Sending home query')
     const encodedABI = query.encodeABI()
-    return await homeSender({
+    const senderResponse = await homeSender({
       data: encodedABI,
       to: HOME_BRIDGE_ADDRESS,
-      nonce: homeValidatorNonce++
+      nonce: homeValidatorNonce
     })
+    if (senderResponse !== true) {
+      homeValidatorNonce++
+    }
+    return senderResponse
   })
 }
 

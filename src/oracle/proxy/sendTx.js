@@ -49,7 +49,7 @@ async function createSender (url, privateKey) {
       } ])
 
       if (estimate.error) {
-        logger.debug('Gas estimate failed %o', estimate.error)
+        logger.debug('Gas estimate failed %o, skipping tx, reverting nonce', estimate.error)
         return true
       }
       const gasLimit = BN.min(new BN(estimate.result, 16).multipliedBy(GAS_LIMIT_FACTOR), MAX_GAS_LIMIT)
