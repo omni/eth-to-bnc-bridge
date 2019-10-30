@@ -47,7 +47,8 @@ describe('bridge tests', function () {
   testBncToEth(() => users, () => info.foreignBridgeAddress)
 
   describe('remove validator', function () {
-    before(function () {
+    before(async function () {
+      info = await controller1.getInfo()
       prevForeignBridgeBalance = info.foreignBalanceTokens
       prevForeignBridgeAddress = info.foreignBridgeAddress
     })
@@ -126,6 +127,7 @@ describe('bridge tests', function () {
       assert.deepStrictEqual(info.validators, [ validatorsConfig[0], validatorsConfig[2] ], 'Incorrect set of validators in epoch 2')
       assert.strictEqual(info.nextEpoch, 2, 'Incorrect next epoch')
       assert.strictEqual(info.bridgeStatus, 'ready', 'Incorrect bridge state in new epoch')
+      await delay(5000)
       const prevBalance = await getBalance(prevForeignBridgeAddress)
       const newBalance = await getBalance(info.foreignBridgeAddress)
       assert.strictEqual(prevBalance, 0, "Did not transfer all funds")

@@ -222,7 +222,8 @@ function parseError (message) {
 
 async function sendVote (query, req, res, waitFlag = false) {
   try {
-    let { txHash, gasLimit } = await homeSendQuery(query)
+    const sentQuery = await homeSendQuery(query)
+    let { txHash, gasLimit } = sentQuery
     if (txHash) {
       while (waitFlag) {
         const { status, gasUsed } = await waitForReceipt(HOME_RPC_URL, txHash)
@@ -232,14 +233,16 @@ async function sendVote (query, req, res, waitFlag = false) {
         }
         if (gasLimit === gasUsed) {
           logger.info('Sending vote failed due to out of gas revert, retrying with more gas')
-          const nexTx = await homeSendQuery(query)
-          txHash = nexTx.txHash
-          gasLimit = nexTx.gasLimit
+          const nextTx = await homeSendQuery(query)
+          txHash = nextTx.txHash
+          gasLimit = nextTx.gasLimit
         } else {
           logger.warn(`Vote tx was reverted, txHash ${txHash}`)
           break
         }
       }
+    }
+    if (sentQuery) {
       res.send('Voted\n')
       logger.info('Voted successfully')
     } else {
@@ -300,8 +303,7 @@ function decodeStatus (status) {
   }
 }
 
-
-function boundX(x) {
+function boundX (x) {
   try {
     return x.toNumber()
   } catch (e) {
