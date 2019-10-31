@@ -111,6 +111,9 @@ services:
       - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
+      - FOREIGN_START_TIME
+      - FOREIGN_FETCH_INTERVAL
+      - FOREIGN_FETCH_BLOCK_TIME_OFFSET
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'

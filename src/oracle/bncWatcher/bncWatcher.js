@@ -9,13 +9,17 @@ const { publicKeyToAddress } = require('./crypto')
 
 const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
+const FOREIGN_START_TIME = parseInt(process.env.FOREIGN_START_TIME)
+const FOREIGN_FETCH_INTERVAL = parseInt(process.env.FOREIGN_FETCH_INTERVAL)
+const FOREIGN_FETCH_BLOCK_TIME_OFFSET = parseInt(process.env.FOREIGN_FETCH_BLOCK_TIME_OFFSET)
+
 const foreignHttpClient = axios.create({ baseURL: FOREIGN_URL })
 const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
 
 async function initialize () {
   if (await redis.get('foreignTime') === null) {
     logger.info('Set default foreign time')
-    await redis.set('foreignTime', Date.now() - 2 * 30 * 24 * 60 * 60 * 1000)
+    await redis.set('foreignTime', FOREIGN_START_TIME)
   }
 }
 
@@ -23,7 +27,7 @@ async function main () {
   const { transactions, endTime } = await fetchNewTransactions()
   if (!transactions || transactions.length === 0) {
     logger.debug(`Found 0 new transactions`)
-    await new Promise(r => setTimeout(r, 5000))
+    await new Promise(r => setTimeout(r, FOREIGN_FETCH_INTERVAL))
     return
   }
 
@@ -40,7 +44,6 @@ async function main () {
           hash: `0x${tx.txHash}`
         })
     }
-    //await redis.set('foreignTime', Date.parse(tx.timeStamp))
   }
   await redis.set('foreignTime', endTime)
 }
@@ -59,7 +62,7 @@ function getTx (hash) {
 function getBlockTime () {
   return foreignHttpClient
     .get(`/api/v1/time`)
-    .then(res => Date.parse(res.data.block_time) - 10 * 1000)
+    .then(res => Date.parse(res.data.block_time) - FOREIGN_FETCH_BLOCK_TIME_OFFSET)
     .catch(() => getBlockTime())
 }
 
@@ -67,7 +70,7 @@ async function fetchNewTransactions () {
   logger.debug('Fetching new transactions')
   const startTime = parseInt(await redis.get('foreignTime')) + 1
   const address = getLastForeignAddress()
-  const endTime = await getBlockTime()
+  const endTime = Math.min(startTime + 3 * 30 * 24 * 60 * 60 * 1000, await getBlockTime())
   if (address === null)
     return {}
   logger.debug('Sending api transactions request')
