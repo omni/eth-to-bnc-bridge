@@ -27,10 +27,12 @@ async function main () {
     return
   }
 
-  if (newTransactions.length)
+  if (newTransactions.length) {
     logger.info(`Found ${newTransactions.length} new transactions`)
-  else
+    logger.trace('%o', newTransactions)
+  } else {
     logger.debug(`Found 0 new transactions`)
+  }
 
   for (const tx of newTransactions.reverse()) {
     if (tx.memo !== 'funding') {
@@ -46,7 +48,7 @@ async function main () {
   }
 }
 
-function getTx(hash) {
+function getTx (hash) {
   return foreignHttpClient
     .get(`/api/v1/tx/${hash}`, {
       params: {
