@@ -10,7 +10,7 @@ const testChangeThreshold = require('./changeThreshold')
 const usersConfig = require('../config').users
 const validatorsConfig = require('../config').validators
 
-const { FOREIGN_PRIVATE_KEY } = process.env
+const { HOME_PRIVATE_KEY, FOREIGN_PRIVATE_KEY, HOME_BRIDGE_ADDRESS } = process.env
 
 const { controller1 } = require('./utils/proxyController')
 
@@ -23,9 +23,11 @@ describe('bridge tests', function () {
 
   describe('generation of initial epoch keys', function () {
     let info
+    let homePrefundedUser
     let foreignPrefundedUser
 
     before(async function () {
+      homePrefundedUser = await createUser(HOME_PRIVATE_KEY)
       foreignPrefundedUser = await createUser(FOREIGN_PRIVATE_KEY)
     })
 
@@ -36,6 +38,7 @@ describe('bridge tests', function () {
 
     after(async function () {
       await foreignPrefundedUser.transferBnc(info.foreignBridgeAddress, 50, 0.1)
+      await homePrefundedUser.transferEth(HOME_BRIDGE_ADDRESS, 500)
     })
   })
 

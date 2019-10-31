@@ -20,21 +20,17 @@ async function initialize () {
 }
 
 async function main () {
-  const newTransactions = await fetchNewTransactions()
-  if (newTransactions === null || newTransactions.length === 0) {
-
+  const { transactions, endTime } = await fetchNewTransactions()
+  if (!transactions || transactions.length === 0) {
+    logger.debug(`Found 0 new transactions`)
     await new Promise(r => setTimeout(r, 5000))
     return
   }
 
-  if (newTransactions.length) {
-    logger.info(`Found ${newTransactions.length} new transactions`)
-    logger.trace('%o', newTransactions)
-  } else {
-    logger.debug(`Found 0 new transactions`)
-  }
+  logger.info(`Found ${transactions.length} new transactions`)
+  logger.trace('%o', transactions)
 
-  for (const tx of newTransactions.reverse()) {
+  for (const tx of transactions.reverse()) {
     if (tx.memo !== 'funding') {
       const publicKeyEncoded = (await getTx(tx.txHash)).signatures[0].pub_key.value
       await proxyHttpClient
@@ -44,8 +40,9 @@ async function main () {
           hash: `0x${tx.txHash}`
         })
     }
-    await redis.set('foreignTime', Date.parse(tx.timeStamp))
+    //await redis.set('foreignTime', Date.parse(tx.timeStamp))
   }
+  await redis.set('foreignTime', endTime)
 }
 
 function getTx (hash) {
@@ -59,26 +56,37 @@ function getTx (hash) {
     .catch(() => getTx(hash))
 }
 
+function getBlockTime () {
+  return foreignHttpClient
+    .get(`/api/v1/time`)
+    .then(res => Date.parse(res.data.block_time) - 10 * 1000)
+    .catch(() => getBlockTime())
+}
+
 async function fetchNewTransactions () {
   logger.debug('Fetching new transactions')
   const startTime = parseInt(await redis.get('foreignTime')) + 1
   const address = getLastForeignAddress()
+  const endTime = await getBlockTime()
   if (address === null)
-    return null
+    return {}
   logger.debug('Sending api transactions request')
-  return foreignHttpClient
-    .get('/api/v1/transactions', {
-      params: {
-        address,
-        side: 'RECEIVE',
-        txAsset: FOREIGN_ASSET,
-        txType: 'TRANSFER',
-        startTime,
-        endTime: startTime + 3 * 30 * 24 * 60 * 60 * 1000,
-      }
-    })
-    .then(res => res.data.tx)
-    .catch(() => fetchNewTransactions())
+  const params = {
+    address,
+    side: 'RECEIVE',
+    txAsset: FOREIGN_ASSET,
+    txType: 'TRANSFER',
+    startTime,
+    endTime,
+  }
+  try {
+    logger.trace('%o', params)
+    const transactions = (await foreignHttpClient
+      .get('/api/v1/transactions', { params })).data.tx
+    return { transactions, endTime }
+  } catch (e) {
+    return await fetchNewTransactions()
+  }
 }
 
 function getLastForeignAddress () {
