@@ -24,8 +24,9 @@ const keygenEncoders = [
   },
   // round 3
   function * (value) {
-    yield Buffer.from(value.ciphertext) // 32 bytes
-    yield Buffer.from(value.tag) // 16 bytes
+    yield Buffer.from([ value.ciphertext.length ])
+    yield Buffer.from(value.ciphertext) // 32 bytes or less
+    yield Buffer.from(value.tag) // 16 bytes or less
   },
   // round 4
   function * (value) {

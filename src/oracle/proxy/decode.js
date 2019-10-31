@@ -52,10 +52,11 @@ const keygenDecoders = [
       ciphertext: [],
       tag: []
     }
-    for (let i = 0; i < 32; i++) {
+    const ciphertextLength = tokenizer.byte() // probably 32
+    for (let i = 0; i < ciphertextLength; i++) {
       res.ciphertext.push(tokenizer.byte())
     }
-    for (let i = 0; i < 16; i++) {
+    while (!tokenizer.isEmpty()) {
       res.tag.push(tokenizer.byte())
     }
     return res
