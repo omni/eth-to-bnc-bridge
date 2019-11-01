@@ -1,0 +1,11 @@
+{
+  "extends": [
+    "../../.eslintrc"
+  ],
+  "plugins": [
+    "truffle"
+  ],
+  "env": {
+    "truffle/globals": true
+  }
+}
