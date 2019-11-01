@@ -10,42 +10,52 @@ const { FOREIGN_CHAIN_ID } = process.env
 const BNB_ASSET = 'BNB'
 
 class Transaction {
-  constructor (options) {
-    const { from, accountNumber, sequence, recipients, asset, memo = '' } = options
+  constructor(options) {
+    const {
+      from, accountNumber, sequence, recipients, asset, memo = ''
+    } = options
 
-    const totalTokens = recipients.reduce((sum, { tokens }) => sum.plus(new BN(tokens || 0)), new BN(0))
-    const totalBnbs = recipients.reduce((sum, { bnbs }) => sum.plus(new BN(bnbs || 0)), new BN(0))
+    const totalTokens = recipients.reduce(
+      (sum, { tokens }) => sum.plus(new BN(tokens || 0)), new BN(0)
+    )
+    const totalBnbs = recipients.reduce(
+      (sum, { bnbs }) => sum.plus(new BN(bnbs || 0)), new BN(0)
+    )
     const senderCoins = []
     if (asset && totalTokens.isGreaterThan(0)) {
       senderCoins.push({
         denom: asset,
-        amount: totalTokens.multipliedBy(10 ** 8).toNumber(),
+        amount: totalTokens.multipliedBy(10 ** 8)
+          .toNumber()
       })
     }
     if (totalBnbs.isGreaterThan(0)) {
       senderCoins.push({
         denom: BNB_ASSET,
-        amount: totalBnbs.multipliedBy(10 ** 8).toNumber(),
+        amount: totalBnbs.multipliedBy(10 ** 8)
+          .toNumber()
       })
     }
     senderCoins.sort((a, b) => a.denom > b.denom)
 
-    const inputs = [ {
+    const inputs = [{
       address: from,
       coins: senderCoins
-    } ]
+    }]
     const outputs = recipients.map(({ to, tokens, bnbs }) => {
       const receiverCoins = []
       if (asset && tokens) {
         receiverCoins.push({
           denom: asset,
-          amount: new BN(tokens).multipliedBy(10 ** 8).toNumber(),
+          amount: new BN(tokens).multipliedBy(10 ** 8)
+            .toNumber()
         })
       }
       if (bnbs) {
         receiverCoins.push({
           denom: BNB_ASSET,
-          amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber(),
+          amount: new BN(bnbs).multipliedBy(10 ** 8)
+            .toNumber()
         })
       }
       receiverCoins.sort((a, b) => a.denom > b.denom)
@@ -56,8 +66,14 @@ class Transaction {
     })
 
     const msg = {
-      inputs: inputs.map((x) => ({...x, address: crypto.decodeAddress(x.address)})),
-      outputs: outputs.map((x) => ({...x, address: crypto.decodeAddress(x.address)})),
+      inputs: inputs.map((x) => ({
+        ...x,
+        address: crypto.decodeAddress(x.address)
+      })),
+      outputs: outputs.map((x) => ({
+        ...x,
+        address: crypto.decodeAddress(x.address)
+      })),
       msgType: 'MsgSend'
     }
 
@@ -72,29 +88,31 @@ class Transaction {
       memo,
       msg,
       sequence,
-      type: msg.msgType,
+      type: msg.msgType
     })
   }
 
-  getSignBytes () {
+  getSignBytes() {
     return this.tx.getSignBytes(this.signMsg)
   }
 
-  addSignature (publicKey, signature) {
+  addSignature(publicKey, signature) {
     const yLast = parseInt(publicKey.y[publicKey.y.length - 1], 16)
     const n = new BN('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141', 16)
     const s = new BN(signature.s, 16)
     if (s.gt(n.div(2))) {
       logger.debug('Normalizing s')
-      signature.s = n.minus(s).toString(16)
+      // eslint-disable-next-line no-param-reassign
+      signature.s = n.minus(s)
+        .toString(16)
     }
-    const publicKeyEncoded = Buffer.from('eb5ae98721' + (yLast % 2 ? '03' : '02') + padZeros(publicKey.x, 64), 'hex')
-    this.tx.signatures = [ {
+    const publicKeyEncoded = Buffer.from(`eb5ae98721${yLast % 2 ? '03' : '02'}${padZeros(publicKey.x, 64)}`, 'hex')
+    this.tx.signatures = [{
       pub_key: publicKeyEncoded,
       signature: Buffer.from(padZeros(signature.r, 64) + padZeros(signature.s, 64), 'hex'),
       account_number: this.tx.account_number,
-      sequence: this.tx.sequence,
-    } ]
+      sequence: this.tx.sequence
+    }]
     return this.tx.serialize()
   }
 }

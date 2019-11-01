@@ -1,6 +1,6 @@
 const axios = require('axios')
 
-function createController (validatorId) {
+function createController(validatorId) {
   const url = `http://validator${validatorId}_proxy_1:8002/`
 
   const proxy = axios.create({
@@ -9,22 +9,22 @@ function createController (validatorId) {
   })
 
   return {
-    getInfo: async function () {
+    async getInfo() {
       return (await proxy.get('/info')).data
     },
-    voteStartVoting: async function () {
+    async voteStartVoting() {
       return (await proxy.get('/vote/startVoting')).data
     },
-    voteStartKeygen: async function () {
+    async voteStartKeygen() {
       return (await proxy.get('/vote/startKeygen')).data
     },
-    voteAddValidator: async function (validatorAddress) {
+    async voteAddValidator(validatorAddress) {
       return (await proxy.get(`/vote/addValidator/${validatorAddress}`)).data
     },
-    voteRemoveValidator: async function (validatorAddress) {
+    async voteRemoveValidator(validatorAddress) {
       return (await proxy.get(`/vote/removeValidator/${validatorAddress}`)).data
     },
-    voteChangeThreshold: async function (threshold) {
+    async voteChangeThreshold(threshold) {
       return (await proxy.get(`/vote/changeThreshold/${threshold}`)).data
     }
   }

@@ -9,6 +9,9 @@
     "ethers": "4.0.33",
     "pino": "5.13.4",
     "pino-pretty": "3.2.1"
+  },
+  "engines": {
+    "node": ">=10.6.0"
   }
 }
 

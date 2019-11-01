@@ -1,18 +1,19 @@
 const BN = require('bn.js')
 
-function Tokenizer (_buffer) {
+function Tokenizer(_buffer) {
   const buffer = _buffer
   let position = 0
   return {
-    isEmpty: function () {
+    isEmpty() {
       return position === buffer.length
     },
-    parse: function (length = 32, base = 16) {
+    parse(length = 32, base = 16) {
       const res = new BN(buffer.slice(position, position + length)).toString(base)
       position += length
       return res
     },
-    byte: function () {
+    byte() {
+      // eslint-disable-next-line no-plusplus
       return buffer[position++]
     }
   }
@@ -21,7 +22,7 @@ function Tokenizer (_buffer) {
 const keygenDecoders = [
   null,
   // round 1
-  function (tokenizer) {
+  (tokenizer) => {
     const res = {
       e: {
         n: tokenizer.parse(256, 10)
@@ -37,23 +38,21 @@ const keygenDecoders = [
     return res
   },
   // round 2
-  function (tokenizer) {
-    return {
-      blind_factor: tokenizer.parse(),
-      y_i: {
-        x: tokenizer.parse(),
-        y: tokenizer.parse()
-      }
+  (tokenizer) => ({
+    blind_factor: tokenizer.parse(),
+    y_i: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
     }
-  },
+  }),
   // round 3
-  function (tokenizer) {
+  (tokenizer) => {
     const res = {
       ciphertext: [],
       tag: []
     }
     const ciphertextLength = tokenizer.byte() // probably 32
-    for (let i = 0; i < ciphertextLength; i++) {
+    for (let i = 0; i < ciphertextLength; i += 1) {
       res.ciphertext.push(tokenizer.byte())
     }
     while (!tokenizer.isEmpty()) {
@@ -62,7 +61,7 @@ const keygenDecoders = [
     return res
   },
   // round 4
-  function (tokenizer) {
+  (tokenizer) => {
     const res = {
       parameters: {
         threshold: tokenizer.byte(),
@@ -73,157 +72,139 @@ const keygenDecoders = [
     while (!tokenizer.isEmpty()) {
       res.commitments.push({
         x: tokenizer.parse(),
-        y: tokenizer.parse(),
+        y: tokenizer.parse()
       })
     }
     return res
   },
   // round 5
-  function (tokenizer) {
-    return {
-      pk: {
-        x: tokenizer.parse(),
-        y: tokenizer.parse()
-      },
-      pk_t_rand_commitment: {
-        x: tokenizer.parse(),
-        y: tokenizer.parse()
-      },
-      challenge_response: tokenizer.parse()
-    }
-  }
+  (tokenizer) => ({
+    pk: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
+    },
+    pk_t_rand_commitment: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
+    },
+    challenge_response: tokenizer.parse()
+  })
 ]
 
 const signDecoders = [
   // round 0
-  function (tokenizer) {
-    return tokenizer.byte()
-  },
+  (tokenizer) => tokenizer.byte(),
   // round 1
-  function (tokenizer) {
-    return [
-      {
-        com: tokenizer.parse()
-      },
-      {
-        c: tokenizer.parse(512)
-      }
-    ]
-  },
+  (tokenizer) => [
+    {
+      com: tokenizer.parse()
+    },
+    {
+      c: tokenizer.parse(512)
+    }
+  ],
   // round 2
-  function (tokenizer) {
+  (tokenizer) => {
     const res = []
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 2; i += 1) {
       res[i] = {
         c: tokenizer.parse(512),
         b_proof: {
           pk: {
             x: tokenizer.parse(),
-            y: tokenizer.parse(),
+            y: tokenizer.parse()
           },
           pk_t_rand_commitment: {
             x: tokenizer.parse(),
-            y: tokenizer.parse(),
+            y: tokenizer.parse()
           },
-          challenge_response: tokenizer.parse(),
+          challenge_response: tokenizer.parse()
         },
         beta_tag_proof: {
           pk: {
             x: tokenizer.parse(),
-            y: tokenizer.parse(),
+            y: tokenizer.parse()
           },
           pk_t_rand_commitment: {
             x: tokenizer.parse(),
-            y: tokenizer.parse(),
+            y: tokenizer.parse()
           },
-          challenge_response: tokenizer.parse(),
+          challenge_response: tokenizer.parse()
         }
       }
     }
     return res
   },
   // round 3
-  function (tokenizer) {
-    return tokenizer.parse()
-  },
+  (tokenizer) => tokenizer.parse(),
   // round 4
-  function (tokenizer) {
-    return {
-      blind_factor: tokenizer.parse(),
-      g_gamma_i: {
-        x: tokenizer.parse(),
-        y: tokenizer.parse()
-      }
+  (tokenizer) => ({
+    blind_factor: tokenizer.parse(),
+    g_gamma_i: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
     }
-  },
+  }),
   // round 5
-  function (tokenizer) {
-    return {
-      com: tokenizer.parse()
-    }
-  },
+  (tokenizer) => ({
+    com: tokenizer.parse()
+  }),
   // round 6
-  function (tokenizer) {
-    return [
-      {
-        V_i: {
-          x: tokenizer.parse(),
-          y: tokenizer.parse()
-        },
-        A_i: {
-          x: tokenizer.parse(),
-          y: tokenizer.parse()
-        },
-        B_i: {
-          x: tokenizer.parse(),
-          y: tokenizer.parse()
-        },
-        blind_factor: tokenizer.parse()
-      },
-      {
-        T: {
-          x: tokenizer.parse(),
-          y: tokenizer.parse()
-        },
-        A3: {
-          x: tokenizer.parse(),
-          y: tokenizer.parse()
-        },
-        z1: tokenizer.parse(),
-        z2: tokenizer.parse()
-      }
-    ]
-  },
-  // round 7
-  function (tokenizer) {
-    return {
-      com: tokenizer.parse()
-    }
-  },
-  // round 8
-  function (tokenizer) {
-    return {
-      u_i: {
+  (tokenizer) => [
+    {
+      V_i: {
         x: tokenizer.parse(),
         y: tokenizer.parse()
       },
-      t_i: {
+      A_i: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      },
+      B_i: {
         x: tokenizer.parse(),
         y: tokenizer.parse()
       },
       blind_factor: tokenizer.parse()
+    },
+    {
+      T: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      },
+      A3: {
+        x: tokenizer.parse(),
+        y: tokenizer.parse()
+      },
+      z1: tokenizer.parse(),
+      z2: tokenizer.parse()
     }
-  },
+  ],
+  // round 7
+  (tokenizer) => ({
+    com: tokenizer.parse()
+  }),
+  // round 8
+  (tokenizer) => ({
+    u_i: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
+    },
+    t_i: {
+      x: tokenizer.parse(),
+      y: tokenizer.parse()
+    },
+    blind_factor: tokenizer.parse()
+  }),
   // round 9
-  function (tokenizer) {
-    return tokenizer.parse()
-  },
+  (tokenizer) => tokenizer.parse()
 ]
 
-module.exports = function (isKeygen, round, value) {
-  value = Buffer.from(value.substr(2), 'hex')
-  const tokenizer = Tokenizer(value)
-  const roundNumber = parseInt(round[round.length - 1])
+function decode(isKeygen, round, value) {
+  const newValue = Buffer.from(value.substr(2), 'hex')
+  const tokenizer = Tokenizer(newValue)
+  const roundNumber = parseInt(round[round.length - 1], 10)
   const decoder = (isKeygen ? keygenDecoders : signDecoders)[roundNumber]
   return JSON.stringify(decoder(tokenizer))
 }
+
+module.exports = decode

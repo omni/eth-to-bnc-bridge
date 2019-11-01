@@ -8,11 +8,18 @@ const abiToken = require('./IERC20').abi
 const web3 = new Web3(HOME_RPC_URL, null, { transactionConfirmationBlocks: 1 })
 const token = new web3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
 
-const address = process.argv[2]
+function main() {
+  const address = process.argv[2]
 
-web3.eth.getBalance(address).then(x => console.log(`${x.toString()} wei`))
+  web3.eth.getBalance(address)
+    .then((balance) => console.log(`${balance.toString()} wei`))
 
-token.methods.balanceOf(address).call()
-  .then(x => parseFloat(new BN(x).dividedBy(10 ** 18).toFixed(8, 3)))
-  .then(x => console.log(`${x.toString()} tokens`))
-  .catch(() => console.log('0 tokens'))
+  token.methods.balanceOf(address)
+    .call()
+    .then((balance) => parseFloat(new BN(balance).dividedBy(10 ** 18)
+      .toFixed(8, 3)))
+    .then((balance) => console.log(`${balance.toString()} tokens`))
+    .catch(() => console.log('0 tokens'))
+}
+
+main()

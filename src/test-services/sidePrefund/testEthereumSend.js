@@ -7,7 +7,7 @@ const web3 = new Web3(SIDE_RPC_URL, null, { transactionConfirmationBlocks: 1 })
 
 const sender = web3.eth.accounts.privateKeyToAccount(`0x${SIDE_PRIVATE_KEY}`).address
 
-async function main () {
+async function main() {
   const SIDE_CHAIN_ID = await web3.eth.net.getId()
 
   const to = process.argv[2]
@@ -15,20 +15,19 @@ async function main () {
 
   console.log(`Transfer from ${sender} to ${to}, ${amount} eth`)
 
-  const tx_coins = {
+  const txCoins = {
     data: '0x',
     from: sender,
-    to: to,
+    to,
     nonce: await web3.eth.getTransactionCount(sender),
     chainId: SIDE_CHAIN_ID,
     value: web3.utils.toWei(new BN(amount).toString(), 'ether'),
     gas: 21000
   }
-  const signedTx = await web3.eth.accounts.signTransaction(tx_coins, SIDE_PRIVATE_KEY)
+  const signedTx = await web3.eth.accounts.signTransaction(txCoins, SIDE_PRIVATE_KEY)
 
   const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction)
-  console.log('txHash: ' + receipt.transactionHash)
-
+  console.log(`txHash: ${receipt.transactionHash}`)
 }
 
 main()

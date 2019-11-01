@@ -10,12 +10,12 @@ const bnc = axios.create({
 })
 
 module.exports = {
-  getBalance: async function (address) {
+  async getBalance(address) {
     const response = await retry(5, () => bnc.get(`/api/v1/account/${address}`))
-    const tokens = response.data.balances.find(x => x.symbol === FOREIGN_ASSET)
+    const tokens = response.data.balances.find((x) => x.symbol === FOREIGN_ASSET)
     return response && tokens ? parseFloat(tokens.free) : 0
   },
-  getSequence: async function (address) {
+  async getSequence(address) {
     const response = await retry(5, () => bnc.get(`/api/v1/account/${address}/sequence`))
     return response ? response.data.sequence : 0
   }

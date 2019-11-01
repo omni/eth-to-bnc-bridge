@@ -12,7 +12,7 @@ redis.on('error', () => {
 })
 
 redis.on('connect', async () => {
-  await redis.set('homeBlock', parseInt(process.argv[2]))
+  await redis.set('homeBlock', parseInt(process.argv[2], 10))
   await redis.save()
   redis.disconnect()
 })

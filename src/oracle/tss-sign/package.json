@@ -9,5 +9,8 @@
     "express": "4.17.1",
     "pino": "5.13.4",
     "pino-pretty": "3.2.1"
+  },
+  "engines": {
+    "node": ">=10.6.0"
   }
 }

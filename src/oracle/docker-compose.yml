@@ -9,10 +9,8 @@ services:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
-      - HOME_CHAIN_ID
       - SIDE_RPC_URL
       - SIDE_SHARED_DB_ADDRESS
-      - SIDE_CHAIN_ID
       - VALIDATOR_PRIVATE_KEY
       - FOREIGN_URL
       - FOREIGN_ASSET
@@ -93,7 +91,6 @@ services:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
-      - HOME_CHAIN_ID
       - HOME_START_BLOCK
       - VALIDATOR_PRIVATE_KEY
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'

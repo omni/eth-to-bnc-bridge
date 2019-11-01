@@ -6,7 +6,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY || FOREIGN_PRIVATE_KEY
 
 const client = new Bnc(FOREIGN_URL)
 
-async function main () {
+async function main() {
   client.chooseNetwork('testnet')
   await client.setPrivateKey(PRIVATE_KEY)
 
@@ -43,10 +43,11 @@ async function main () {
     receipt = await client.transfer(from, to, tokens, FOREIGN_ASSET, 'exchange')
   }
 
-  if (receipt.status === 200)
+  if (receipt.status === 200) {
     console.log(receipt.result[0].hash)
-  else
+  } else {
     console.log(receipt)
+  }
 }
 
 main()

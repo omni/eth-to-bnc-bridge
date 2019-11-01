@@ -4,7 +4,7 @@ const { delay } = require('./wait')
 
 const { FOREIGN_URL, FOREIGN_ASSET } = process.env
 
-module.exports = async function main (privateKey) {
+module.exports = async function main(privateKey) {
   const client = new Bnc(FOREIGN_URL)
   client.chooseNetwork('testnet')
 
@@ -16,7 +16,7 @@ module.exports = async function main (privateKey) {
   await delay(1000)
 
   return {
-    transfer: async function (to, tokens, bnbs) {
+    async transfer(to, tokens, bnbs) {
       const outputs = [{
         to,
         coins: []
@@ -35,7 +35,7 @@ module.exports = async function main (privateKey) {
       }
       await client.multiSend(from, outputs, 'funding')
     },
-    exchange: async function (to, value) {
+    async exchange(to, value) {
       await client.transfer(from, to, value.toString(), FOREIGN_ASSET, 'exchange')
     }
   }

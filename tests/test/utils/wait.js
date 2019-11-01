@@ -1,32 +1,34 @@
 async function delay(ms) {
-  await new Promise(res => setTimeout(res, ms))
+  await new Promise((res) => setTimeout(res, ms))
 }
 
-async function waitPromise (getPromise, checker) {
-  do {
+async function waitPromise(getPromise, checker) {
+  while (true) {
     const result = await getPromise()
-    if (checker(result))
+    if (checker(result)) {
       return result
+    }
     await delay(1000)
-  } while (true)
+  }
 }
 
-async function retry (n, getPromise) {
+async function retry(n, getPromise) {
   while (n) {
     try {
       return await getPromise()
     } catch (e) {
       await delay(3000)
-      n--
+      // eslint-disable-next-line no-param-reassign
+      n -= 1
     }
   }
   return null
 }
 
-Array.prototype.seqMap = async function (transition) {
+async function seqMap(arr, transition) {
   const results = []
-  for (let i = 0; i < this.length; i++) {
-    results[i] = await transition(this[i])
+  for (let i = 0; i < arr.length; i += 1) {
+    results[i] = await transition(arr[i])
   }
   return results
 }
@@ -34,5 +36,6 @@ Array.prototype.seqMap = async function (transition) {
 module.exports = {
   waitPromise,
   delay,
-  retry
+  retry,
+  seqMap
 }

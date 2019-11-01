@@ -1,5 +1,5 @@
 const createUser = require('./utils/user')
-const { waitPromise } = require('./utils/wait')
+const { waitPromise, seqMap } = require('./utils/wait')
 
 const testEthToBnc = require('./ethToBnc')
 const testBncToEth = require('./bncToEth')
@@ -18,7 +18,7 @@ describe('bridge tests', function () {
   let users
 
   before(async function () {
-    users = await usersConfig.seqMap(user => createUser(user.privateKey))
+    users = await seqMap(usersConfig, (user) => createUser(user.privateKey))
   })
 
   describe('generation of initial epoch keys', function () {
@@ -33,7 +33,7 @@ describe('bridge tests', function () {
 
     it('should generate keys', async function () {
       this.timeout(120000)
-      info = await waitPromise(controller1.getInfo, info => info.epoch === 1)
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.epoch === 1)
     })
 
     after(async function () {

@@ -9,17 +9,15 @@ const { publicKeyToAddress } = require('./crypto')
 const { RABBITMQ_URL, PROXY_URL } = process.env
 
 const app = express()
-app.get('/start', (req, res) => {
-  logger.info('Ready to start')
-  ready = true
-  res.send()
-})
-app.listen(8001, () => logger.debug('Listening on 8001'))
 
 let currentKeygenEpoch = null
 let ready = false
 
-async function main () {
+async function confirmKeygen(keysFile) {
+  exec.execSync(`curl -X POST -H "Content-Type: application/json" -d @"${keysFile}" "${PROXY_URL}/confirmKeygen"`, { stdio: 'pipe' })
+}
+
+async function main() {
   logger.info('Connecting to RabbitMQ server')
   const channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to epoch events queue')
@@ -27,11 +25,11 @@ async function main () {
   const cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
 
   while (!ready) {
-    await new Promise(res => setTimeout(res, 1000))
+    await new Promise((res) => setTimeout(res, 1000))
   }
 
   channel.prefetch(1)
-  keygenQueue.consume(msg => {
+  keygenQueue.consume((msg) => {
     const { epoch, parties, threshold } = JSON.parse(msg.content)
     logger.info(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
 
@@ -41,8 +39,11 @@ async function main () {
     currentKeygenEpoch = epoch
 
     logger.debug('Writing params')
-    fs.writeFileSync('./params', JSON.stringify({ parties: parties.toString(), threshold: threshold.toString() }))
-    const cmd = exec.execFile('./keygen-entrypoint.sh', [ PROXY_URL, keysFile ], async () => {
+    fs.writeFileSync('./params', JSON.stringify({
+      parties: parties.toString(),
+      threshold: threshold.toString()
+    }))
+    const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
       currentKeygenEpoch = null
       if (fs.existsSync(keysFile)) {
         logger.info(`Finished keygen for epoch ${epoch}`)
@@ -57,11 +58,11 @@ async function main () {
       logger.debug('Ack for keygen message')
       channel.ack(msg)
     })
-    cmd.stdout.on('data', data => logger.debug(data.toString()))
-    cmd.stderr.on('data', data => logger.debug(data.toString()))
+    cmd.stdout.on('data', (data) => logger.debug(data.toString()))
+    cmd.stderr.on('data', (data) => logger.debug(data.toString()))
   })
 
-  cancelKeygenQueue.consume(async msg => {
+  cancelKeygenQueue.consume(async (msg) => {
     const { epoch } = JSON.parse(msg.content)
     logger.info(`Consumed new cancel event for epoch ${epoch} keygen`)
     if (currentKeygenEpoch === epoch) {
@@ -72,8 +73,12 @@ async function main () {
   })
 }
 
-main()
 
-async function confirmKeygen (keysFile) {
-  exec.execSync(`curl -X POST -H "Content-Type: application/json" -d @"${keysFile}" "${PROXY_URL}/confirmKeygen"`, { stdio: 'pipe' })
-}
+app.get('/start', (req, res) => {
+  logger.info('Ready to start')
+  ready = true
+  res.send()
+})
+app.listen(8001, () => logger.debug('Listening on 8001'))
+
+main()

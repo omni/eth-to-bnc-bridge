@@ -5,13 +5,14 @@ const { getBalance } = require('./utils/bncController')
 
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
 
-module.exports = newThreshold => {
+module.exports = (newThreshold) => {
   describe('change threshold', function () {
     let info
     let initialInfo
 
     before(async function () {
-      initialInfo = info = await controller1.getInfo()
+      initialInfo = await controller1.getInfo()
+      info = initialInfo
     })
 
     it('should start voting process', async function () {
@@ -21,7 +22,7 @@ module.exports = newThreshold => {
       assert.strictEqual(info.bridgeStatus, 'ready', 'Should not change state after one vote')
 
       await controller2.voteStartVoting()
-      info = await waitPromise(controller1.getInfo, info => info.bridgeStatus === 'voting')
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'voting')
       assert.deepStrictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
       assert.deepStrictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Next validators are not set correctly')
@@ -46,7 +47,10 @@ module.exports = newThreshold => {
       assert.deepStrictEqual(info.nextThreshold, initialInfo.threshold, 'Next threshold is not set correctly')
 
       await controller2.voteChangeThreshold(newThreshold)
-      info = await waitPromise(controller1.getInfo, info => info.nextThreshold === newThreshold)
+      info = await waitPromise(
+        controller1.getInfo,
+        (newInfo) => newInfo.nextThreshold === newThreshold
+      )
       assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Next validators are not set correctly')
       assert.deepStrictEqual(info.threshold, initialInfo.threshold, 'Threshold not set correctly')
@@ -70,7 +74,7 @@ module.exports = newThreshold => {
       assert.strictEqual(info.bridgeStatus, 'voting', 'Should not change state after one vote')
 
       await controller2.voteStartKeygen()
-      info = await waitPromise(controller1.getInfo, info => info.bridgeStatus === 'keygen')
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'keygen')
 
       await controller3.voteStartKeygen()
       await delay(5000)
@@ -86,12 +90,15 @@ module.exports = newThreshold => {
 
     it('should finish keygen process and start funds transfer', async function () {
       this.timeout(120000)
-      info = await waitPromise(controller1.getInfo, info => info.bridgeStatus === 'funds_transfer')
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'funds_transfer')
     })
 
     it('should transfer all funds to new account and start new epoch', async function () {
       this.timeout(300000)
-      info = await waitPromise(controller1.getInfo, info => info.epoch === initialInfo.epoch + 1)
+      info = await waitPromise(
+        controller1.getInfo,
+        (newInfo) => newInfo.epoch === initialInfo.epoch + 1
+      )
       assert.deepStrictEqual(info.validators, initialInfo.validators, 'Incorrect set of validators in new epoch')
       assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Incorrect next epoch')
       assert.strictEqual(info.bridgeStatus, 'ready', 'Incorrect bridge state in new epoch')
