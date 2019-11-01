@@ -11,6 +11,18 @@ async function waitPromise (getPromise, checker) {
   } while (true)
 }
 
+async function retry (n, getPromise) {
+  while (n) {
+    try {
+      return await getPromise()
+    } catch (e) {
+      await delay(3000)
+      n--
+    }
+  }
+  return null
+}
+
 Array.prototype.seqMap = async function (transition) {
   const results = []
   for (let i = 0; i < this.length; i++) {
@@ -21,5 +33,6 @@ Array.prototype.seqMap = async function (transition) {
 
 module.exports = {
   waitPromise,
-  delay
+  delay,
+  retry
 }

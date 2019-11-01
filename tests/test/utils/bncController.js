@@ -1,5 +1,7 @@
 const axios = require('axios')
 
+const { retry } = require('./wait')
+
 const { FOREIGN_URL, FOREIGN_ASSET } = process.env
 
 const bnc = axios.create({
@@ -9,21 +11,12 @@ const bnc = axios.create({
 
 module.exports = {
   getBalance: async function (address) {
-    try {
-      const response = await bnc.get(`/api/v1/account/${address}`)
-
-      return parseFloat(response.data.balances.find(x => x.symbol === FOREIGN_ASSET).free)
-    } catch (e) {
-      return 0
-    }
+    const response = await retry(5, () => bnc.get(`/api/v1/account/${address}`))
+    const tokens = response.data.balances.find(x => x.symbol === FOREIGN_ASSET)
+    return response && tokens ? parseFloat(tokens.free) : 0
   },
-  getSequence: async function(address) {
-    try {
-      const response = await bnc.get(`/api/v1/account/${address}/sequence`)
-
-      return response.data.sequence
-    } catch (e) {
-      return 0
-    }
+  getSequence: async function (address) {
+    const response = await retry(5, () => bnc.get(`/api/v1/account/${address}/sequence`))
+    return response ? response.data.sequence : 0
   }
 }

@@ -3,6 +3,8 @@
 set -e
 set -v
 
+docker build -t tss ./src/tss
+
 ./demo/start-environment.sh
 
 cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
