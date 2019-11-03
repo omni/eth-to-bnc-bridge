@@ -159,10 +159,8 @@ async function set(req, res) {
 
 async function signupKeygen(req, res) {
   logger.debug('SignupKeygen call')
-  const epoch = (await bridge.methods.nextEpoch()
-    .call()).toNumber()
-  const partyId = (await bridge.methods.getNextPartyId(validatorAddress)
-    .call()).toNumber()
+  const epoch = (await bridge.methods.nextEpoch().call()).toNumber()
+  const partyId = (await bridge.methods.getNextPartyId(validatorAddress).call()).toNumber()
 
   if (partyId === 0) {
     res.send(Err({ message: 'Not a validator' }))
@@ -193,10 +191,9 @@ async function signupSign(req, res) {
     return
   }
 
-  const validators = await bridge.methods.getValidators()
-    .call()
-  const id = (await sharedDb.methods.getSignupNumber(hash, validators, validatorAddress)
-    .call()).toNumber()
+  const validators = await bridge.methods.getValidators().call()
+  const id = (await sharedDb.methods.getSignupNumber(hash, validators, validatorAddress).call())
+    .toNumber()
 
   res.send(Ok({
     uuid: hash,
@@ -345,62 +342,37 @@ async function info(req, res) {
       x, y, epoch, rangeSize, nextRangeSize, epochStartBlock, foreignNonce, nextEpoch,
       threshold, nextThreshold, validators, nextValidators, status, homeBalance
     ] = await Promise.all([
-      bridge.methods.getX()
-        .call()
-        .then((value) => new BN(value).toString(16)),
-      bridge.methods.getY()
-        .call()
-        .then((value) => new BN(value).toString(16)),
-      bridge.methods.epoch()
-        .call()
-        .then(boundX),
-      bridge.methods.getRangeSize()
-        .call()
-        .then(boundX),
-      bridge.methods.getNextRangeSize()
-        .call()
-        .then(boundX),
-      bridge.methods.getStartBlock()
-        .call()
-        .then(boundX),
-      bridge.methods.getNonce()
-        .call()
-        .then(boundX),
-      bridge.methods.nextEpoch()
-        .call()
-        .then(boundX),
-      bridge.methods.getThreshold()
-        .call()
-        .then(boundX),
-      bridge.methods.getNextThreshold()
-        .call()
-        .then(boundX),
-      bridge.methods.getValidators()
-        .call(),
-      bridge.methods.getNextValidators()
-        .call(),
-      bridge.methods.status()
-        .call(),
-      token.methods.balanceOf(HOME_BRIDGE_ADDRESS)
-        .call()
-        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18)
-          .toFixed(8, 3)))
+      bridge.methods.getX().call().then((value) => new BN(value).toString(16)),
+      bridge.methods.getY().call().then((value) => new BN(value).toString(16)),
+      bridge.methods.epoch().call().then(boundX),
+      bridge.methods.getRangeSize().call().then(boundX),
+      bridge.methods.getNextRangeSize().call().then(boundX),
+      bridge.methods.getStartBlock().call().then(boundX),
+      bridge.methods.getNonce().call().then(boundX),
+      bridge.methods.nextEpoch().call().then(boundX),
+      bridge.methods.getThreshold().call().then(boundX),
+      bridge.methods.getNextThreshold().call().then(boundX),
+      bridge.methods.getValidators().call(),
+      bridge.methods.getNextValidators().call(),
+      bridge.methods.status().call(),
+      token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call()
+        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
     const [
       confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen
     ] = await Promise.all([
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [1, nextEpoch])))
-        .call()
-        .then(boundX),
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [2, nextEpoch])))
-        .call()
-        .then(boundX),
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [7, nextEpoch])))
-        .call()
-        .then(boundX),
-      bridge.methods.votesCount(homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [8, nextEpoch])))
-        .call()
-        .then(boundX)
+      bridge.methods.votesCount(
+        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [1, nextEpoch]))
+      ).call().then(boundX),
+      bridge.methods.votesCount(
+        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [2, nextEpoch]))
+      ).call().then(boundX),
+      bridge.methods.votesCount(
+        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [7, nextEpoch]))
+      ).call().then(boundX),
+      bridge.methods.votesCount(
+        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [8, nextEpoch]))
+      ).call().then(boundX)
     ])
     const foreignAddress = publicKeyToAddress({
       x,

@@ -196,8 +196,6 @@ async function initialize() {
   if (epochStart > saved) {
     logger.info(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
     blockNumber = epochStart
-    rangeSize = (await bridge.methods.getRangeSize()
-      .call()).toNumber()
     await redis.multi()
       .set('homeBlock', blockNumber - 1)
       .set(`foreignNonce${epoch}`, 0)
@@ -208,9 +206,10 @@ async function initialize() {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`), 10) || 0
   }
+  rangeSize = (await bridge.methods.getRangeSize().call()).toNumber()
+  logger.debug(`Range size ${rangeSize}`)
   logger.debug('Checking if current validator')
-  isCurrentValidator = (await bridge.methods.getValidators()
-    .call()).includes(validatorAddress)
+  isCurrentValidator = (await bridge.methods.getValidators().call()).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {

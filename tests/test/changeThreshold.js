@@ -1,7 +1,7 @@
 const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
-const { getBalance } = require('./utils/bncController')
+const { getBepBalance } = require('./utils/bncController')
 
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
 
@@ -105,8 +105,8 @@ module.exports = (newThreshold) => {
       assert.deepStrictEqual(info.threshold, newThreshold, 'Threshold not set correctly')
       assert.deepStrictEqual(info.nextThreshold, newThreshold, 'Next threshold is not set correctly')
       await delay(5000)
-      const prevBalance = await getBalance(initialInfo.foreignBridgeAddress)
-      const newBalance = await getBalance(info.foreignBridgeAddress)
+      const prevBalance = await getBepBalance(initialInfo.foreignBridgeAddress)
+      const newBalance = await getBepBalance(info.foreignBridgeAddress)
       assert.strictEqual(prevBalance, 0, 'Did not transfer all funds')
       assert.strictEqual(newBalance, initialInfo.foreignBalanceTokens, 'Funds are lost somewhere')
     })

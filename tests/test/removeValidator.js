@@ -1,7 +1,7 @@
 const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
-const { getBalance } = require('./utils/bncController')
+const { getBepBalance } = require('./utils/bncController')
 
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
 
@@ -98,8 +98,8 @@ module.exports = (oldValidator) => {
       assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Incorrect next epoch')
       assert.strictEqual(info.bridgeStatus, 'ready', 'Incorrect bridge state in new epoch')
       await delay(5000)
-      const prevBalance = await getBalance(initialInfo.foreignBridgeAddress)
-      const newBalance = await getBalance(info.foreignBridgeAddress)
+      const prevBalance = await getBepBalance(initialInfo.foreignBridgeAddress)
+      const newBalance = await getBepBalance(info.foreignBridgeAddress)
       assert.strictEqual(prevBalance, 0, 'Did not transfer all funds')
       assert.strictEqual(newBalance, initialInfo.foreignBalanceTokens, 'Funds are lost somewhere')
     })
