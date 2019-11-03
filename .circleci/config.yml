@@ -80,7 +80,7 @@ orbs:
         steps:
           - run:
               name: "Load tss image from archive"
-              command: docker load -i ./workspace/tss.tar.gz
+              command: docker load -i ./workspace/tss.tar.gz || true
       save_docker_logs:
         description: "Save docker logs"
         parameters:
