@@ -6,6 +6,7 @@ const { computeAddress } = require('ethers').utils
 const logger = require('./logger')
 const redis = require('./db')
 const { publicKeyToAddress } = require('./crypto')
+const { delay, retry } = require('./wait')
 
 const { FOREIGN_URL, PROXY_URL, FOREIGN_ASSET } = process.env
 
@@ -27,22 +28,21 @@ function getLastForeignAddress() {
   return publicKeyToAddress(publicKey)
 }
 
-function getTx(hash) {
-  return foreignHttpClient
-    .get(`/api/v1/tx/${hash}`, {
+async function getTx(hash) {
+  const response = await retry(() => foreignHttpClient.get(
+    `/api/v1/tx/${hash}`,
+    {
       params: {
         format: 'json'
       }
-    })
-    .then((res) => res.data.tx.value)
-    .catch(() => getTx(hash))
+    }
+  ))
+  return response.data.tx.value
 }
 
-function getBlockTime() {
-  return foreignHttpClient
-    .get('/api/v1/time')
-    .then((res) => Date.parse(res.data.block_time) - FOREIGN_FETCH_BLOCK_TIME_OFFSET)
-    .catch(() => getBlockTime())
+async function getBlockTime() {
+  const response = await retry(() => foreignHttpClient.get('/api/v1/time'))
+  return Date.parse(response.data.block_time) - FOREIGN_FETCH_BLOCK_TIME_OFFSET
 }
 
 async function fetchNewTransactions() {
@@ -62,16 +62,14 @@ async function fetchNewTransactions() {
     startTime,
     endTime
   }
-  try {
-    logger.trace('%o', params)
-    const transactions = (await foreignHttpClient
-      .get('/api/v1/transactions', { params })).data.tx
-    return {
-      transactions,
-      endTime
-    }
-  } catch (e) {
-    return await fetchNewTransactions()
+
+  logger.trace('%o', params)
+  const transactions = (await retry(() => foreignHttpClient
+    .get('/api/v1/transactions', { params }))).data.tx
+
+  return {
+    transactions,
+    endTime
   }
 }
 
@@ -82,11 +80,11 @@ async function initialize() {
   }
 }
 
-async function main() {
+async function loop() {
   const { transactions, endTime } = await fetchNewTransactions()
   if (!transactions || transactions.length === 0) {
     logger.debug('Found 0 new transactions')
-    await new Promise((r) => setTimeout(r, FOREIGN_FETCH_INTERVAL))
+    await delay(FOREIGN_FETCH_INTERVAL)
     return
   }
 
@@ -100,7 +98,8 @@ async function main() {
       await proxyHttpClient
         .post('/transfer', {
           to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
-          value: new BN(tx.value).multipliedBy(10 ** 18)
+          value: new BN(tx.value)
+            .multipliedBy(10 ** 18)
             .integerValue(),
           hash: `0x${tx.txHash}`
         })
@@ -109,9 +108,12 @@ async function main() {
   await redis.set('foreignTime', endTime)
 }
 
-initialize()
-  .then(async () => {
-    while (true) {
-      await main()
-    }
-  })
+async function main() {
+  await initialize()
+
+  while (true) {
+    await loop()
+  }
+}
+
+main()

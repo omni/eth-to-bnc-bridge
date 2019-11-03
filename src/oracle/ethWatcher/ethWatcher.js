@@ -7,6 +7,7 @@ const logger = require('./logger')
 const redis = require('./db')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress } = require('./crypto')
+const { delay } = require('./wait')
 
 const abiBridge = require('./contracts_data/Bridge.json').abi
 
@@ -225,11 +226,11 @@ async function initialize() {
   await axios.get('http://signer:8001/start')
 }
 
-async function main() {
+async function loop() {
   logger.debug(`Watching events in block #${blockNumber}`)
   if (await homeWeb3.eth.getBlock(blockNumber) === null) {
     logger.debug('No block')
-    await new Promise((r) => setTimeout(r, 1000))
+    await delay(1000)
     return
   }
 
@@ -283,9 +284,12 @@ async function main() {
   await redis.save()
 }
 
-initialize()
-  .then(async () => {
-    while (true) {
-      await main()
-    }
-  }, (e) => logger.warn('Initialization failed %o', e))
+async function main() {
+  await initialize()
+
+  while (true) {
+    await loop()
+  }
+}
+
+main()

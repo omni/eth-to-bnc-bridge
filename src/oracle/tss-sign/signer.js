@@ -7,6 +7,7 @@ const express = require('express')
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress, sha256 } = require('./crypto')
+const { delay, retry } = require('./wait')
 
 const Transaction = require('./tx')
 
@@ -70,15 +71,10 @@ function getAccountFromFile(file) {
   }
 }
 
-function getAccount(address) {
+async function getAccount(address) {
   logger.info(`Getting account ${address} data`)
-  return httpClient
-    .get(`/api/v1/account/${address}`)
-    .then((res) => res.data)
-    .catch(() => {
-      logger.debug('Retrying')
-      return getAccount(address)
-    })
+  const response = await retry(() => httpClient.get(`/api/v1/account/${address}`))
+  return response.data
 }
 
 async function waitForAccountNonce(address, nonce) {
@@ -152,7 +148,7 @@ async function main() {
   const signQueue = await assertQueue(channel, 'signQueue')
 
   while (!ready) {
-    await new Promise((res) => setTimeout(res, 1000))
+    await delay(1000)
   }
 
   channel.prefetch(1)
@@ -216,7 +212,7 @@ async function main() {
           attempt = nextAttempt || attempt + 1
           logger.warn(`Sign failed, starting next attempt ${attempt}`)
           nextAttempt = null
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await delay(1000)
         }
       }
     } else if (account.sequence <= nonce) {
@@ -250,7 +246,7 @@ async function main() {
         attempt = nextAttempt || attempt + 1
         logger.warn(`Sign failed, starting next attempt ${attempt}`)
         nextAttempt = null
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await delay(1000)
       }
     } else {
       logger.debug('Tx has been already sent')

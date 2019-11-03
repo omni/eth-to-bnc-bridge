@@ -12,12 +12,12 @@ async function waitPromise(getPromise, checker) {
   }
 }
 
-async function retry(n, getPromise) {
+async function retry(n, getPromise, sleep = 3000) {
   while (n) {
     try {
       return await getPromise()
     } catch (e) {
-      await delay(3000)
+      await delay(sleep)
       // eslint-disable-next-line no-param-reassign
       n -= 1
     }

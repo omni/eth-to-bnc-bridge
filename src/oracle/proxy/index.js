@@ -259,37 +259,37 @@ async function sendVote(query, req, res, waitFlag = false) {
 async function voteStartVoting(req, res) {
   logger.info('Voting for starting new epoch voting process')
   const query = bridge.methods.startVoting()
-  sendVote(query, req, res, true)
+  await sendVote(query, req, res, true)
 }
 
 async function voteStartKeygen(req, res) {
   logger.info('Voting for starting new epoch keygen')
   const query = bridge.methods.voteStartKeygen()
-  sendVote(query, req, res)
+  await sendVote(query, req, res)
 }
 
 async function voteCancelKeygen(req, res) {
   logger.info('Voting for cancelling new epoch keygen')
   const query = bridge.methods.voteCancelKeygen()
-  sendVote(query, req, res)
+  await sendVote(query, req, res)
 }
 
 async function voteAddValidator(req, res) {
   logger.info('Voting for adding new validator')
   const query = bridge.methods.voteAddValidator(req.params.validator)
-  sendVote(query, req, res)
+  await sendVote(query, req, res)
 }
 
 async function voteChangeThreshold(req, res) {
   logger.info('Voting for changing threshold')
   const query = bridge.methods.voteChangeThreshold(req.params.threshold)
-  sendVote(query, req, res)
+  await sendVote(query, req, res)
 }
 
 async function voteRemoveValidator(req, res) {
   logger.info('Voting for removing validator')
   const query = bridge.methods.voteRemoveValidator(req.params.validator)
-  sendVote(query, req, res, true)
+  await sendVote(query, req, res, true)
 }
 
 function decodeStatus(status) {
@@ -313,10 +313,6 @@ function boundX(x) {
   } catch (e) {
     return -1
   }
-}
-
-function toNumber(x) {
-  return x.toNumber()
 }
 
 async function transfer(req, res) {
@@ -357,28 +353,28 @@ async function info(req, res) {
         .then((value) => new BN(value).toString(16)),
       bridge.methods.epoch()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getRangeSize()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getNextRangeSize()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getStartBlock()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getNonce()
         .call()
         .then(boundX),
       bridge.methods.nextEpoch()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getThreshold()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getNextThreshold()
         .call()
-        .then(toNumber),
+        .then(boundX),
       bridge.methods.getValidators()
         .call(),
       bridge.methods.getNextValidators()

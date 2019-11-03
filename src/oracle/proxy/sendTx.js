@@ -4,22 +4,18 @@ const ethers = require('ethers')
 const BN = require('bignumber.js')
 
 const logger = require('./logger')
+const { delay, retry } = require('./wait')
 
 const { GAS_LIMIT_FACTOR, MAX_GAS_LIMIT } = process.env
 
-function sendRpcRequest(url, method, params) {
-  return axios.post(url, {
+async function sendRpcRequest(url, method, params) {
+  const response = await retry(() => axios.post(url, {
     jsonrpc: '2.0',
     method,
     params,
     id: 1
-  })
-    .then((res) => res.data)
-    .catch(async () => {
-      logger.warn(`Request to ${url}, method ${method} failed, retrying`)
-      await new Promise((res) => setTimeout(res, 1000))
-      return sendRpcRequest(url, method, params)
-    })
+  }))
+  return response.data
 }
 
 async function createSender(url, privateKey) {
@@ -85,7 +81,7 @@ async function waitForReceipt(url, txHash) {
     const { result, error } = await sendRpcRequest(url, 'eth_getTransactionReceipt', [txHash])
 
     if (result === null || error) {
-      await new Promise((res) => setTimeout(res, 1000))
+      await delay(1000)
     } else {
       return result
     }

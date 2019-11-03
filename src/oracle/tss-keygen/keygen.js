@@ -5,6 +5,7 @@ const express = require('express')
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress } = require('./crypto')
+const { delay } = require('./wait')
 
 const { RABBITMQ_URL, PROXY_URL } = process.env
 
@@ -25,7 +26,7 @@ async function main() {
   const cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
 
   while (!ready) {
-    await new Promise((res) => setTimeout(res, 1000))
+    await delay(1000)
   }
 
   channel.prefetch(1)
