@@ -4,7 +4,7 @@ async function delay(ms) {
   await new Promise((res) => setTimeout(res, ms))
 }
 
-async function retry(n, getPromise = -1, sleep = 3000) {
+async function retry(getPromise, n = -1, sleep = 3000) {
   while (n) {
     try {
       return await getPromise()

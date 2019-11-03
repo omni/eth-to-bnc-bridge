@@ -12,7 +12,7 @@ async function waitPromise(getPromise, checker) {
   }
 }
 
-async function retry(n, getPromise, sleep = 3000) {
+async function retry(getPromise, n = -1, sleep = 3000) {
   while (n) {
     try {
       return await getPromise()

@@ -13,7 +13,7 @@ const keygenEncoders = [
     yield makeBuffer(value.e.n, 256, 10)
     yield makeBuffer(value.com)
     for (let i = 0; i < value.correct_key_proof.sigma_vec.length; i += 1) {
-      yield makeBuffer(value.correct_key_proof.sigma_vecp[i], 256, 10)
+      yield makeBuffer(value.correct_key_proof.sigma_vec[i], 256, 10)
     }
   },
   // round 2
@@ -33,7 +33,7 @@ const keygenEncoders = [
     yield Buffer.from([value.parameters.threshold]) // 1 byte
     yield Buffer.from([value.parameters.share_count]) // 1 byte
     for (let i = 0; i < value.commitments.length; i += 1) {
-      const x = value.correct_key_proof.sigma_vec[i]
+      const x = value.commitments[i]
       yield makeBuffer(x.x)
       yield makeBuffer(x.y)
     }

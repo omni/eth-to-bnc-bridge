@@ -9,12 +9,14 @@ const { delay, retry } = require('./wait')
 const { GAS_LIMIT_FACTOR, MAX_GAS_LIMIT } = process.env
 
 async function sendRpcRequest(url, method, params) {
+  logger.trace(`Request to ${url}, method ${method}, params %o`, params)
   const response = await retry(() => axios.post(url, {
     jsonrpc: '2.0',
     method,
     params,
     id: 1
   }))
+  logger.trace('Response %o', response.data)
   return response.data
 }
 
@@ -53,9 +55,9 @@ async function createSender(url, privateKey) {
       newTx.gasLimit = `0x${new BN(gasLimit).toString(16)}`
       logger.trace(`Estimated gas to ${gasLimit}`)
 
-      const hash = web3.utils.sha3(ethers.utils.serializeTransaction(tx))
+      const hash = web3.utils.sha3(ethers.utils.serializeTransaction(newTx))
       const signature = signer.signDigest(hash)
-      const signedTx = ethers.utils.serializeTransaction(tx, signature)
+      const signedTx = ethers.utils.serializeTransaction(newTx, signature)
 
       const { result, error } = await sendRpcRequest(url, 'eth_sendRawTransaction', [signedTx])
       // handle nonce error
