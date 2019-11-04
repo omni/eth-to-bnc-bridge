@@ -1,4 +1,3 @@
-const Web3 = require('web3')
 const axios = require('axios')
 const ethers = require('ethers')
 const BN = require('bignumber.js')
@@ -21,10 +20,10 @@ async function sendRpcRequest(url, method, params) {
 }
 
 async function createSender(url, privateKey) {
-  const web3 = new Web3(url, null, { transactionConfirmationBlocks: 1 })
-  const signer = new ethers.utils.SigningKey(privateKey)
+  const provider = new ethers.providers.JsonRpcProvider(url)
+  const wallet = new ethers.Wallet(privateKey, provider)
 
-  const chainId = await web3.eth.net.getId()
+  const { chainId } = await provider.getNetwork()
   return async function send(tx) {
     const newTx = {
       data: tx.data,
@@ -38,7 +37,7 @@ async function createSender(url, privateKey) {
     try {
       logger.trace(`Preparing and sending transaction %o on ${url}`, newTx)
       const estimate = await sendRpcRequest(url, 'eth_estimateGas', [{
-        from: signer.address,
+        from: wallet.address,
         to: newTx.to,
         data: newTx.data,
         gasPrice: newTx.gasPrice,
@@ -50,14 +49,14 @@ async function createSender(url, privateKey) {
         logger.debug('Gas estimate failed %o, skipping tx, reverting nonce', estimate.error)
         return true
       }
-      const gasLimit = BN.min(new BN(estimate.result, 16)
-        .multipliedBy(GAS_LIMIT_FACTOR), MAX_GAS_LIMIT)
+      const gasLimit = BN.min(
+        new BN(estimate.result, 16).multipliedBy(GAS_LIMIT_FACTOR),
+        MAX_GAS_LIMIT
+      )
       newTx.gasLimit = `0x${new BN(gasLimit).toString(16)}`
       logger.trace(`Estimated gas to ${gasLimit}`)
 
-      const hash = web3.utils.sha3(ethers.utils.serializeTransaction(newTx))
-      const signature = signer.signDigest(hash)
-      const signedTx = ethers.utils.serializeTransaction(newTx, signature)
+      const signedTx = await wallet.sign(newTx)
 
       const { result, error } = await sendRpcRequest(url, 'eth_sendRawTransaction', [signedTx])
       // handle nonce error
@@ -79,14 +78,15 @@ async function createSender(url, privateKey) {
 }
 
 async function waitForReceipt(url, txHash) {
+  const provider = new ethers.providers.JsonRpcProvider(url)
   while (true) {
-    const { result, error } = await sendRpcRequest(url, 'eth_getTransactionReceipt', [txHash])
+    const receipt = await provider.getTransactionReceipt(txHash)
 
-    if (result === null || error) {
-      await delay(1000)
-    } else {
-      return result
+    if (receipt) {
+      return receipt
     }
+
+    await delay(1000)
   }
 }
 

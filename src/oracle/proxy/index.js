@@ -1,9 +1,8 @@
 const express = require('express')
-const Web3 = require('web3')
 const AsyncLock = require('async-lock')
 const axios = require('axios')
 const BN = require('bignumber.js')
-const { utils } = require('ethers')
+const ethers = require('ethers')
 
 const encode = require('./encode')
 const decode = require('./decode')
@@ -15,16 +14,54 @@ const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
   HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
 } = process.env
-const abiSharedDb = require('./contracts_data/SharedDB.json').abi
-const abiBridge = require('./contracts_data/Bridge.json').abi
-const abiToken = require('./contracts_data/IERC20.json').abi
 
-const homeWeb3 = new Web3(HOME_RPC_URL, null, { transactionConfirmationBlocks: 1 })
-const sideWeb3 = new Web3(SIDE_RPC_URL, null, { transactionConfirmationBlocks: 1 })
-const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
-const token = new homeWeb3.eth.Contract(abiToken, HOME_TOKEN_ADDRESS)
-const sharedDb = new sideWeb3.eth.Contract(abiSharedDb, SIDE_SHARED_DB_ADDRESS)
-const validatorAddress = homeWeb3.eth.accounts.privateKeyToAccount(`0x${VALIDATOR_PRIVATE_KEY}`).address
+const tokenAbi = [
+  'function balanceOf(address account) view returns (uint256)'
+]
+const bridgeAbi = [
+  'function getX() view returns (uint)',
+  'function getY() view returns (uint)',
+  'function epoch() view returns (uint)',
+  'function getRangeSize() view returns (uint)',
+  'function getNextRangeSize() view returns (uint)',
+  'function getStartBlock() view returns (uint)',
+  'function getNonce() view returns (uint)',
+  'function nextEpoch() view returns (uint)',
+  'function getThreshold() view returns (uint)',
+  'function getNextThreshold() view returns (uint)',
+  'function getValidators() view returns (address[])',
+  'function getNextValidators() view returns (address[])',
+  'function status() view returns (uint)',
+  'function votesCount(bytes32) view returns (uint)',
+  'function getNextPartyId(address a) view returns (uint)',
+  'function confirmKeygen(uint x, uint y)',
+  'function confirmFundsTransfer()',
+  'function startVoting()',
+  'function voteStartKeygen()',
+  'function voteCancelKeygen()',
+  'function voteAddValidator(address validator)',
+  'function voteRemoveValidator(address validator)',
+  'function voteChangeThreshold(uint threshold)',
+  'function transfer(bytes32 hash, address to, uint value)'
+]
+const sharedDbAbi = [
+  'function getSignupAddress(bytes32 hash, address[] validators, uint signupNumber) view returns (address)',
+  'function getData(address from, bytes32 hash, bytes32 key) view returns (bytes)',
+  'function getSignupNumber(bytes32 hash, address[] validators, address validator) view returns (uint)',
+  'function setData(bytes32 hash, bytes32 key, bytes data)',
+  'function signupSign(bytes32 hash)'
+]
+
+const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
+const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
+const homeWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, homeProvider)
+const sideWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, sideProvider)
+
+const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeWallet)
+const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
+const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideWallet)
+
+const validatorAddress = homeWallet.address
 
 const httpClient = axios.create({ baseURL: FOREIGN_URL })
 
@@ -42,8 +79,8 @@ app.use(express.urlencoded({ extended: true }))
 const votesProxyApp = express()
 
 async function main() {
-  homeValidatorNonce = await homeWeb3.eth.getTransactionCount(validatorAddress)
-  sideValidatorNonce = await sideWeb3.eth.getTransactionCount(validatorAddress)
+  homeValidatorNonce = await homeWallet.getTransactionCount()
+  sideValidatorNonce = await sideWallet.getTransactionCount()
 
   homeSender = await createSender(HOME_RPC_URL, VALIDATOR_PRIVATE_KEY)
   sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
@@ -72,9 +109,8 @@ function Err(data) {
 function sideSendQuery(query) {
   return lock.acquire('home', async () => {
     logger.debug('Sending side query')
-    const encodedABI = query.encodeABI()
     const senderResponse = await sideSender({
-      data: encodedABI,
+      data: query,
       to: SIDE_SHARED_DB_ADDRESS,
       nonce: sideValidatorNonce
     })
@@ -88,9 +124,8 @@ function sideSendQuery(query) {
 function homeSendQuery(query) {
   return lock.acquire('home', async () => {
     logger.debug('Sending home query')
-    const encodedABI = query.encodeABI()
     const senderResponse = await homeSender({
-      data: encodedABI,
+      data: query,
       to: HOME_BRIDGE_ADDRESS,
       nonce: homeValidatorNonce
     })
@@ -107,22 +142,19 @@ async function get(req, res) {
   const uuid = req.body.key.third
   let from
   if (uuid.startsWith('k')) {
-    from = (await bridge.methods.getNextValidators()
-      .call())[parseInt(req.body.key.first, 10) - 1]
+    from = (await bridge.getNextValidators())[parseInt(req.body.key.first, 10) - 1]
   } else {
-    const validators = await bridge.methods.getValidators()
-      .call()
-    from = await sharedDb.methods.getSignupAddress(
+    const validators = await bridge.getValidators()
+    from = await sharedDb.getSignupAddress(
       uuid,
-      validators, parseInt(req.body.key.first, 10)
+      validators,
+      parseInt(req.body.key.first, 10)
     )
-      .call()
   }
   const to = Number(req.body.key.fourth) // 0 if empty
-  const key = homeWeb3.utils.sha3(`${round}_${to}`)
+  const key = ethers.utils.id(`${round}_${to}`)
 
-  const data = await sharedDb.methods.getData(from, sideWeb3.utils.sha3(uuid), key)
-    .call()
+  const data = await sharedDb.getData(from, ethers.utils.id(uuid), key)
 
   if (data.length > 2) {
     logger.trace(`Received encoded data: ${data}`)
@@ -144,13 +176,13 @@ async function set(req, res) {
   const round = req.body.key.second
   const uuid = req.body.key.third
   const to = Number(req.body.key.fourth)
-  const key = homeWeb3.utils.sha3(`${round}_${to}`)
+  const key = ethers.utils.id(`${round}_${to}`)
 
   logger.trace('Received data: %o', req.body.value)
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
   logger.trace(`Encoded data: ${encoded.toString('hex')}`)
   logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
-  const query = sharedDb.methods.setData(sideWeb3.utils.sha3(uuid), key, encoded)
+  const query = sharedDb.interface.functions.setData.encode([ethers.utils.id(uuid), key, encoded])
   await sideSendQuery(query)
 
   res.send(Ok(null))
@@ -159,8 +191,8 @@ async function set(req, res) {
 
 async function signupKeygen(req, res) {
   logger.debug('SignupKeygen call')
-  const epoch = (await bridge.methods.nextEpoch().call()).toNumber()
-  const partyId = (await bridge.methods.getNextPartyId(validatorAddress).call()).toNumber()
+  const epoch = (await bridge.nextEpoch()).toNumber()
+  const partyId = (await bridge.getNextPartyId(validatorAddress)).toNumber()
 
   if (partyId === 0) {
     res.send(Err({ message: 'Not a validator' }))
@@ -176,8 +208,8 @@ async function signupKeygen(req, res) {
 
 async function signupSign(req, res) {
   logger.debug('SignupSign call')
-  const hash = sideWeb3.utils.sha3(`0x${req.body.third}`)
-  const query = sharedDb.methods.signupSign(hash)
+  const hash = ethers.utils.id(req.body.third)
+  const query = sharedDb.interface.functions.signupSign.encode([hash])
   const { txHash } = await sideSendQuery(query)
   const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
 
@@ -191,9 +223,8 @@ async function signupSign(req, res) {
     return
   }
 
-  const validators = await bridge.methods.getValidators().call()
-  const id = (await sharedDb.methods.getSignupNumber(hash, validators, validatorAddress).call())
-    .toNumber()
+  const validators = await bridge.getValidators()
+  const id = (await sharedDb.getSignupNumber(hash, validators, validatorAddress)).toNumber()
 
   res.send(Ok({
     uuid: hash,
@@ -205,7 +236,7 @@ async function signupSign(req, res) {
 async function confirmKeygen(req, res) {
   logger.debug('Confirm keygen call')
   const { x, y } = req.body[5]
-  const query = bridge.methods.confirmKeygen(`0x${x}`, `0x${y}`)
+  const query = bridge.interface.functions.confirmKeygen.encode([`0x${x}`, `0x${y}`])
   await homeSendQuery(query)
   res.send()
   logger.debug('Confirm keygen end')
@@ -213,7 +244,7 @@ async function confirmKeygen(req, res) {
 
 async function confirmFundsTransfer(req, res) {
   logger.debug('Confirm funds transfer call')
-  const query = bridge.methods.confirmFundsTransfer()
+  const query = bridge.interface.functions.confirmFundsTransfer.encode([])
   await homeSendQuery(query)
   res.send()
   logger.debug('Confirm funds transfer end')
@@ -255,37 +286,37 @@ async function sendVote(query, req, res, waitFlag = false) {
 
 async function voteStartVoting(req, res) {
   logger.info('Voting for starting new epoch voting process')
-  const query = bridge.methods.startVoting()
+  const query = bridge.interface.functions.startVoting.encode([])
   await sendVote(query, req, res, true)
 }
 
 async function voteStartKeygen(req, res) {
   logger.info('Voting for starting new epoch keygen')
-  const query = bridge.methods.voteStartKeygen()
+  const query = bridge.interface.functions.voteStartKeygen.encode([])
   await sendVote(query, req, res)
 }
 
 async function voteCancelKeygen(req, res) {
   logger.info('Voting for cancelling new epoch keygen')
-  const query = bridge.methods.voteCancelKeygen()
+  const query = bridge.interface.functions.voteCancelKeygen.encode([])
   await sendVote(query, req, res)
 }
 
 async function voteAddValidator(req, res) {
   logger.info('Voting for adding new validator')
-  const query = bridge.methods.voteAddValidator(req.params.validator)
+  const query = bridge.interface.functions.voteAddValidator.encode([req.params.validator])
   await sendVote(query, req, res)
 }
 
 async function voteChangeThreshold(req, res) {
   logger.info('Voting for changing threshold')
-  const query = bridge.methods.voteChangeThreshold(req.params.threshold)
+  const query = bridge.interface.functions.voteChangeThreshold.encode([req.params.threshold])
   await sendVote(query, req, res)
 }
 
 async function voteRemoveValidator(req, res) {
   logger.info('Voting for removing validator')
-  const query = bridge.methods.voteRemoveValidator(req.params.validator)
+  const query = bridge.interface.functions.voteRemoveValidator.encode([req.params.validator])
   await sendVote(query, req, res, true)
 }
 
@@ -315,9 +346,9 @@ function boundX(x) {
 async function transfer(req, res) {
   logger.info('Transfer start')
   const { hash, to, value } = req.body
-  if (homeWeb3.utils.isAddress(to)) {
+  if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, ${value} tokens`)
-    const query = bridge.methods.transfer(hash, to, `0x${new BN(value).toString(16)}`)
+    const query = bridge.interface.functions.transfer.encode([hash, to, `0x${new BN(value).toString(16)}`])
     await homeSendQuery(query)
   }
   res.send()
@@ -335,6 +366,12 @@ function getForeignBalances(address) {
     .catch(() => ({}))
 }
 
+function getVotesCount(nextEpoch, voteType) {
+  return bridge.votesCount(
+    ethers.utils.keccak256(ethers.utils.solidityPack(['uint8', 'uint256'], [voteType, nextEpoch]))
+  ).then(boundX)
+}
+
 async function info(req, res) {
   logger.debug('Info start')
   try {
@@ -342,37 +379,29 @@ async function info(req, res) {
       x, y, epoch, rangeSize, nextRangeSize, epochStartBlock, foreignNonce, nextEpoch,
       threshold, nextThreshold, validators, nextValidators, status, homeBalance
     ] = await Promise.all([
-      bridge.methods.getX().call().then((value) => new BN(value).toString(16)),
-      bridge.methods.getY().call().then((value) => new BN(value).toString(16)),
-      bridge.methods.epoch().call().then(boundX),
-      bridge.methods.getRangeSize().call().then(boundX),
-      bridge.methods.getNextRangeSize().call().then(boundX),
-      bridge.methods.getStartBlock().call().then(boundX),
-      bridge.methods.getNonce().call().then(boundX),
-      bridge.methods.nextEpoch().call().then(boundX),
-      bridge.methods.getThreshold().call().then(boundX),
-      bridge.methods.getNextThreshold().call().then(boundX),
-      bridge.methods.getValidators().call(),
-      bridge.methods.getNextValidators().call(),
-      bridge.methods.status().call(),
-      token.methods.balanceOf(HOME_BRIDGE_ADDRESS).call()
+      bridge.getX().then((value) => new BN(value).toString(16)),
+      bridge.getY().then((value) => new BN(value).toString(16)),
+      bridge.epoch().then(boundX),
+      bridge.getRangeSize().then(boundX),
+      bridge.getNextRangeSize().then(boundX),
+      bridge.getStartBlock().then(boundX),
+      bridge.getNonce().then(boundX),
+      bridge.nextEpoch().then(boundX),
+      bridge.getThreshold().then(boundX),
+      bridge.getNextThreshold().then(boundX),
+      bridge.getValidators(),
+      bridge.getNextValidators(),
+      bridge.status().then(boundX),
+      token.balanceOf(HOME_BRIDGE_ADDRESS)
         .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
     const [
       confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen
     ] = await Promise.all([
-      bridge.methods.votesCount(
-        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [1, nextEpoch]))
-      ).call().then(boundX),
-      bridge.methods.votesCount(
-        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [2, nextEpoch]))
-      ).call().then(boundX),
-      bridge.methods.votesCount(
-        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [7, nextEpoch]))
-      ).call().then(boundX),
-      bridge.methods.votesCount(
-        homeWeb3.utils.sha3(utils.solidityPack(['uint8', 'uint256'], [8, nextEpoch]))
-      ).call().then(boundX)
+      getVotesCount(nextEpoch, 1),
+      getVotesCount(nextEpoch, 2),
+      getVotesCount(nextEpoch, 7),
+      getVotesCount(nextEpoch, 8)
     ])
     const foreignAddress = publicKeyToAddress({
       x,
