@@ -197,11 +197,11 @@ The public Binance Chain testnet will keep a BEP2 token.
           "nextEpoch": 3,
       
           // threshold number for current epoch, 
-          // threshold + 1 votes are required for any changes in next epoch
-          "threshold": 1, 
+          // at least threshold votes are required for any changes in next epoch
+          "threshold": 2, 
       
           // threshold number for next epoch
-          "nextThreshold": 1,
+          "nextThreshold": 2,
       
           // current bridge addresses in home and foreign networks
           "homeBridgeAddress": "0x44c158FE850821ae69DaF37AADF5c539e9d0025B",
@@ -239,13 +239,13 @@ The public Binance Chain testnet will keep a BEP2 token.
           "confirmationsForFundsTransfer": 0
         }
       ``` 
-    * (7.1) Start voting process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startVoting` url. Bridge 
+    * (7.1) Start voting process for next epoch, via sending `$THRESHOLD` requests to `/vote/startVoting` url. Bridge 
       state should be successfully changed to `voting`.
     * 7.2 Changing next epoch bridge validators / threshold
-        * (7.2.1) Add / remove validator in next validators list, via sending `$THRESHOLD + 1` requests to 
+        * (7.2.1) Add / remove validator in next validators list, via sending `$THRESHOLD` requests to 
           `/vote/addValidator/$ADDRESS` / `/vote/removeValidator/$ADDRESS`.
-        * (7.2.2) Change threshold for the next epoch, via sending `$THRESHOLD + 1` requests to `/vote/changeThreshold/$THRESHOLD`.
-    * (7.3) Start keygen process for next epoch, via sending `$THRESHOLD + 1` requests to `/vote/startKeygen` url. Bridge 
+        * (7.2.2) Change threshold for the next epoch, via sending `$THRESHOLD` requests to `/vote/changeThreshold/$THRESHOLD`.
+    * (7.3) Start keygen process for next epoch, via sending `$THRESHOLD` requests to `/vote/startKeygen` url. Bridge 
       state should be successfully changed to `keygen`, and in some time to `funds_transfer`, and then to `ready`.
     * (7.4) If keygen process at some state was stopped(i. e. one validator turned of his oracle), 
       it can be cancelled via via sending `$THRESHOLD + 1` requests to `/vote/cancelKeygen` url. After

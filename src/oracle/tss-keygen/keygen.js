@@ -42,7 +42,7 @@ async function main() {
     logger.debug('Writing params')
     fs.writeFileSync('./params', JSON.stringify({
       parties: parties.toString(),
-      threshold: threshold.toString()
+      threshold: (threshold - 1).toString()
     }))
     const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
       currentKeygenEpoch = null

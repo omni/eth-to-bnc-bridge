@@ -57,7 +57,7 @@ contract Bridge {
 
     constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits, uint rangeSize) public {
         require(validators.length > 0);
-        require(threshold < validators.length);
+        require(threshold <= validators.length);
 
         tokenContract = IERC20(_tokenContract);
 
@@ -280,6 +280,8 @@ contract Bridge {
     }
 
     function voteChangeThreshold(uint threshold) public voting currentValidator {
+        require(threshold > 0 && threshold <= getParties(), "Invalid threshold value");
+
         if (tryVote(Vote.CHANGE_THRESHOLD, threshold)) {
             states[nextEpoch].threshold = threshold;
         }
@@ -292,6 +294,8 @@ contract Bridge {
     }
 
     function voteStartKeygen() public voting currentValidator {
+        require(getNextThreshold() <= getNextParties(), "Invalid threshold number");
+
         if (tryVote(Vote.START_KEYGEN)) {
             status = Status.KEYGEN;
 
@@ -342,7 +346,7 @@ contract Bridge {
         require(!votes[personalVote], "Voted already");
 
         votes[personalVote] = true;
-        if (votesCount[vote] == getThreshold()) {
+        if (votesCount[vote] + 1 == getThreshold()) {
             votesCount[vote] = 2 ** 255;
             return true;
         } else {
@@ -356,7 +360,7 @@ contract Bridge {
         require(!votes[personalVote], "Confirmed already");
 
         votes[personalVote] = true;
-        if (votesCount[vote] == getNextThreshold()) {
+        if (votesCount[vote] + 1 == getNextThreshold()) {
             votesCount[vote] = 2 ** 255;
             return true;
         } else {
