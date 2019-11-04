@@ -4,5 +4,8 @@
   "dependencies": {
     "ethers": "4.0.39",
     "bignumber.js": "9.0.0"
+  },
+  "engines": {
+    "node": ">=10.6.0"
   }
 }

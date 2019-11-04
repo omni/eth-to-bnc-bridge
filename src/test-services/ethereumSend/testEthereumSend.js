@@ -25,7 +25,7 @@ async function main() {
   const to = process.argv[2]
 
   const amount = process.argv[3]
-  let native = process.argv[4]
+  const native = process.argv[4]
 
   if (to === 'bridge' && amount !== '0') {
     console.log(`Transfer from ${sender} to ${HOME_BRIDGE_ADDRESS}, ${amount} tokens`)
