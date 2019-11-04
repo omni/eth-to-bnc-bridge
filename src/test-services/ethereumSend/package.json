@@ -2,7 +2,6 @@
   "name": "ethereum-send",
   "version": "0.0.1",
   "dependencies": {
-  	"bignumber.js": "9.0.0",
-    "web3": "1.0.0-beta.55"
+    "ethers": "4.0.39"
   }
 }
