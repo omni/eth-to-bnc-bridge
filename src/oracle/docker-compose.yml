@@ -93,6 +93,7 @@ services:
       - HOME_TOKEN_ADDRESS
       - HOME_START_BLOCK
       - VALIDATOR_PRIVATE_KEY
+      - HOME_MAX_FETCH_RANGE_SIZE
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
     networks:
