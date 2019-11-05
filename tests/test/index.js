@@ -71,11 +71,13 @@ describe('bridge tests', function () {
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
+  testEthToBnc(() => users)
 
   testRemoveValidator(validatorsConfig[1])
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
+  testEthToBnc(() => users)
 
   testAddValidator(validatorsConfig[1])
 
@@ -88,4 +90,5 @@ describe('bridge tests', function () {
   testEthToBnc(() => users)
   testBncToEth(() => users)
   testEthToBncWithRestart(() => users, 2)
+  testEthToBnc(() => users)
 })
