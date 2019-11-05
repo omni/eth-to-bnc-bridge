@@ -130,6 +130,7 @@ function sign(keysFile, hash, tx, publicKey, signerAddress) {
   let nonceInterrupt = false
   return new Promise((resolve) => {
     const cmd = exec.execFile('./sign-entrypoint.sh', [PROXY_URL, keysFile, hash], async (error) => {
+      logger.debug('%o', error)
       clearInterval(nonceDaemonIntervalId)
       clearTimeout(restartTimeoutId)
       if (fs.existsSync('signature')) { // if signature was generated
@@ -150,22 +151,22 @@ function sign(keysFile, hash, tx, publicKey, signerAddress) {
         const sendTimeoutId = setTimeout(() => {
           cancelled = true
         }, SEND_TIMEOUT)
-        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence)
+        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence + 1)
         clearTimeout(sendTimeoutId)
         resolve(waitResponse ? SIGN_OK : SIGN_FAILED)
       } else if (error === null || error.code === 0) { // if was already enough parties
         const signTimeoutId = setTimeout(() => {
           cancelled = true
         }, SIGN_ATTEMPT_TIMEOUT)
-        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence)
+        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence + 1)
         clearTimeout(signTimeoutId)
         resolve(waitResponse ? SIGN_OK : SIGN_FAILED)
+      } else if (error.code === 143) { // if process was killed
+        logger.warn('Sign process was killed')
+        resolve(nonceInterrupt ? SIGN_NONCE_INTERRUPT : SIGN_FAILED)
       } else if (error.code !== null && error.code !== 0) { // if process has failed
         logger.warn('Sign process has failed')
         resolve(SIGN_FAILED)
-      } else if (error.code === null && error.signal === 'SIGTERM') { // if process was killed
-        logger.warn('Sign process was killed')
-        resolve(nonceInterrupt ? SIGN_NONCE_INTERRUPT : SIGN_FAILED)
       } else {
         logger.warn('Unknown error state %o', error)
         resolve(SIGN_FAILED)
@@ -182,11 +183,11 @@ function sign(keysFile, hash, tx, publicKey, signerAddress) {
 
     // Kill signer if current nonce is already processed at some time
     nonceDaemonIntervalId = setInterval(async () => {
-      nonceInterrupt = true
       logger.info(`Checking if account ${signerAddress} has nonce ${tx.tx.sequence + 1}`)
       const { sequence } = await getAccount(signerAddress)
       if (sequence > tx.tx.sequence) {
         logger.info('Account already has needed nonce, cancelling current sign process')
+        nonceInterrupt = true
         killSigner()
       }
     }, SIGN_NONCE_CHECK_INTERVAL)
