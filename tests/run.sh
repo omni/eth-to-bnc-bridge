@@ -11,6 +11,7 @@ docker create --name tests \
     tests $@
 
 docker network connect blockchain_home tests
+docker network connect blockchain_side tests
 docker network connect validator1_test_network tests
 docker network connect validator2_test_network tests
 docker network connect validator3_test_network tests
