@@ -36,25 +36,25 @@ describe('bridge tests', function () {
       bncPrefundedUser = await createUser(FOREIGN_PRIVATE_KEY)
 
       const bnbBalance = await bncPrefundedUser.getBnbBalance()
-      assert.ok(bnbBalance >= 0.5, `Insufficient BNB balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 0.5 BNB, got ${bnbBalance}`)
+      assert.ok(bnbBalance >= 1, `Insufficient BNB balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 1 BNB, got ${bnbBalance}`)
       const bepBalance = await bncPrefundedUser.getBepBalance()
-      assert.ok(bepBalance >= 500, `Insufficient BEP2 balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 500 ${FOREIGN_ASSET}, got ${bepBalance}`)
+      assert.ok(bepBalance >= 2000, `Insufficient BEP2 balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 2000 ${FOREIGN_ASSET}, got ${bepBalance}`)
 
       const ethBalance = await ethPrefundedUser.getEthBalance()
-      assert.ok(ethBalance >= 0.5, `Insufficient ETH balance on ${ethPrefundedUser.ethAddress} in Ethereum network, expected 0.5 ETH, got ${ethBalance}`)
+      assert.ok(ethBalance >= 1, `Insufficient ETH balance on ${ethPrefundedUser.ethAddress} in Ethereum network, expected 1 ETH, got ${ethBalance}`)
       const ercBalance = await ethPrefundedUser.getErcBalance()
-      assert.ok(ercBalance >= 500, `Insufficient ERC20 balance on ${ethPrefundedUser.ethAddress} in Ethereum network, expected 500 ERC20, got ${ercBalance}`)
+      assert.ok(ercBalance >= 2000, `Insufficient ERC20 balance on ${ethPrefundedUser.ethAddress} in Ethereum network, expected 2000 ERC20, got ${ercBalance}`)
 
 
       for (let i = 0; i < 3; i += 1) {
         const userEthBalance = await users[i].getEthBalance()
-        assert.ok(userEthBalance >= 0.2, `Insufficient ETH balance on ${users[i].ethAddress} in Ethereum network, expected 0.2 ETH, got ${userEthBalance}`)
+        assert.ok(userEthBalance >= 0.3, `Insufficient ETH balance on ${users[i].ethAddress} in Ethereum network, expected 0.3 ETH, got ${userEthBalance}`)
         const userErcBalance = await users[i].getErcBalance()
-        assert.ok(userErcBalance >= 50, `Insufficient ERC20 balance on ${users[i].ethAddress} in Ethereum network, expected 50 ERC20, got ${userErcBalance}`)
+        assert.ok(userErcBalance >= 200, `Insufficient ERC20 balance on ${users[i].ethAddress} in Ethereum network, expected 200 ERC20, got ${userErcBalance}`)
         const userBnbBalance = await users[i].getBepBalance()
-        assert.ok(userBnbBalance >= 0.1, `Insufficient BNB balance on ${users[i].bncAddress} in Binance network, expected 0.1 BNB, got ${userBnbBalance}`)
+        assert.ok(userBnbBalance >= 0.2, `Insufficient BNB balance on ${users[i].bncAddress} in Binance network, expected 0.2 BNB, got ${userBnbBalance}`)
         const userBepBalance = await users[i].getBepBalance()
-        assert.ok(userErcBalance >= 50, `Insufficient BEP2 balance on ${users[i].bncAddress} in Binance network, expected 50 ${FOREIGN_ASSET}, got ${userBepBalance}`)
+        assert.ok(userErcBalance >= 200, `Insufficient BEP2 balance on ${users[i].bncAddress} in Binance network, expected 200 ${FOREIGN_ASSET}, got ${userBepBalance}`)
       }
     })
 
@@ -64,8 +64,8 @@ describe('bridge tests', function () {
     })
 
     after(async function () {
-      await bncPrefundedUser.transferBepBnb(info.foreignBridgeAddress, 100, 0.1)
-      await ethPrefundedUser.transferErc(HOME_BRIDGE_ADDRESS, 100)
+      await bncPrefundedUser.transferBepBnb(info.foreignBridgeAddress, 1000, 0.1)
+      await ethPrefundedUser.transferErc(HOME_BRIDGE_ADDRESS, 1000)
     })
   })
 
