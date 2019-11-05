@@ -49,6 +49,9 @@ services:
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
       - FOREIGN_ASSET
+      - SIGN_ATTEMPT_TIMEOUT
+      - SIGN_NONCE_CHECK_INTERVAL
+      - SEND_TIMEOUT
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'

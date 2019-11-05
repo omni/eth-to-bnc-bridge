@@ -242,24 +242,24 @@ async function voteCancelKeygen(req, res) {
 }
 
 async function voteAddValidator(req, res) {
-  logger.info('Voting for adding new validator')
   if (ethers.utils.isHexString(req.params.validator, 20)) {
+    logger.info('Voting for adding new validator')
     const query = bridge.interface.functions.voteAddValidator.encode([req.params.validator])
     await sendVote(query, req, res)
   }
 }
 
 async function voteChangeThreshold(req, res) {
-  logger.info('Voting for changing threshold')
   if (/^[0-9]+$/.test(req.params.threshold)) {
+    logger.info('Voting for changing threshold')
     const query = bridge.interface.functions.voteChangeThreshold.encode([req.params.threshold])
     await sendVote(query, req, res)
   }
 }
 
 async function voteRemoveValidator(req, res) {
-  logger.info('Voting for removing validator')
   if (ethers.utils.isHexString(req.params.validator, 20)) {
+    logger.info('Voting for removing validator')
     const query = bridge.interface.functions.voteRemoveValidator.encode([req.params.validator])
     await sendVote(query, req, res, true)
   }

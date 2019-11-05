@@ -16,8 +16,15 @@ const app = express()
 const {
   RABBITMQ_URL, FOREIGN_URL, PROXY_URL, FOREIGN_ASSET
 } = process.env
+const SIGN_ATTEMPT_TIMEOUT = parseInt(process.env.SIGN_ATTEMPT_TIMEOUT, 10)
+const SIGN_NONCE_CHECK_INTERVAL = parseInt(process.env.SIGN_NONCE_CHECK_INTERVAL, 10)
+const SEND_TIMEOUT = parseInt(process.env.SEND_TIMEOUT, 10)
 
 const httpClient = axios.create({ baseURL: FOREIGN_URL })
+
+const SIGN_OK = 0
+const SIGN_NONCE_INTERRUPT = 1
+const SIGN_FAILED = 2
 
 let attempt
 let nextAttempt = null
@@ -46,12 +53,18 @@ async function getExchangeMessages(nonce) {
   return messages
 }
 
-function restart(req, res) {
-  logger.info('Cancelling current sign')
-  nextAttempt = req.params.attempt
+function killSigner() {
   exec.execSync('pkill gg18_sign || true')
-  cancelled = true
-  res.send('Cancelled')
+}
+
+function restart(req, res) {
+  if (/^[0-9]+$/.test(req.params.attempt)) {
+    logger.info(`Manual cancelling current sign attempt, starting ${req.params.attempt} attempt`)
+    nextAttempt = parseInt(req.params.attempt, 10)
+    killSigner()
+    cancelled = true
+    res.send('Done')
+  }
 }
 
 function confirmFundsTransfer() {
@@ -85,7 +98,7 @@ async function waitForAccountNonce(address, nonce) {
     if (sequence >= nonce) {
       break
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await delay(1000)
     logger.debug('Waiting for needed account nonce')
   }
   logger.info('Account nonce is OK')
@@ -100,20 +113,26 @@ function sendTx(tx) {
         'Content-Type': 'text/plain'
       }
     })
-    .catch((err) => {
+    .catch(async (err) => {
       if (err.response.data.message.includes('Tx already exists in cache')) {
         logger.debug('Tx already exists in cache')
         return true
       }
       logger.info('Something failed, restarting: %o', err.response)
-      return new Promise((resolve) => setTimeout(() => resolve(sendTx(tx)), 1000))
+      await delay(1000)
+      return await sendTx(tx)
     })
 }
 
-function sign(keysFile, hash, tx, publicKey) {
+function sign(keysFile, hash, tx, publicKey, signerAddress) {
+  let restartTimeoutId
+  let nonceDaemonIntervalId
+  let nonceInterrupt = false
   return new Promise((resolve) => {
     const cmd = exec.execFile('./sign-entrypoint.sh', [PROXY_URL, keysFile, hash], async (error) => {
-      if (fs.existsSync('signature')) {
+      clearInterval(nonceDaemonIntervalId)
+      clearTimeout(restartTimeoutId)
+      if (fs.existsSync('signature')) { // if signature was generated
         logger.info('Finished signature generation')
         const signature = JSON.parse(fs.readFileSync('signature'))
         logger.debug('%o', signature)
@@ -127,16 +146,50 @@ function sign(keysFile, hash, tx, publicKey) {
         logger.info('Sending transaction')
         logger.debug(signedTx)
         await sendTx(signedTx)
-        resolve(true)
-      } else if (error === null || error.code === 0) {
-        resolve(true)
+        // if nonce does not update in some time, cancel process, consider sign as failed
+        const sendTimeoutId = setTimeout(() => {
+          cancelled = true
+        }, SEND_TIMEOUT)
+        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence)
+        clearTimeout(sendTimeoutId)
+        resolve(waitResponse ? SIGN_OK : SIGN_FAILED)
+      } else if (error === null || error.code === 0) { // if was already enough parties
+        const signTimeoutId = setTimeout(() => {
+          cancelled = true
+        }, SIGN_ATTEMPT_TIMEOUT)
+        const waitResponse = await waitForAccountNonce(signerAddress, tx.tx.sequence)
+        clearTimeout(signTimeoutId)
+        resolve(waitResponse ? SIGN_OK : SIGN_FAILED)
+      } else if (error.code !== null && error.code !== 0) { // if process has failed
+        logger.warn('Sign process has failed')
+        resolve(SIGN_FAILED)
+      } else if (error.code === null && error.signal === 'SIGTERM') { // if process was killed
+        logger.warn('Sign process was killed')
+        resolve(nonceInterrupt ? SIGN_NONCE_INTERRUPT : SIGN_FAILED)
       } else {
-        logger.warn('Sign failed')
-        resolve(false)
+        logger.warn('Unknown error state %o', error)
+        resolve(SIGN_FAILED)
       }
     })
-    cmd.stdout.on('data', (data) => logger.debug(data.toString()))
+    cmd.stdout.on('data', (data) => {
+      const str = data.toString()
+      if (str.includes('Got all party ids')) {
+        restartTimeoutId = setTimeout(killSigner, SIGN_ATTEMPT_TIMEOUT)
+      }
+      logger.debug(str)
+    })
     cmd.stderr.on('data', (data) => logger.debug(data.toString()))
+
+    // Kill signer if current nonce is already processed at some time
+    nonceDaemonIntervalId = setInterval(async () => {
+      nonceInterrupt = true
+      logger.info(`Checking if account ${signerAddress} has nonce ${tx.tx.sequence + 1}`)
+      const { sequence } = await getAccount(signerAddress)
+      if (sequence > tx.tx.sequence) {
+        logger.info('Account already has needed nonce, cancelling current sign process')
+        killSigner()
+      }
+    }, SIGN_NONCE_CHECK_INTERVAL)
   })
 }
 
@@ -201,17 +254,18 @@ async function main() {
 
           const hash = sha256(tx.getSignBytes())
           logger.info(`Starting signature generation for transaction hash ${hash}`)
-          const done = await sign(keysFile, hash, tx, publicKey)
-            && await waitForAccountNonce(from, nonce + 1)
+          const signResult = await sign(keysFile, hash, tx, publicKey, from)
 
-          if (done) {
+          if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
             // eslint-disable-next-line no-loop-func
             exchanges.forEach((exchangeMsg) => channel.ack(exchangeMsg))
             break
           }
+
+          // signer either failed, or timed out after parties signup
           attempt = nextAttempt || attempt + 1
-          logger.warn(`Sign failed, starting next attempt ${attempt}`)
           nextAttempt = null
+          logger.warn(`Sign failed, starting next attempt ${attempt}`)
           await delay(1000)
         }
       }
@@ -236,16 +290,17 @@ async function main() {
 
         const hash = sha256(tx.getSignBytes())
         logger.info(`Starting signature generation for transaction hash ${hash}`)
-        const done = await sign(keysFile, hash, tx, publicKey)
-          && await waitForAccountNonce(from, nonce + 1)
+        const signResult = await sign(keysFile, hash, tx, publicKey, from)
 
-        if (done) {
+        if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
           await confirmFundsTransfer()
           break
         }
+
+        // signer either failed, or timed out after parties signup
         attempt = nextAttempt || attempt + 1
-        logger.warn(`Sign failed, starting next attempt ${attempt}`)
         nextAttempt = null
+        logger.warn(`Sign failed, starting next attempt ${attempt}`)
         await delay(1000)
       }
     } else {
