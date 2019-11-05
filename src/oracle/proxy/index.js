@@ -4,6 +4,10 @@ const axios = require('axios')
 const BN = require('bignumber.js')
 const ethers = require('ethers')
 
+const { tokenAbi, bridgeAbi, sharedDbAbi } = require('./contractsAbi')
+const {
+  Ok, Err, decodeStatus, boundX
+} = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
 const { createSender, waitForReceipt } = require('./sendTx')
@@ -14,43 +18,6 @@ const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
   HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
 } = process.env
-
-const tokenAbi = [
-  'function balanceOf(address account) view returns (uint256)'
-]
-const bridgeAbi = [
-  'function getX() view returns (uint)',
-  'function getY() view returns (uint)',
-  'function epoch() view returns (uint)',
-  'function getRangeSize() view returns (uint)',
-  'function getNextRangeSize() view returns (uint)',
-  'function getStartBlock() view returns (uint)',
-  'function getNonce() view returns (uint)',
-  'function nextEpoch() view returns (uint)',
-  'function getThreshold() view returns (uint)',
-  'function getNextThreshold() view returns (uint)',
-  'function getValidators() view returns (address[])',
-  'function getNextValidators() view returns (address[])',
-  'function status() view returns (uint)',
-  'function votesCount(bytes32) view returns (uint)',
-  'function getNextPartyId(address a) view returns (uint)',
-  'function confirmKeygen(uint x, uint y)',
-  'function confirmFundsTransfer()',
-  'function startVoting()',
-  'function voteStartKeygen()',
-  'function voteCancelKeygen()',
-  'function voteAddValidator(address validator)',
-  'function voteRemoveValidator(address validator)',
-  'function voteChangeThreshold(uint threshold)',
-  'function transfer(bytes32 hash, address to, uint value)'
-]
-const sharedDbAbi = [
-  'function getSignupAddress(bytes32 hash, address[] validators, uint signupNumber) view returns (address)',
-  'function getData(address from, bytes32 hash, bytes32 key) view returns (bytes)',
-  'function getSignupNumber(bytes32 hash, address[] validators, address validator) view returns (uint)',
-  'function setData(bytes32 hash, bytes32 key, bytes data)',
-  'function signupSign(bytes32 hash)'
-]
 
 const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
@@ -78,36 +45,8 @@ app.use(express.urlencoded({ extended: true }))
 
 const votesProxyApp = express()
 
-async function main() {
-  homeValidatorNonce = await homeWallet.getTransactionCount()
-  sideValidatorNonce = await sideWallet.getTransactionCount()
-
-  homeSender = await createSender(HOME_RPC_URL, VALIDATOR_PRIVATE_KEY)
-  sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
-
-  logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
-
-  app.listen(8001, () => {
-    logger.debug('Proxy is listening on port 8001')
-  })
-
-  votesProxyApp.listen(8002, () => {
-    logger.debug('Votes proxy is listening on port 8002')
-  })
-}
-
-main()
-
-function Ok(data) {
-  return { Ok: data }
-}
-
-function Err(data) {
-  return { Err: data }
-}
-
 function sideSendQuery(query) {
-  return lock.acquire('home', async () => {
+  return lock.acquire('side', async () => {
     logger.debug('Sending side query')
     const senderResponse = await sideSender({
       data: query,
@@ -304,42 +243,25 @@ async function voteCancelKeygen(req, res) {
 
 async function voteAddValidator(req, res) {
   logger.info('Voting for adding new validator')
-  const query = bridge.interface.functions.voteAddValidator.encode([req.params.validator])
-  await sendVote(query, req, res)
+  if (ethers.utils.isHexString(req.params.validator, 20)) {
+    const query = bridge.interface.functions.voteAddValidator.encode([req.params.validator])
+    await sendVote(query, req, res)
+  }
 }
 
 async function voteChangeThreshold(req, res) {
   logger.info('Voting for changing threshold')
-  const query = bridge.interface.functions.voteChangeThreshold.encode([req.params.threshold])
-  await sendVote(query, req, res)
+  if (/^[0-9]+$/.test(req.params.threshold)) {
+    const query = bridge.interface.functions.voteChangeThreshold.encode([req.params.threshold])
+    await sendVote(query, req, res)
+  }
 }
 
 async function voteRemoveValidator(req, res) {
   logger.info('Voting for removing validator')
-  const query = bridge.interface.functions.voteRemoveValidator.encode([req.params.validator])
-  await sendVote(query, req, res, true)
-}
-
-function decodeStatus(status) {
-  switch (status) {
-    case 0:
-      return 'ready'
-    case 1:
-      return 'voting'
-    case 2:
-      return 'keygen'
-    case 3:
-      return 'funds_transfer'
-    default:
-      return 'unknown_state'
-  }
-}
-
-function boundX(x) {
-  try {
-    return x.toNumber()
-  } catch (e) {
-    return -1
+  if (ethers.utils.isHexString(req.params.validator, 20)) {
+    const query = bridge.interface.functions.voteRemoveValidator.encode([req.params.validator])
+    await sendVote(query, req, res, true)
   }
 }
 
@@ -458,3 +380,23 @@ votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
 votesProxyApp.get('/info', info)
+
+async function main() {
+  homeValidatorNonce = await homeWallet.getTransactionCount()
+  sideValidatorNonce = await sideWallet.getTransactionCount()
+
+  homeSender = await createSender(HOME_RPC_URL, VALIDATOR_PRIVATE_KEY)
+  sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
+
+  logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
+
+  app.listen(8001, () => {
+    logger.debug('Proxy is listening on port 8001')
+  })
+
+  votesProxyApp.listen(8002, () => {
+    logger.debug('Votes proxy is listening on port 8002')
+  })
+}
+
+main()
