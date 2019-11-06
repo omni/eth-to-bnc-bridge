@@ -1,5 +1,7 @@
 const axios = require('axios')
 
+const {retry} = require('./wait')
+
 function createController(validatorId) {
   const url = `http://validator${validatorId}_proxy_1:8002/`
 
@@ -10,22 +12,22 @@ function createController(validatorId) {
 
   return {
     async getInfo() {
-      return (await proxy.get('/info')).data
+      return (await retry(() => proxy.get('/info'))).data
     },
     async voteStartVoting() {
-      return (await proxy.get('/vote/startVoting')).data
+      return (await retry(() => proxy.get('/vote/startVoting'))).data
     },
     async voteStartKeygen() {
-      return (await proxy.get('/vote/startKeygen')).data
+      return (await retry(() => proxy.get('/vote/startKeygen'))).data
     },
     async voteAddValidator(validatorAddress) {
-      return (await proxy.get(`/vote/addValidator/${validatorAddress}`)).data
+      return (await retry(() => proxy.get(`/vote/addValidator/${validatorAddress}`))).data
     },
     async voteRemoveValidator(validatorAddress) {
-      return (await proxy.get(`/vote/removeValidator/${validatorAddress}`)).data
+      return (await retry(() => proxy.get(`/vote/removeValidator/${validatorAddress}`))).data
     },
     async voteChangeThreshold(threshold) {
-      return (await proxy.get(`/vote/changeThreshold/${threshold}`)).data
+      return (await retry(() => proxy.get(`/vote/changeThreshold/${threshold}`))).data
     }
   }
 }
