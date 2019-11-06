@@ -7,8 +7,8 @@ docker build -t tss ./src/tss
 
 ./demo/start-environment.sh
 
-cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
-cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
+cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 300
+cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
 
 N=1 ./demo/validator-demo.sh -d
 N=2 ./demo/validator-demo.sh -d

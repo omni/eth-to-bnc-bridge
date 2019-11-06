@@ -151,7 +151,7 @@ jobs:
           name: "Run dev environment, deploy contracts, prefund accounts"
           command: |
             BLOCK_TIME=3 ./demo/start-environment.sh
-            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 100
+            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 300
       - run:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home
@@ -160,7 +160,7 @@ jobs:
           name: "Prefund bnc addresses"
           command: |
             echo "FOREIGN_PRIVATE_KEY=$FOREIGN_PRIVATE_KEY" > ./src/test-services/.keys.$TARGET_NETWORK
-            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 100 0.1
+            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
   run_tests:
     executor: bridge/node-dev
     steps:

@@ -48,11 +48,11 @@ describe('bridge tests', function () {
 
       for (let i = 0; i < 3; i += 1) {
         const userEthBalance = await users[i].getEthBalance()
-        assert.ok(userEthBalance >= 0.3, `Insufficient ETH balance on ${users[i].ethAddress} in Ethereum network, expected 0.3 ETH, got ${userEthBalance}`)
+        assert.ok(userEthBalance >= 0.1, `Insufficient ETH balance on ${users[i].ethAddress} in Ethereum network, expected 0.1 ETH, got ${userEthBalance}`)
         const userErcBalance = await users[i].getErcBalance()
         assert.ok(userErcBalance >= 200, `Insufficient ERC20 balance on ${users[i].ethAddress} in Ethereum network, expected 200 ERC20, got ${userErcBalance}`)
         const userBnbBalance = await users[i].getBepBalance()
-        assert.ok(userBnbBalance >= 0.2, `Insufficient BNB balance on ${users[i].bncAddress} in Binance network, expected 0.2 BNB, got ${userBnbBalance}`)
+        assert.ok(userBnbBalance >= 0.1, `Insufficient BNB balance on ${users[i].bncAddress} in Binance network, expected 0.1 BNB, got ${userBnbBalance}`)
         const userBepBalance = await users[i].getBepBalance()
         assert.ok(userErcBalance >= 200, `Insufficient BEP2 balance on ${users[i].bncAddress} in Binance network, expected 200 ${FOREIGN_ASSET}, got ${userBepBalance}`)
       }
