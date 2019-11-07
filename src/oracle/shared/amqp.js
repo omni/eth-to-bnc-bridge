@@ -1,16 +1,11 @@
 const amqp = require('amqplib')
 
 const logger = require('./logger')
+const { retry } = require('./wait')
 
 async function connectRabbit(url) {
-  while (true) {
-    try {
-      return (await amqp.connect(url)).createChannel()
-    } catch (e) {
-      logger.debug('Failed to connect to rabbitmqServer, reconnecting')
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-    }
-  }
+  logger.info('Connecting to RabbitMQ server')
+  return (await retry(() => amqp.connect(url))).createChannel()
 }
 
 async function assertQueue(channel, name) {

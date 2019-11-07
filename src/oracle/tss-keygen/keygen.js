@@ -19,7 +19,6 @@ async function confirmKeygen(keysFile) {
 }
 
 async function main() {
-  logger.info('Connecting to RabbitMQ server')
   const channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to epoch events queue')
   const keygenQueue = await assertQueue(channel, 'keygenQueue')

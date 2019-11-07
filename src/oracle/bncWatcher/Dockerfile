@@ -9,6 +9,6 @@ COPY ./bncWatcher/package.json /watcher/
 
 RUN npm install
 
-COPY ./bncWatcher/bncWatcher.js ./shared/db.js ./shared/logger.js ./shared/crypto.js ./shared/wait.js /watcher/
+COPY ./bncWatcher/bncWatcher.js ./shared/db.js ./shared/logger.js ./shared/crypto.js ./shared/amqp.js ./shared/wait.js /watcher/
 
 ENTRYPOINT ["node", "bncWatcher.js"]

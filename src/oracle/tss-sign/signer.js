@@ -130,7 +130,7 @@ function sign(keysFile, hash, tx, publicKey, signerAddress) {
   let nonceInterrupt = false
   return new Promise((resolve) => {
     const cmd = exec.execFile('./sign-entrypoint.sh', [PROXY_URL, keysFile, hash], async (error) => {
-      logger.debug('%o', error)
+      logger.trace('Sign entrypoint exited, %o', error)
       clearInterval(nonceDaemonIntervalId)
       clearTimeout(restartTimeoutId)
       if (fs.existsSync('signature')) { // if signature was generated
@@ -195,7 +195,6 @@ function sign(keysFile, hash, tx, publicKey, signerAddress) {
 }
 
 async function main() {
-  logger.info('Connecting to RabbitMQ server')
   channel = await connectRabbit(RABBITMQ_URL)
   logger.info('Connecting to signature events queue')
   exchangeQueue = await assertQueue(channel, 'exchangeQueue')

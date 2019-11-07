@@ -1,6 +1,6 @@
 const axios = require('axios')
 
-const {retry} = require('./wait')
+const { retry } = require('./wait')
 
 function createController(validatorId) {
   const url = `http://validator${validatorId}_proxy_1:8002/`

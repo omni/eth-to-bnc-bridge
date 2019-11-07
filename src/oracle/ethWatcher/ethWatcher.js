@@ -16,6 +16,7 @@ const HOME_MAX_FETCH_RANGE_SIZE = parseInt(process.env.HOME_MAX_FETCH_RANGE_SIZE
 const provider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 const bridgeAbi = [
   'event ExchangeRequest(uint value, uint nonce)',
+  'event EpochEnd(uint indexed epoch)',
   'event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch)',
   'event NewEpochCancelled(uint indexed epoch)',
   'event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch)',
@@ -34,6 +35,7 @@ let exchangeQueue
 let signQueue
 let keygenQueue
 let cancelKeygenQueue
+let epochTimeIntervalsQueue
 let chainId
 let blockNumber
 let epoch
@@ -42,6 +44,11 @@ let redisTx
 let rangeSize
 let lastTransactionBlockNumber
 let isCurrentValidator
+let activeEpoch
+
+async function getBlockTimestamp(n) {
+  return (await provider.getBlock(n, false)).timestamp
+}
 
 async function resetFutureMessages(queue) {
   logger.debug(`Resetting future messages in queue ${queue.name}`)
@@ -169,8 +176,7 @@ async function processEpochStart(event) {
   epochStart = blockNumber
   logger.info(`Epoch ${epoch} started`)
   rangeSize = (await bridge.getRangeSize()).toNumber()
-  isCurrentValidator = (await bridge.getValidators())
-    .includes(validatorAddress)
+  isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
@@ -186,6 +192,9 @@ async function initialize() {
   signQueue = await assertQueue(channel, 'signQueue')
   keygenQueue = await assertQueue(channel, 'keygenQueue')
   cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
+  epochTimeIntervalsQueue = await assertQueue(channel, 'epochTimeIntervalsQueue')
+
+  activeEpoch = !!(await redis.get('activeEpoch'))
 
   chainId = (await provider.getNetwork()).chainId
 
@@ -228,6 +237,7 @@ async function initialize() {
   await resetFutureMessages(cancelKeygenQueue)
   await resetFutureMessages(exchangeQueue)
   await resetFutureMessages(signQueue)
+  await resetFutureMessages(epochTimeIntervalsQueue)
   logger.debug('Sending start commands')
   await axios.get('http://keygen:8001/start')
   await axios.get('http://signer:8001/start')
@@ -255,9 +265,11 @@ async function loop() {
   }))
 
   for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
+    let epochTimeUpdated = false
+    const curBlockTimestamp = await getBlockTimestamp(curBlockNumber)
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
       const event = bridge.interface.parseLog(bridgeEvents[i])
-      logger.debug('%o %o', event, bridgeEvents[i])
+      logger.trace('Consumed event %o %o', event, bridgeEvents[i])
       switch (event.name) {
         case 'NewEpoch':
           await sendKeygen(event)
@@ -277,12 +289,39 @@ async function loop() {
           break
         case 'EpochStart':
           await processEpochStart(event)
+          await redis.set('activeEpoch', true)
+          activeEpoch = true
+          epochTimeIntervalsQueue.send({
+            blockNumber: curBlockNumber,
+            startTime: curBlockTimestamp * 1000,
+            epoch
+          })
+          epochTimeUpdated = true
+          break
+        case 'EpochEnd':
+          logger.debug(`Consumed epoch ${epoch} end event`)
+          await redis.set('activeEpoch', false)
+          activeEpoch = false
+          epochTimeIntervalsQueue.send({
+            blockNumber: curBlockNumber,
+            prolongedTime: curBlockTimestamp * 1000,
+            epoch
+          })
           break
         default:
           logger.warn('Unknown event %o', event)
       }
       i += 1
     }
+
+    if (!epochTimeUpdated && epoch > 0 && activeEpoch) {
+      epochTimeIntervalsQueue.send({
+        blockNumber: curBlockNumber,
+        prolongedTime: curBlockTimestamp * 1000,
+        epoch
+      })
+    }
+
     if ((curBlockNumber + 1 - epochStart) % rangeSize === 0) {
       logger.info('Reached end of the current block range')
 

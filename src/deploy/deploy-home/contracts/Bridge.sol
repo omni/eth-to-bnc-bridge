@@ -4,6 +4,7 @@ import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 
 contract Bridge {
     event ExchangeRequest(uint value, uint nonce);
+    event EpochEnd(uint indexed epoch);
     event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
     event NewEpochCancelled(uint indexed epoch);
     event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
@@ -14,6 +15,7 @@ contract Bridge {
         uint threshold;
         uint rangeSize;
         uint startBlock;
+        uint endBlock;
         uint nonce;
         uint x;
         uint y;
@@ -65,7 +67,16 @@ contract Bridge {
         status = Status.KEYGEN;
         nextEpoch = 1;
 
-        states[nextEpoch] = State(validators, threshold, rangeSize, 0, uint(-1), 0, 0);
+        states[nextEpoch] = State({
+            validators : validators,
+            threshold : threshold,
+            rangeSize : rangeSize,
+            startBlock : 0,
+            endBlock : uint(-1),
+            nonce : uint(-1),
+            x : 0,
+            y : 0
+        });
 
         minTxLimit = limits[0];
         maxTxLimit = limits[1];
@@ -133,7 +144,7 @@ contract Bridge {
             if (nextEpoch == 1) {
                 status = Status.READY;
                 states[nextEpoch].startBlock = block.number;
-                states[nextEpoch].nonce = uint(-1);
+                states[nextEpoch].nonce = uint(- 1);
                 epoch = nextEpoch;
                 emit EpochStart(epoch, x, y);
             }
@@ -246,9 +257,12 @@ contract Bridge {
         if (tryVote(Vote.START_VOTING, epoch)) {
             nextEpoch++;
             status = Status.VOTING;
+            states[nextEpoch].endBlock = block.number;
             states[nextEpoch].threshold = getThreshold();
             states[nextEpoch].validators = getValidators();
             states[nextEpoch].rangeSize = getRangeSize();
+
+            emit EpochEnd(epoch);
         }
     }
 
