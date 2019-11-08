@@ -1,0 +1,21 @@
+version: '3.0'
+services:
+  testnet:
+    build: ./testnet
+    image: bnc-testnet
+    volumes:
+      - 'marketdata:/root/.bnbchaind/marketdata'
+  api-server:
+    build: ./api-server
+    image: bnc-api-server
+    networks:
+      - binance_net
+    ports:
+      - '8000:8000'
+    volumes:
+      - 'marketdata:/api-server/marketdata'
+networks:
+  binance_net:
+    external: true
+volumes:
+  marketdata:
