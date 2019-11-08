@@ -1,10 +1,12 @@
 version: '3.0'
 services:
-  testnet:
-    build: ./testnet
+  node:
+    build: node
     image: bnc-testnet
     networks:
       - binance_rpc_net
+    ports:
+      - '26657:26657'
     volumes:
       - 'marketdata:/root/.bnbchaind/marketdata'
   api-server:
