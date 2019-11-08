@@ -3,6 +3,8 @@ services:
   testnet:
     build: ./testnet
     image: bnc-testnet
+    networks:
+      - binance_rpc_net
     volumes:
       - 'marketdata:/root/.bnbchaind/marketdata'
   api-server:
@@ -10,6 +12,7 @@ services:
     image: bnc-api-server
     networks:
       - binance_net
+      - binance_rpc_net
     ports:
       - '8000:8000'
     volumes:
@@ -17,5 +20,6 @@ services:
 networks:
   binance_net:
     external: true
+  binance_rpc_net:
 volumes:
   marketdata:
