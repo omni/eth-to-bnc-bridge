@@ -10,15 +10,25 @@ services:
     volumes:
       - 'marketdata:/root/.bnbchaind/marketdata'
   api-server:
-    build: ./api-server
+    build: api-server
     image: bnc-api-server
+    networks:
+      - binance_rpc_net
+    ports:
+      - '8080:8080'
+  http-api:
+    build: http-api
+    image: bnc-http-api
+    environment:
+      FOREIGN_RPC_URL: 'http://node:26657'
+      FOREIGN_API_SERVER_URL: 'http://api-server:8080'
     networks:
       - binance_net
       - binance_rpc_net
     ports:
       - '8000:8000'
     volumes:
-      - 'marketdata:/api-server/marketdata'
+      - 'marketdata:/http-api/marketdata'
 networks:
   binance_net:
     external: true

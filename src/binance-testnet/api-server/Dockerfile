@@ -6,10 +6,8 @@ WORKDIR /api-server
 
 COPY --from=testnet-binaries /binaries/cli/testnet/${BNC_VERSION}/linux/tbnbcli ./
 
-COPY ./package.json ./
+RUN echo 12345678 | ./tbnbcli keys add key
 
-RUN npm install
+EXPOSE 8080
 
-COPY ./index.js ./
-
-ENTRYPOINT ["node", "./index.js"]
+ENTRYPOINT ["./tbnbcli", "api-server", "--chain-id", "Binance-Dev", "--node", "http://node:26657", "--laddr", "tcp://0.0.0.0:8080"]
