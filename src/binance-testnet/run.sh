@@ -2,8 +2,31 @@
 
 set -e
 
+tbnbcli() {
+    echo 12345678 | docker exec -i binance-testnet_node_1 ./tbnbcli $@ --from node0 --node http://node:26657 --chain-id Binance-Dev --json
+}
+
+echo "Removing old environment"
+docker kill $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+docker volume rm binance-testnet_marketdata > /dev/null 2>&1 || true
+
 docker network create binance_net > /dev/null 2>&1 || true
 
-docker build -t testnet-binaries .
+echo "Building required binaries"
+docker build -t testnet-binaries . > /dev/null 2>&1 || true
 
-docker-compose up --build
+echo "Running environment"
+docker-compose up --build -d
+
+sleep 2
+
+echo "Issuing test asset"
+ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 1000000000000 --token-name "DEV Token" | jq .Response.log)
+TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
+echo "Issued $TOKEN_SYMBOL"
+
+sleep 2
+
+echo "Sending tokens to controlled address"
+tbnbcli token multi-send --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"1000000000000:BNB,1000000000000:'"$TOKEN_SYMBOL"'"}]'

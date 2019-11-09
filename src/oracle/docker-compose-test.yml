@@ -23,6 +23,7 @@ services:
       - test_network
       - blockchain_home
       - blockchain_side
+      - binance_net
   keygen:
     image: keygen-client
     build:
@@ -57,6 +58,7 @@ services:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
       - test_network
+      - binance_net
   redis:
     image: redis
     build:
@@ -111,9 +113,12 @@ services:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - test_network
+      - binance_net
 networks:
   test_network:
   blockchain_side:
     external: true
   blockchain_home:
+    external: true
+  binance_net:
     external: true
