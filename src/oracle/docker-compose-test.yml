@@ -20,10 +20,12 @@ services:
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
-      - test_network
-      - blockchain_home
-      - blockchain_side
-      - binance_net
+      test_network:
+        aliases:
+          - local_proxy
+      blockchain_home:
+      blockchain_side:
+      binance_net:
   keygen:
     image: keygen-client
     build:
@@ -31,7 +33,7 @@ services:
       context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
@@ -44,7 +46,7 @@ services:
       context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
       - FOREIGN_ASSET
@@ -104,7 +106,7 @@ services:
       - FOREIGN_URL
       - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
       - FOREIGN_FETCH_MAX_TIME_INTERVAL
       - FOREIGN_FETCH_INTERVAL
       - FOREIGN_FETCH_BLOCK_TIME_OFFSET
