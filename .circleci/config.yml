@@ -156,9 +156,6 @@ jobs:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home
       - bridge/save_ganache_data
-      - run:
-          name: "Prefund bnc addresses"
-          command: cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
   run_tests:
     executor: bridge/node-dev
     steps:
@@ -173,6 +170,7 @@ jobs:
           command: |
             BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
             ./demo/start-binance-environment.sh
+            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
             N=1 ./demo/validator-demo.sh -d
             N=2 ./demo/validator-demo.sh -d
             N=3 ./demo/validator-demo.sh -d
