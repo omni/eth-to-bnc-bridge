@@ -28,12 +28,12 @@ ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 1000000000000 --tok
 TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
 echo "Issued $TOKEN_SYMBOL"
 
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../test-services/binanceBalance/.env.development
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../test-services/binanceSend/.env.development
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator1/.env.development
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator2/.env.development
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator3/.env.development
-sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../tests/.env
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../src/test-services/binanceBalance/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../src/test-services/binanceSend/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../tests/.env
+for file in ./validator*/.env.development; do
+    sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' "$file"
+done
 
 sleep 2
 
