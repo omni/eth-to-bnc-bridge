@@ -13,34 +13,38 @@ const txOptions = {
 
 const { SIDE_RPC_URL } = process.env
 
-async function createUser(privateKey) {
-  const providerSide = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
-  const walletSide = new ethers.Wallet(privateKey, providerSide)
-  const wallet = new ethers.Wallet(privateKey, provider)
-  const ethAddress = wallet.address
-  const bncAddress = getAddressFromPrivateKey(privateKey)
-  const token = tokenContract.connect(wallet)
-  const bridge = bridgeContract.connect(wallet)
-
-  const bncClient = await createBncClient(privateKey)
+async function createUser(privateKey, network) {
+  const opts = {}
+  if (network !== 'bnc') {
+    opts.providerSide = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
+    opts.walletSide = new ethers.Wallet(privateKey, opts.providerSide)
+    opts.wallet = new ethers.Wallet(privateKey, provider)
+    opts.ethAddress = opts.wallet.address
+    opts.token = tokenContract.connect(opts.wallet)
+    opts.bridge = bridgeContract.connect(opts.wallet)
+  }
+  if (network !== 'eth') {
+    opts.bncAddress = getAddressFromPrivateKey(privateKey)
+    opts.bncClient = await createBncClient(privateKey)
+  }
 
   return {
-    ethAddress,
-    bncAddress,
+    ethAddress: opts.ethAddress,
+    bncAddress: opts.bncAddress,
     async getEthBalance() {
-      const balance = await wallet.getBalance()
+      const balance = await opts.wallet.getBalance()
       return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
     },
     async getSideEthBalance() {
-      const balance = await walletSide.getBalance()
+      const balance = await opts.walletSide.getBalance()
       return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
     },
     async getErcBalance() {
-      const balance = await token.balanceOf(ethAddress)
+      const balance = await opts.token.balanceOf(opts.ethAddress)
       return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
     },
     async transferEth(to, value) {
-      const tx = await wallet.sendTransaction(
+      const tx = await opts.wallet.sendTransaction(
         {
           to,
           value: `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`
@@ -50,7 +54,7 @@ async function createUser(privateKey) {
       await tx.wait()
     },
     async transferEthSide(to, value) {
-      const tx = await walletSide.sendTransaction(
+      const tx = await opts.walletSide.sendTransaction(
         {
           to,
           value: `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`
@@ -60,7 +64,7 @@ async function createUser(privateKey) {
       await tx.wait()
     },
     async transferErc(to, value) {
-      const tx = await token.transfer(
+      const tx = await opts.token.transfer(
         to,
         `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
         txOptions
@@ -68,7 +72,7 @@ async function createUser(privateKey) {
       await tx.wait()
     },
     async approveErc(to, value) {
-      const tx = await token.approve(
+      const tx = await opts.token.approve(
         to,
         `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
         txOptions
@@ -76,27 +80,27 @@ async function createUser(privateKey) {
       await tx.wait()
     },
     async exchangeErc(value) {
-      const tx = await bridge.exchange(
+      const tx = await opts.bridge.exchange(
         `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
         txOptions
       )
       await tx.wait()
     },
     async getBnbBalance() {
-      const balance = await getBnbBalance(bncAddress)
+      const balance = await getBnbBalance(opts.bncAddress)
       await delay(1000)
       return balance
     },
     async getBepBalance() {
-      const balance = await getBepBalance(bncAddress)
+      const balance = await getBepBalance(opts.bncAddress)
       await delay(1000)
       return balance
     },
     async transferBepBnb(to, tokens, bnbs) {
-      return await bncClient.transfer(to, tokens, bnbs)
+      return await opts.bncClient.transfer(to, tokens, bnbs)
     },
     async exchangeBep(bridgeAddress, value) {
-      return await bncClient.exchange(bridgeAddress, value)
+      return await opts.bncClient.exchange(bridgeAddress, value)
     }
   }
 }

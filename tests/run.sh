@@ -7,9 +7,9 @@ docker build -t tests ./tests
 docker rm tests > /dev/null 2>&1 || true
 docker create --name tests \
     --env-file ./tests/.env \
-    -e FOREIGN_PRIVATE_KEY \
     tests $@
 
+docker network connect binance_net tests
 docker network connect blockchain_home tests
 docker network connect blockchain_side tests
 docker network connect validator1_test_network tests

@@ -32,8 +32,8 @@ describe('bridge tests', function () {
     let bncPrefundedUser
 
     before(async function () {
-      ethPrefundedUser = await createUser(HOME_PRIVATE_KEY)
-      bncPrefundedUser = await createUser(FOREIGN_PRIVATE_KEY)
+      ethPrefundedUser = await createUser(HOME_PRIVATE_KEY, 'eth')
+      bncPrefundedUser = await createUser(FOREIGN_PRIVATE_KEY, 'bnc')
 
       const bnbBalance = await bncPrefundedUser.getBnbBalance()
       assert.ok(bnbBalance >= 1, `Insufficient BNB balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 1 BNB, got ${bnbBalance}`)
