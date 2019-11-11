@@ -16,10 +16,10 @@ docker volume rm binance-testnet_marketdata > /dev/null 2>&1 || true
 docker network create binance_net > /dev/null 2>&1 || true
 
 echo "Building required binaries"
-docker build -t testnet-binaries . > /dev/null 2>&1 || true
+docker build -t testnet-binaries ../src/binance-testnet > /dev/null 2>&1 || true
 
 echo "Running environment"
-docker-compose up --build -d
+docker-compose -f ../src/binance-testnet/docker-compose.yml up --build -d
 
 sleep 2
 

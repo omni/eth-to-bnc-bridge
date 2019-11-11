@@ -2,12 +2,16 @@
 
 set -e
 
-echo "Cleaning previous demo environment"
-./demo/clean.sh
-
-echo "Killing all remaining validator docker containers"
+echo "Killing all remaining docker containers"
 docker kill $(docker ps | grep validator[1-3]_ | awk '{print $1}') > /dev/null 2>&1 || true
 docker rm $(docker ps | grep validator[1-3]_ | awk '{print $1}') > /dev/null 2>&1 || true
+docker kill ganache_home ganache_side > /dev/null 2>&1 || true
+docker rm ganache_home ganache_side > /dev/null 2>&1 || true
+docker kill $(docker ps | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+docker rm $(docker ps | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+
+echo "Cleaning previous demo environment"
+./demo/clean.sh
 
 echo "Building tss clients"
 docker build -t tss ./src/tss
