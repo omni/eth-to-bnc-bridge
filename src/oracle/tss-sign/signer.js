@@ -90,6 +90,12 @@ async function getAccount(address) {
   return response.data
 }
 
+async function getFee() {
+  logger.info('Getting fees')
+  const response = await retry(() => httpClient.get('/api/v1/fees'))
+  return response.data.filter((fee) => fee.multi_transfer_fee)[0].multi_transfer_fee * 2
+}
+
 async function waitForAccountNonce(address, nonce) {
   cancelled = false
   logger.info(`Waiting for account ${address} to have nonce ${nonce}`)
@@ -275,6 +281,7 @@ async function main() {
 
       while (to !== '') {
         logger.info(`Building corresponding transaction for transferring all funds, nonce ${nonce}, recipient ${to}`)
+        const fee = await getFee()
         const tx = new Transaction({
           from,
           accountNumber: account.account_number,
@@ -282,7 +289,7 @@ async function main() {
           recipients: [{
             to,
             tokens: account.balances.find((token) => token.symbol === FOREIGN_ASSET).free,
-            bnbs: new BN(account.balances.find((token) => token.symbol === 'BNB').free).minus(new BN(60000).div(10 ** 8))
+            bnbs: new BN(account.balances.find((token) => token.symbol === 'BNB').free).minus(new BN(fee).div(10 ** 8))
           }],
           asset: FOREIGN_ASSET,
           memo: `Attempt ${attempt}`

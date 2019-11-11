@@ -25,15 +25,13 @@ class Transaction {
     if (asset && totalTokens.isGreaterThan(0)) {
       senderCoins.push({
         denom: asset,
-        amount: totalTokens.multipliedBy(10 ** 8)
-          .toNumber()
+        amount: totalTokens.multipliedBy(10 ** 8).toNumber()
       })
     }
     if (totalBnbs.isGreaterThan(0)) {
       senderCoins.push({
         denom: BNB_ASSET,
-        amount: totalBnbs.multipliedBy(10 ** 8)
-          .toNumber()
+        amount: totalBnbs.multipliedBy(10 ** 8).toNumber()
       })
     }
     senderCoins.sort((a, b) => a.denom > b.denom)
@@ -47,15 +45,13 @@ class Transaction {
       if (asset && tokens) {
         receiverCoins.push({
           denom: asset,
-          amount: new BN(tokens).multipliedBy(10 ** 8)
-            .toNumber()
+          amount: new BN(tokens).multipliedBy(10 ** 8).toNumber()
         })
       }
       if (bnbs) {
         receiverCoins.push({
           denom: BNB_ASSET,
-          amount: new BN(bnbs).multipliedBy(10 ** 8)
-            .toNumber()
+          amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber()
         })
       }
       receiverCoins.sort((a, b) => a.denom > b.denom)
@@ -103,8 +99,7 @@ class Transaction {
     if (s.gt(n.div(2))) {
       logger.debug('Normalizing s')
       // eslint-disable-next-line no-param-reassign
-      signature.s = n.minus(s)
-        .toString(16)
+      signature.s = n.minus(s).toString(16)
     }
     const publicKeyEncoded = Buffer.from(`eb5ae98721${yLast % 2 ? '03' : '02'}${padZeros(publicKey.x, 64)}`, 'hex')
     this.tx.signatures = [{
