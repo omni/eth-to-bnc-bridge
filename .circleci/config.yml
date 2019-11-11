@@ -187,6 +187,7 @@ jobs:
           command: |
             docker build -t tests ./tests
             docker create --env-file ./tests/.env --name tests tests
+            docker network connect binance_net tests
             docker network connect blockchain_side tests
             docker network connect blockchain_home tests
             docker network connect validator1_test_network tests
