@@ -8,7 +8,6 @@ demo/validator*/.keys.staging
 src/deploy/deploy*/build/
 src/deploy/.keys.staging
 src/test-services/.keys.staging
-src/test-services/.keys.development
 src/test.js
 tests/results.xml
 package-lock.json
