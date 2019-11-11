@@ -2,6 +2,8 @@
 
 set -e
 
+cd $(dirname "$0")
+
 tbnbcli() {
     echo 12345678 | docker exec -i binance-testnet_node_1 ./tbnbcli $@ --from node0 --node http://node:26657 --chain-id Binance-Dev --json
 }
@@ -26,7 +28,16 @@ ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 1000000000000 --tok
 TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
 echo "Issued $TOKEN_SYMBOL"
 
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../test-services/binanceBalance/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../test-services/binanceSend/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator1/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator2/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../demo/validator3/.env.development
+sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../../tests/.env
+
 sleep 2
 
 echo "Sending tokens to controlled address"
 tbnbcli token multi-send --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"1000000000000:BNB,1000000000000:'"$TOKEN_SYMBOL"'"}]'
+
+sleep 2

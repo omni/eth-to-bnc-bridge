@@ -22,14 +22,21 @@ const parser = createParser('/http-api/marketdata/marketdata.json', 20 * 1024)
 parser.eventEmitter.on('object', (obj) => {
   obj.Transfers.forEach((event) => {
     // eslint-disable-next-line no-param-reassign
-    event.Timestamp = Math.ceil(obj.Timestamp / 1000)
+    event.Timestamp = Math.ceil(obj.Timestamp / 10 ** 6)
     transfers.push(event)
   })
 })
 
 const app = express()
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use('/api/v1/broadcast', (req, res, next) => {
+  req.rawBody = ''
+  req.on('data', (chunk) => {
+    req.rawBody += chunk.toString()
+  })
+  req.on('end', () => {
+    next()
+  })
+})
 
 function wrap(f) {
   return async (req, res) => {
@@ -97,19 +104,29 @@ async function handleAccount(req, res) {
 
 async function handleAccountSequence(req, res) {
   const response = (await apiClient.get(`/api/v1/account/${req.params.account}`)).data
-  res.send(response.sequence.toString())
+  res.send({ sequence: response.sequence })
+}
+
+async function handleNodeInfo(req, res) {
+  const response = (await rpcClient.get('/status')).data
+  res.send(response.result)
+}
+
+async function handleFees(req, res) {
+  const response = (await apiClient.get('/api/v1/fees')).data
+  res.send(response)
 }
 
 async function handleBroadcast(req, res) {
   if (req.query.sync !== 'true') {
     res.status(400).send('Async broadcast is not supported')
   } else {
-    const response = (await rpcClient.get('/broadcast_tx_sync', {
+    const response = await rpcClient.get('/broadcast_tx_sync', {
       params: {
-        tx: req.body
+        tx: `0x${req.rawBody}`
       }
-    })).data
-    res.send(response.result)
+    })
+    res.send([response.data.result])
   }
 }
 
@@ -118,8 +135,11 @@ app.get('/api/v1/time', wrap(handleTime))
 app.get('/api/v1/transactions', wrap(handleTransactions))
 app.get('/api/v1/account/:account', wrap(handleAccount))
 app.get('/api/v1/account/:account/sequence', wrap(handleAccountSequence))
+app.get('/api/v1/node-info', wrap(handleNodeInfo))
+app.get('/api/v1/fees', wrap(handleFees))
 app.post('/api/v1/broadcast', wrap(handleBroadcast))
 
 app.listen(8000, () => {
+  // eslint-disable-next-line no-console
   console.log('Listening on port 8000')
 })
