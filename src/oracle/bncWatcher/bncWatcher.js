@@ -79,6 +79,7 @@ async function fetchTimeIntervalsQueue() {
       break
     }
     const data = JSON.parse(msg.content)
+    let accept = false
     logger.trace('Consumed time interval event %o', data)
     if (epoch !== null && epoch !== data.epoch) {
       logger.warn('Two consequently events have different epochs, should not be like this')
@@ -92,25 +93,15 @@ async function fetchTimeIntervalsQueue() {
       break
     }
     if (epoch === null) {
+      accept = true
       epoch = data.epoch
       startTime = await redis.get(`foreignTime${epoch}`)
       logger.trace(`Retrieved epoch ${epoch} and start time ${startTime} from redis`)
       if (startTime === null) {
         logger.warn(`Empty foreign time for epoch ${epoch}`)
       }
-    } /*
-    if (data.endTime) {
-      if (data.endTime - startTime < FOREIGN_FETCH_MAX_TIME_INTERVAL
-        && data.endTime < lastBncBlockTime) {
-        endTime = data.endTime
-        channel.ack(msg)
-      } else {
-        logger.trace('Requeuing current queue message')
-        channel.nack(msg, false, true)
-      }
-      break
-    } */
-    if (data.prolongedTime - startTime < FOREIGN_FETCH_MAX_TIME_INTERVAL
+    }
+    if ((data.prolongedTime - startTime < FOREIGN_FETCH_MAX_TIME_INTERVAL || accept)
       && data.prolongedTime < lastBncBlockTime) {
       endTime = data.prolongedTime
       channel.ack(msg)

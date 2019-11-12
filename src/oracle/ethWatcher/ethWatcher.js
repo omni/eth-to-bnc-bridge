@@ -225,8 +225,7 @@ async function initialize() {
   rangeSize = (await bridge.getRangeSize()).toNumber()
   logger.debug(`Range size ${rangeSize}`)
   logger.debug('Checking if current validator')
-  isCurrentValidator = (await bridge.getValidators())
-    .includes(validatorAddress)
+  isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
@@ -266,7 +265,6 @@ async function loop() {
 
   for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
     let epochTimeUpdated = false
-    const curBlockTimestamp = await retry(() => getBlockTimestamp(curBlockNumber))
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
       const event = bridge.interface.parseLog(bridgeEvents[i])
       logger.trace('Consumed event %o %o', event, bridgeEvents[i])
@@ -293,7 +291,7 @@ async function loop() {
           activeEpoch = true
           epochTimeIntervalsQueue.send({
             blockNumber: curBlockNumber,
-            startTime: curBlockTimestamp * 1000,
+            startTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
             epoch
           })
           epochTimeUpdated = true
@@ -304,7 +302,7 @@ async function loop() {
           activeEpoch = false
           epochTimeIntervalsQueue.send({
             blockNumber: curBlockNumber,
-            prolongedTime: curBlockTimestamp * 1000,
+            prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
             epoch
           })
           break
@@ -314,10 +312,10 @@ async function loop() {
       i += 1
     }
 
-    if (!epochTimeUpdated && epoch > 0 && activeEpoch) {
+    if (curBlockNumber === endBlock && !epochTimeUpdated && epoch > 0 && activeEpoch) {
       epochTimeIntervalsQueue.send({
         blockNumber: curBlockNumber,
-        prolongedTime: curBlockTimestamp * 1000,
+        prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
         epoch
       })
     }
@@ -334,7 +332,7 @@ async function loop() {
 
   blockNumber = endBlock + 1
   // Exec redis tx
-  await redisTx.set('homeBlock', blockNumber).exec()
+  await redisTx.set('homeBlock', endBlock).exec()
   await redis.save()
 }
 
