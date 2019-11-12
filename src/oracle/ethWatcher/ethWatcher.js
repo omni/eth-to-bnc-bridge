@@ -6,7 +6,7 @@ const logger = require('./logger')
 const redis = require('./db')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress } = require('./crypto')
-const { delay } = require('./wait')
+const { delay, retry } = require('./wait')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY
@@ -266,7 +266,7 @@ async function loop() {
 
   for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
     let epochTimeUpdated = false
-    const curBlockTimestamp = await getBlockTimestamp(curBlockNumber)
+    const curBlockTimestamp = await retry(() => getBlockTimestamp(curBlockNumber))
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
       const event = bridge.interface.parseLog(bridgeEvents[i])
       logger.trace('Consumed event %o %o', event, bridgeEvents[i])
@@ -334,7 +334,7 @@ async function loop() {
 
   blockNumber = endBlock + 1
   // Exec redis tx
-  await redisTx.incr('homeBlock').exec()
+  await redisTx.set('homeBlock', blockNumber).exec()
   await redis.save()
 }
 
