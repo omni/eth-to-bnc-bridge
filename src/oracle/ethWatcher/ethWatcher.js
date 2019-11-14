@@ -21,6 +21,8 @@ const bridgeAbi = [
   'event NewEpochCancelled(uint indexed epoch)',
   'event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch)',
   'event EpochStart(uint indexed epoch, uint x, uint y)',
+  'event EpochClose(uint indexed epoch)',
+  'event ForceSign()',
   'function getThreshold(uint epoch) view returns (uint)',
   'function getParties(uint epoch) view returns (uint)',
   'function getRangeSize() view returns (uint)',
@@ -160,7 +162,6 @@ async function sendSign(event, transactionHash) {
 }
 
 async function sendStartSign() {
-  redisTx.incr(`foreignNonce${epoch}`)
   signQueue.send({
     epoch,
     blockNumber,
@@ -169,6 +170,7 @@ async function sendStartSign() {
     parties: (await bridge.getParties(epoch)).toNumber()
   })
   foreignNonce[epoch] += 1
+  redisTx.incr(`foreignNonce${epoch}`)
 }
 
 async function processEpochStart(event) {
@@ -184,6 +186,19 @@ async function processEpochStart(event) {
   }
   logger.info(`Updated range size to ${rangeSize}`)
   foreignNonce[epoch] = 0
+}
+
+async function sendEpochClose() {
+  logger.debug(`Consumed epoch ${epoch} close event`)
+  signQueue.send({
+    closeEpoch: epoch,
+    blockNumber,
+    nonce: foreignNonce[epoch],
+    threshold: (await bridge.getThreshold(epoch)).toNumber(),
+    parties: (await bridge.getParties(epoch)).toNumber()
+  })
+  foreignNonce[epoch] += 1
+  redisTx.incr(`foreignNonce${epoch}`)
 }
 
 async function initialize() {
@@ -264,6 +279,8 @@ async function loop() {
   }))
 
   for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
+    const rangeOffset = (curBlockNumber + 1 - epochStart) % rangeSize
+    const rangeStart = curBlockNumber - (rangeOffset || rangeSize)
     let epochTimeUpdated = false
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
       const event = bridge.interface.parseLog(bridgeEvents[i])
@@ -306,6 +323,19 @@ async function loop() {
             epoch
           })
           break
+        case 'EpochClose':
+          if (isCurrentValidator) {
+            await sendEpochClose()
+          }
+          break
+        case 'ForceSign':
+          if (isCurrentValidator && lastTransactionBlockNumber > rangeStart) {
+            logger.debug('Consumed force sign event')
+            lastTransactionBlockNumber = 0
+            redisTx.set('lastTransactionBlockNumber', 0)
+            await sendStartSign()
+          }
+          break
         default:
           logger.warn('Unknown event %o', event)
       }
@@ -320,10 +350,10 @@ async function loop() {
       })
     }
 
-    if ((curBlockNumber + 1 - epochStart) % rangeSize === 0) {
+    if (rangeOffset === 0) {
       logger.info('Reached end of the current block range')
 
-      if (lastTransactionBlockNumber > curBlockNumber - rangeSize) {
+      if (isCurrentValidator && lastTransactionBlockNumber > curBlockNumber - rangeSize) {
         logger.info('Sending message to start signature generation for the ended range')
         await sendStartSign()
       }

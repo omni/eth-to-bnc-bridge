@@ -12,70 +12,84 @@ const BNB_ASSET = 'BNB'
 class Transaction {
   constructor(options) {
     const {
-      from, accountNumber, sequence, recipients, asset, memo = ''
+      from, accountNumber, sequence, recipients, asset, memo = '', flags
     } = options
 
-    const totalTokens = recipients.reduce(
-      (sum, { tokens }) => sum.plus(new BN(tokens || 0)), new BN(0)
-    )
-    const totalBnbs = recipients.reduce(
-      (sum, { bnbs }) => sum.plus(new BN(bnbs || 0)), new BN(0)
-    )
-    const senderCoins = []
-    if (asset && totalTokens.isGreaterThan(0)) {
-      senderCoins.push({
-        denom: asset,
-        amount: totalTokens.multipliedBy(10 ** 8).toNumber()
-      })
-    }
-    if (totalBnbs.isGreaterThan(0)) {
-      senderCoins.push({
-        denom: BNB_ASSET,
-        amount: totalBnbs.multipliedBy(10 ** 8).toNumber()
-      })
-    }
-    senderCoins.sort((a, b) => a.denom > b.denom)
+    let msg
+    if (flags) {
+      msg = {
+        from: crypto.decodeAddress(from),
+        flags,
+        msgType: 'NewOrderMsg' // until 'SetAccountFlagsMsg' is not available
+      }
 
-    const inputs = [{
-      address: from,
-      coins: senderCoins
-    }]
-    const outputs = recipients.map(({ to, tokens, bnbs }) => {
-      const receiverCoins = []
-      if (asset && tokens) {
-        receiverCoins.push({
+      this.signMsg = {
+        flags,
+        from
+      }
+    } else {
+      const totalTokens = recipients.reduce(
+        (sum, { tokens }) => sum.plus(new BN(tokens || 0)), new BN(0)
+      )
+      const totalBnbs = recipients.reduce(
+        (sum, { bnbs }) => sum.plus(new BN(bnbs || 0)), new BN(0)
+      )
+      const senderCoins = []
+      if (asset && totalTokens.isGreaterThan(0)) {
+        senderCoins.push({
           denom: asset,
-          amount: new BN(tokens).multipliedBy(10 ** 8).toNumber()
+          amount: totalTokens.multipliedBy(10 ** 8).toNumber()
         })
       }
-      if (bnbs) {
-        receiverCoins.push({
+      if (totalBnbs.isGreaterThan(0)) {
+        senderCoins.push({
           denom: BNB_ASSET,
-          amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber()
+          amount: totalBnbs.multipliedBy(10 ** 8).toNumber()
         })
       }
-      receiverCoins.sort((a, b) => a.denom > b.denom)
-      return {
-        address: to,
-        coins: receiverCoins
+      senderCoins.sort((a, b) => a.denom > b.denom)
+
+      const inputs = [{
+        address: from,
+        coins: senderCoins
+      }]
+      const outputs = recipients.map(({ to, tokens, bnbs }) => {
+        const receiverCoins = []
+        if (asset && tokens) {
+          receiverCoins.push({
+            denom: asset,
+            amount: new BN(tokens).multipliedBy(10 ** 8).toNumber()
+          })
+        }
+        if (bnbs) {
+          receiverCoins.push({
+            denom: BNB_ASSET,
+            amount: new BN(bnbs).multipliedBy(10 ** 8).toNumber()
+          })
+        }
+        receiverCoins.sort((a, b) => a.denom > b.denom)
+        return {
+          address: to,
+          coins: receiverCoins
+        }
+      })
+
+      msg = {
+        inputs: inputs.map((x) => ({
+          ...x,
+          address: crypto.decodeAddress(x.address)
+        })),
+        outputs: outputs.map((x) => ({
+          ...x,
+          address: crypto.decodeAddress(x.address)
+        })),
+        msgType: 'MsgSend'
       }
-    })
 
-    const msg = {
-      inputs: inputs.map((x) => ({
-        ...x,
-        address: crypto.decodeAddress(x.address)
-      })),
-      outputs: outputs.map((x) => ({
-        ...x,
-        address: crypto.decodeAddress(x.address)
-      })),
-      msgType: 'MsgSend'
-    }
-
-    this.signMsg = {
-      inputs,
-      outputs
+      this.signMsg = {
+        inputs,
+        outputs
+      }
     }
 
     this.tx = new TransactionBnc({
@@ -109,6 +123,7 @@ class Transaction {
       sequence: this.tx.sequence
     }]
     return this.tx.serialize()
+      .replace(/ce6dc043/, 'bea6e301') // until 'SetAccountFlagsMsg' is not available
   }
 }
 

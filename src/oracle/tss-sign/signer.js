@@ -21,6 +21,7 @@ const SIGN_NONCE_CHECK_INTERVAL = parseInt(process.env.SIGN_NONCE_CHECK_INTERVAL
 const SEND_TIMEOUT = parseInt(process.env.SEND_TIMEOUT, 10)
 
 const httpClient = axios.create({ baseURL: FOREIGN_URL })
+const proxyClient = axios.create({ baseURL: PROXY_URL })
 
 const SIGN_OK = 0
 const SIGN_NONCE_INTERRUPT = 1
@@ -67,8 +68,12 @@ function restart(req, res) {
   }
 }
 
-function confirmFundsTransfer() {
-  exec.execSync(`curl -X POST -H "Content-Type: application/json" "${PROXY_URL}/confirmFundsTransfer"`, { stdio: 'pipe' })
+async function confirmFundsTransfer() {
+  await proxyClient.post('/confirmFundsTransfer')
+}
+
+async function confirmCloseEpoch() {
+  await proxyClient.post('/confirmCloseEpoch')
 }
 
 function getAccountFromFile(file) {
@@ -216,10 +221,10 @@ async function main() {
 
     logger.info('Consumed sign event: %o', data)
     const {
-      nonce, epoch, newEpoch, parties, threshold
+      nonce, epoch, newEpoch, parties, threshold, closeEpoch
     } = data
 
-    const keysFile = `/keys/keys${epoch}.store`
+    const keysFile = `/keys/keys${epoch || closeEpoch}.store`
     const { address: from, publicKey } = getAccountFromFile(keysFile)
     if (from === '') {
       logger.info('No keys found, acking message')
@@ -236,7 +241,34 @@ async function main() {
 
     attempt = 1
 
-    if (!newEpoch) {
+    if (closeEpoch) {
+      while (true) {
+        logger.info(`Building corresponding account flags transaction, nonce ${nonce}`)
+
+        const tx = new Transaction({
+          from,
+          accountNumber: account.account_number,
+          sequence: nonce,
+          flags: 0x01,
+          memo: `Attempt ${attempt}`
+        })
+
+        const hash = sha256(tx.getSignBytes())
+        logger.info(`Starting signature generation for transaction hash ${hash}`)
+        const signResult = await sign(keysFile, hash, tx, publicKey, from)
+
+        if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
+          await confirmCloseEpoch()
+          break
+        }
+
+        // signer either failed, or timed out after parties signup
+        attempt = nextAttempt || attempt + 1
+        nextAttempt = null
+        logger.warn(`Sign failed, starting next attempt ${attempt}`)
+        await delay(1000)
+      }
+    } else if (!newEpoch) {
       const exchanges = await getExchangeMessages(nonce)
       const exchangesData = exchanges.map((exchangeMsg) => JSON.parse(exchangeMsg.content))
 

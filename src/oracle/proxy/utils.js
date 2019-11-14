@@ -11,10 +11,12 @@ function decodeStatus(status) {
     case 0:
       return 'ready'
     case 1:
-      return 'voting'
+      return 'closing_epoch'
     case 2:
-      return 'keygen'
+      return 'voting'
     case 3:
+      return 'keygen'
+    case 4:
       return 'funds_transfer'
     default:
       return 'unknown_state'

@@ -14,17 +14,21 @@ const bridgeAbi = [
   'function getNextThreshold() view returns (uint)',
   'function getValidators() view returns (address[])',
   'function getNextValidators() view returns (address[])',
+  'function getCloseEpoch() view returns (bool)',
+  'function getNextCloseEpoch() view returns (bool)',
   'function status() view returns (uint)',
   'function votesCount(bytes32) view returns (uint)',
   'function getNextPartyId(address a) view returns (uint)',
   'function confirmKeygen(uint x, uint y)',
   'function confirmFundsTransfer()',
+  'function confirmCloseEpoch()',
   'function startVoting()',
   'function voteStartKeygen()',
   'function voteCancelKeygen()',
   'function voteAddValidator(address validator)',
   'function voteRemoveValidator(address validator)',
   'function voteChangeThreshold(uint threshold)',
+  'function voteChangeCloseEpoch(bool closeEpoch)',
   'function transfer(bytes32 hash, address to, uint value)'
 ]
 const sharedDbAbi = [

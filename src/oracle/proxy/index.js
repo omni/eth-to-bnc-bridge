@@ -189,6 +189,14 @@ async function confirmFundsTransfer(req, res) {
   logger.debug('Confirm funds transfer end')
 }
 
+async function confirmCloseEpoch(req, res) {
+  logger.debug('Confirm close epoch call')
+  const query = bridge.interface.functions.confirmCloseEpoch.encode([])
+  await homeSendQuery(query)
+  res.send()
+  logger.debug('Confirm close epoch end')
+}
+
 async function sendVote(query, req, res, waitFlag = false) {
   try {
     const sentQuery = await homeSendQuery(query)
@@ -257,6 +265,14 @@ async function voteChangeThreshold(req, res) {
   }
 }
 
+async function voteChangeCloseEpoch(req, res) {
+  if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
+    logger.info('Voting for changing close epoch')
+    const query = bridge.interface.functions.voteChangeCloseEpoch.encode([req.params.closeEpoch === 'true'])
+    await sendVote(query, req, res)
+  }
+}
+
 async function voteRemoveValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for removing validator')
@@ -298,14 +314,17 @@ async function info(req, res) {
   logger.debug('Info start')
   try {
     const [
-      x, y, epoch, rangeSize, nextRangeSize, epochStartBlock, foreignNonce, nextEpoch,
-      threshold, nextThreshold, validators, nextValidators, status, homeBalance
+      x, y, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch, epochStartBlock,
+      foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, status,
+      homeBalance
     ] = await Promise.all([
       bridge.getX().then((value) => new BN(value).toString(16)),
       bridge.getY().then((value) => new BN(value).toString(16)),
       bridge.epoch().then(boundX),
       bridge.getRangeSize().then(boundX),
       bridge.getNextRangeSize().then(boundX),
+      bridge.getCloseEpoch(),
+      bridge.getNextCloseEpoch(),
       bridge.getStartBlock().then(boundX),
       bridge.getNonce().then(boundX),
       bridge.nextEpoch().then(boundX),
@@ -338,6 +357,8 @@ async function info(req, res) {
       nextEpoch,
       threshold,
       nextThreshold,
+      closeEpoch,
+      nextCloseEpoch,
       homeBridgeAddress: HOME_BRIDGE_ADDRESS,
       foreignBridgeAddress: foreignAddress,
       foreignNonce,
@@ -371,6 +392,7 @@ app.post('/signupsign', signupSign)
 
 app.post('/confirmKeygen', confirmKeygen)
 app.post('/confirmFundsTransfer', confirmFundsTransfer)
+app.post('/confirmCloseEpoch', confirmCloseEpoch)
 app.post('/transfer', transfer)
 
 votesProxyApp.get('/vote/startVoting', voteStartVoting)
@@ -379,6 +401,7 @@ votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
+votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
 
 async function main() {
