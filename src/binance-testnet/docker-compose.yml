@@ -8,7 +8,8 @@ services:
     ports:
       - '26657:26657'
     volumes:
-      - 'marketdata:/root/.bnbchaind/marketdata'
+      - 'binance_marketdata:/root/.bnbchaind/marketdata'
+      - 'binance_data:/root/.bnbchaind/data'
   api-server:
     build: api-server
     image: bnc-api-server
@@ -28,10 +29,13 @@ services:
     ports:
       - '8000:8000'
     volumes:
-      - 'marketdata:/http-api/marketdata'
+      - 'binance_marketdata:/http-api/marketdata'
 networks:
   binance_net:
     external: true
   binance_rpc_net:
 volumes:
-  marketdata:
+  binance_marketdata:
+    external: true
+  binance_data:
+    external: true

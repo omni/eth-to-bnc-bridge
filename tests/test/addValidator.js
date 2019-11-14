@@ -5,6 +5,8 @@ const { getBepBalance, getBncFlags, getBncSequence } = require('./utils/bncContr
 
 const { controller1, controller3 } = require('./utils/proxyController')
 
+const { HOME_BRIDGE_ADDRESS } = process.env
+
 module.exports = (getUsers, newValidator) => {
   describe('add validator', function () {
     let info
@@ -25,11 +27,13 @@ module.exports = (getUsers, newValidator) => {
     })
 
     it('should start closing epoch process', async function () {
-      await user.exchangeErc(5)
       await controller1.voteStartVoting()
       await delay(5000)
       info = await controller1.getInfo()
       assert.strictEqual(info.bridgeStatus, 'ready', 'Should not change state after one vote')
+
+      await user.approveErc(HOME_BRIDGE_ADDRESS, 5)
+      await user.exchangeErc(5)
 
       await controller3.voteStartVoting()
       info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'closing_epoch')
@@ -157,7 +161,7 @@ module.exports = (getUsers, newValidator) => {
       const prevBalance = await getBepBalance(initialInfo.foreignBridgeAddress)
       const newBalance = await getBepBalance(info.foreignBridgeAddress)
       assert.strictEqual(prevBalance, 0, 'Did not transfer all funds')
-      assert.strictEqual(newBalance, initialInfo.foreignBalanceTokens, 'Funds are lost somewhere')
+      assert.strictEqual(newBalance, initialInfo.foreignBalanceTokens - 5, 'Funds are lost somewhere')
     })
   })
 }

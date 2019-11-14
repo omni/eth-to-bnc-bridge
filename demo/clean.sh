@@ -12,6 +12,9 @@ echo "Cleaning $TARGET_NETWORK network"
 if [[ "$TARGET_NETWORK" == "development" ]]; then
   docker volume rm ganache_side_data > /dev/null 2>&1 || true
   docker volume rm ganache_home_data > /dev/null 2>&1 || true
+  docker volume rm binance_data > /dev/null 2>&1 || true
+  docker volume rm binance_marketdata > /dev/null 2>&1 || true
+  docker volume rm binance_marketdata > /dev/null 2>&1 || true
 fi
 
 for (( I = 1; I < 4; ++I )); do
