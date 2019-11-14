@@ -119,19 +119,19 @@ async function waitForAccountNonce(address, nonce) {
 async function sendTx(tx) {
   while (true) {
     try {
-      return await httpClient
-        .post('/api/v1/broadcast?sync=true', tx, {
-          headers: {
-            'Content-Type': 'text/plain'
-          }
-        })
+      return await httpClient.post('/api/v1/broadcast?sync=true', tx, {
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      })
     } catch (err) {
+      logger.trace('Error, response data %o', err.response.data)
       if (err.response.data.message.includes('Tx already exists in cache')) {
         logger.debug('Tx already exists in cache')
         return true
       }
       if (err.response.data.message.includes(' < ')) {
-        logger.warn('Insufficient funds, waiting for funds to income')
+        logger.warn('Insufficient funds, waiting for funds')
         await delay(60000)
       } else {
         logger.info('Something failed, restarting: %o', err.response)

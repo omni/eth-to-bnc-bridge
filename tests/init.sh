@@ -22,7 +22,7 @@ echo "Starting binance test network"
 ./demo/start-binance-environment.sh
 
 echo "Prefunding ethereum user accounts"
-cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 300
+cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 1000
 echo "Prefunding binance user accounts"
 cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
 

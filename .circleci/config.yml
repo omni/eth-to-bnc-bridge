@@ -125,6 +125,14 @@ orbs:
                 docker logs ganache_home > ./artifacts/logs/ganache/home.log
                 docker logs ganache_side > ./artifacts/logs/ganache/side.log
               when: always
+          - run:
+              name: "Save binance logs"
+              command: |
+                mkdir -p ./artifacts/logs/binance
+                docker logs binance-testnet_node_1 > ./artifacts/logs/binance/node.log
+                docker logs binance-testnet_api-server_1 > ./artifacts/logs/binance/api-server.log
+                docker logs binance-testnet_http-api_1 > ./artifacts/logs/binance/http-api.log
+              when: always
           - store_artifacts:
               path: ./artifacts
               when: always
@@ -151,7 +159,7 @@ jobs:
           name: "Run dev environment, deploy contracts, prefund accounts"
           command: |
             BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
-            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 300
+            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 1000
       - run:
           name: "Stop dev environment"
           command: docker kill ganache_side ganache_home

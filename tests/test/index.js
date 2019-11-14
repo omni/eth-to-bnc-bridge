@@ -50,7 +50,7 @@ describe('bridge tests', function () {
         const userEthBalance = await users[i].getEthBalance()
         assert.ok(userEthBalance >= 0.1, `Insufficient ETH balance on ${users[i].ethAddress} in Ethereum network, expected 0.1 ETH, got ${userEthBalance}`)
         const userErcBalance = await users[i].getErcBalance()
-        assert.ok(userErcBalance >= 200, `Insufficient ERC20 balance on ${users[i].ethAddress} in Ethereum network, expected 200 ERC20, got ${userErcBalance}`)
+        assert.ok(userErcBalance >= 1000, `Insufficient ERC20 balance on ${users[i].ethAddress} in Ethereum network, expected 1000 ERC20, got ${userErcBalance}`)
         const userBnbBalance = await users[i].getBepBalance()
         assert.ok(userBnbBalance >= 0.1, `Insufficient BNB balance on ${users[i].bncAddress} in Binance network, expected 0.1 BNB, got ${userBnbBalance}`)
         const userBepBalance = await users[i].getBepBalance()
@@ -84,7 +84,7 @@ describe('bridge tests', function () {
 
   testRemoveValidator(validatorsConfig[1])
 
-  testEthToBnc(() => users)
+  testEthToBnc(() => users, 500, () => bncPrefundedUser)
   testBncToEth(() => users)
   testEthToBnc(() => users)
 
@@ -99,5 +99,5 @@ describe('bridge tests', function () {
   testEthToBnc(() => users)
   testBncToEth(() => users)
   testEthToBncWithRestart(() => users, 2)
-  testEthToBnc(() => users, 500, bncPrefundedUser)
+  testEthToBnc(() => users)
 })

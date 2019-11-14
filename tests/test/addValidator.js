@@ -18,10 +18,10 @@ module.exports = (getUsers, newValidator) => {
       initialInfo = await controller1.getInfo()
       // eslint-disable-next-line prefer-destructuring
       user = getUsers()[0]
-      bncBridgeSequence = await getBncSequence(info.foreignBridgeAddress)
       bncBalance = await user.getBepBalance()
       info = initialInfo
-      nextValidators = [...initialInfo.validators, newValidator]
+      bncBridgeSequence = await getBncSequence(info.foreignBridgeAddress)
+      nextValidators = [...info.validators, newValidator]
     })
 
     it('should start closing epoch process', async function () {

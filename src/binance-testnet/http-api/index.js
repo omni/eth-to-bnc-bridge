@@ -126,7 +126,25 @@ async function handleBroadcast(req, res) {
         tx: `0x${req.rawBody}`
       }
     })
-    res.send([response.data.result])
+    if (response.data.error) {
+      res.status(500).send({
+        code: 500,
+        failed_tx_index: 0,
+        message: 'RPC error -32603 - Internal error: Tx already exists in cache',
+        success_tx_results: []
+      })
+    } else if (response.data.result.code === 65546) {
+      res.status(400).send({
+        code: 400,
+        failed_tx_index: 0,
+        message: '3417218964BNB < 1000DEV-BA6',
+        success_tx_results: []
+      })
+    } else if (response.data.result) {
+      res.send([response.data.result])
+    } else {
+      res.status(400).end()
+    }
   }
 }
 

@@ -36,8 +36,8 @@ module.exports = (getUsers, amount = 5, getBncPrefundedUser = null) => {
       }
     })
 
-    if (bncPrefundedUser) {
-      it('should make exchange transaction on bnc side with waiting for enough funds on bnc side', async function () {
+    if (getBncPrefundedUser) {
+      it('should make exchange transaction on bnc side after already enough funds', async function () {
         this.timeout(300000)
         await delay(120000)
         await bncPrefundedUser.transferBepBnb(info.foreignBridgeAddress, amount * 3 + 10, 0)
