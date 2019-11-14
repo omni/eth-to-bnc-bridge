@@ -40,7 +40,7 @@ async function main() {
     receipt = await client.multiSend(from, outputs, 'funding')
   } else {
     console.log(`From ${from} to ${to}, ${tokens} ${FOREIGN_ASSET}'`)
-    receipt = await client.transfer(from, to, tokens, FOREIGN_ASSET, 'exchange')
+    receipt = await client.transfer(from, to, tokens, FOREIGN_ASSET, '')
   }
 
   if (receipt.status === 200) {

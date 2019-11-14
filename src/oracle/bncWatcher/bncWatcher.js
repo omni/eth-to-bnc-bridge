@@ -156,13 +156,11 @@ async function loop() {
 
   for (let i = transactions.length - 1; i >= 0; i -= 1) {
     const tx = transactions[i]
-    if (tx.memo !== 'funding') {
+    if (tx.memo === '') {
       const publicKeyEncoded = (await getTx(tx.txHash)).signatures[0].pub_key.value
       await proxyHttpClient.post('/transfer', {
         to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
-        value: new BN(tx.value)
-          .multipliedBy(10 ** 18)
-          .integerValue(),
+        value: new BN(tx.value).multipliedBy(10 ** 18).integerValue(),
         hash: `0x${tx.txHash}`
       })
     }
