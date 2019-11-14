@@ -5,6 +5,8 @@ import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 contract Bridge {
     event ExchangeRequest(uint value, uint nonce);
     event EpochEnd(uint indexed epoch);
+    event EpochClose(uint indexed epoch);
+    event ForceSign();
     event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
     event NewEpochCancelled(uint indexed epoch);
     event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
@@ -19,10 +21,12 @@ contract Bridge {
         uint nonce;
         uint x;
         uint y;
+        bool closeEpoch;
     }
 
     enum Status {
         READY, // bridge is in ready to perform operations
+        CLOSING_EPOCH, // generating transaction for blocking binance side of the bridge
         VOTING, // voting for changing in next epoch, but still ready
         KEYGEN, //keygen, can be cancelled
         FUNDS_TRANSFER // funds transfer, cannot be cancelled
@@ -31,11 +35,13 @@ contract Bridge {
     enum Vote {
         CONFIRM_KEYGEN,
         CONFIRM_FUNDS_TRANSFER,
+        CONFIRM_CLOSE_EPOCH,
         START_VOTING,
         ADD_VALIDATOR,
         REMOVE_VALIDATOR,
         CHANGE_THRESHOLD,
         CHANGE_RANGE_SIZE,
+        CHANGE_CLOSE_EPOCH,
         START_KEYGEN,
         CANCEL_KEYGEN,
         TRANSFER
@@ -57,7 +63,7 @@ contract Bridge {
     uint minTxLimit;
     uint maxTxLimit;
 
-    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits, uint rangeSize) public {
+    constructor(uint threshold, address[] memory validators, address _tokenContract, uint[2] memory limits, uint rangeSize, bool closeEpoch) public {
         require(validators.length > 0);
         require(threshold <= validators.length);
 
@@ -72,11 +78,12 @@ contract Bridge {
             threshold : threshold,
             rangeSize : rangeSize,
             startBlock : 0,
-            endBlock : uint(-1),
-            nonce : uint(-1),
+            endBlock : uint(- 1),
+            nonce : uint(- 1),
             x : 0,
-            y : 0
-        });
+            y : 0,
+            closeEpoch : closeEpoch
+            });
 
         minTxLimit = limits[0];
         maxTxLimit = limits[1];
@@ -91,13 +98,23 @@ contract Bridge {
         _;
     }
 
-    modifier readyOrVoting {
-        require(status == Status.READY || status == Status.VOTING, "Not in ready or voting state");
+    modifier closingEpoch {
+        require(status == Status.CLOSING_EPOCH, "Not in closing epoch state");
+        _;
+    }
+
+    modifier readyOrClosing {
+        require(status == Status.READY || status == Status.CLOSING_EPOCH, "Not in ready or closing epoch state");
         _;
     }
 
     modifier voting {
         require(status == Status.VOTING, "Not in voting state");
+        _;
+    }
+
+    modifier readyOrVoting {
+        require(status == Status.READY || status == Status.VOTING, "Not in ready or voting state");
         _;
     }
 
@@ -129,7 +146,7 @@ contract Bridge {
         emit ExchangeRequest(value, getNonce());
     }
 
-    function transfer(bytes32 hash, address to, uint value) public readyOrVoting currentValidator {
+    function transfer(bytes32 hash, address to, uint value) public readyOrClosing currentValidator {
         if (tryVote(Vote.TRANSFER, hash, to, value)) {
             tokenContract.transfer(to, value);
         }
@@ -161,9 +178,16 @@ contract Bridge {
         if (tryConfirm(Vote.CONFIRM_FUNDS_TRANSFER)) {
             status = Status.READY;
             states[nextEpoch].startBlock = block.number;
-            states[nextEpoch].nonce = uint(-1);
+            states[nextEpoch].nonce = uint(- 1);
             epoch = nextEpoch;
             emit EpochStart(epoch, getX(), getY());
+        }
+    }
+
+    function confirmCloseEpoch() public closingEpoch currentValidator {
+        if (tryConfirm(Vote.CONFIRM_CLOSE_EPOCH)) {
+            status = Status.VOTING;
+            emit EpochEnd(epoch);
         }
     }
 
@@ -227,6 +251,18 @@ contract Bridge {
         return states[epoch].y;
     }
 
+    function getCloseEpoch() view public returns (bool) {
+        return getCloseEpoch(epoch);
+    }
+
+    function getNextCloseEpoch() view public returns (bool) {
+        return getCloseEpoch(nextEpoch);
+    }
+
+    function getCloseEpoch(uint _epoch) view public returns (bool) {
+        return states[_epoch].closeEpoch;
+    }
+
     function getPartyId() view public returns (uint) {
         address[] memory validators = getValidators();
         for (uint i = 0; i < getParties(); i++) {
@@ -256,13 +292,21 @@ contract Bridge {
     function startVoting() public readyOrVoting currentValidator {
         if (tryVote(Vote.START_VOTING, epoch)) {
             nextEpoch++;
-            status = Status.VOTING;
             states[nextEpoch].endBlock = block.number;
             states[nextEpoch].threshold = getThreshold();
             states[nextEpoch].validators = getValidators();
             states[nextEpoch].rangeSize = getRangeSize();
+            states[nextEpoch].closeEpoch = getCloseEpoch();
 
-            emit EpochEnd(epoch);
+            if (status == Status.READY && getCloseEpoch()) {
+                status = Status.CLOSING_EPOCH;
+                emit ForceSign();
+                emit EpochClose(epoch);
+            } else {
+                status = Status.VOTING;
+                emit ForceSign();
+                emit EpochEnd(epoch);
+            }
         }
     }
 
@@ -304,6 +348,12 @@ contract Bridge {
     function voteChangeRangeSize(uint rangeSize) public voting currentValidator {
         if (tryVote(Vote.CHANGE_RANGE_SIZE, rangeSize)) {
             states[nextEpoch].rangeSize = rangeSize;
+        }
+    }
+
+    function voteChangeCloseEpoch(bool closeEpoch) public voting currentValidator {
+        if (tryVote(Vote.CHANGE_CLOSE_EPOCH, closeEpoch ? 1 : 0)) {
+            states[nextEpoch].closeEpoch = closeEpoch;
         }
     }
 
