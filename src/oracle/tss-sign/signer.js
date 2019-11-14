@@ -116,23 +116,29 @@ async function waitForAccountNonce(address, nonce) {
   return !cancelled
 }
 
-
-function sendTx(tx) {
-  return httpClient
-    .post('/api/v1/broadcast?sync=true', tx, {
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    })
-    .catch(async (err) => {
+async function sendTx(tx) {
+  while (true) {
+    try {
+      return await httpClient
+        .post('/api/v1/broadcast?sync=true', tx, {
+          headers: {
+            'Content-Type': 'text/plain'
+          }
+        })
+    } catch (err) {
       if (err.response.data.message.includes('Tx already exists in cache')) {
         logger.debug('Tx already exists in cache')
         return true
       }
-      logger.info('Something failed, restarting: %o', err.response)
-      await delay(1000)
-      return await sendTx(tx)
-    })
+      if (err.response.data.message.includes(' < ')) {
+        logger.warn('Insufficient funds, waiting for funds to income')
+        await delay(60000)
+      } else {
+        logger.info('Something failed, restarting: %o', err.response)
+        await delay(10000)
+      }
+    }
+  }
 }
 
 function sign(keysFile, hash, tx, publicKey, signerAddress) {

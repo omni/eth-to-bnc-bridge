@@ -36,7 +36,7 @@ module.exports = async function main(privateKey) {
       await client.multiSend(from, outputs, 'funding')
     },
     async exchange(to, value) {
-      await client.transfer(from, to, value.toString(), FOREIGN_ASSET, 'exchange')
+      await client.transfer(from, to, value.toString(), FOREIGN_ASSET, '')
     }
   }
 }

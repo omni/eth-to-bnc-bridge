@@ -21,6 +21,7 @@ const { controller1 } = require('./utils/proxyController')
 
 describe('bridge tests', function () {
   let users
+  let bncPrefundedUser
 
   before(async function () {
     users = await seqMap(usersConfig, (user) => createUser(user.privateKey))
@@ -29,7 +30,6 @@ describe('bridge tests', function () {
   describe('generation of initial epoch keys', function () {
     let info
     let ethPrefundedUser
-    let bncPrefundedUser
 
     before(async function () {
       ethPrefundedUser = await createUser(HOME_PRIVATE_KEY, 'eth')
@@ -99,5 +99,5 @@ describe('bridge tests', function () {
   testEthToBnc(() => users)
   testBncToEth(() => users)
   testEthToBncWithRestart(() => users, 2)
-  testEthToBnc(() => users)
+  testEthToBnc(() => users, 500, bncPrefundedUser)
 })
