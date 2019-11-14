@@ -1,7 +1,7 @@
 const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
-const { getBepBalance } = require('./utils/bncController')
+const { getBepBalance, getBncFlags } = require('./utils/bncController')
 
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
 
@@ -92,6 +92,8 @@ module.exports = (newThreshold) => {
     it('should finish keygen process and start funds transfer', async function () {
       this.timeout(120000)
       info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'funds_transfer')
+      const flags = await getBncFlags(initialInfo.foreignBridgeAddress)
+      assert.strictEqual(flags, 0, 'Foreign bridge flags are not set correctly')
     })
 
     it('should transfer all funds to new account and start new epoch', async function () {

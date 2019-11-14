@@ -1,7 +1,7 @@
 const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
-const { getBepBalance } = require('./utils/bncController')
+const { getBepBalance, getBncFlags } = require('./utils/bncController')
 
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
 
@@ -41,6 +41,8 @@ module.exports = (oldValidator) => {
     it('should finish close epoch process and start voting process', async function () {
       this.timeout(120000)
       info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'voting')
+      const flags = await getBncFlags(initialInfo.foreignBridgeAddress)
+      assert.strictEqual(flags, 1, 'Foreign bridge flags are not set correctly')
     })
 
     it('should remove validator', async function () {

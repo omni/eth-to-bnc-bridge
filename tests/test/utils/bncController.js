@@ -23,5 +23,9 @@ module.exports = {
   async getBncSequence(address) {
     const response = await retry(() => bnc.get(`/api/v1/account/${address}/sequence`))
     return response ? response.data.sequence : 0
+  },
+  async getBncFlags(address) {
+    const response = await retry(() => bnc.get(`/api/v1/account/${address}`))
+    return response.data.flags
   }
 }
