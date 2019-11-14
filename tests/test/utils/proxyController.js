@@ -28,6 +28,9 @@ function createController(validatorId) {
     },
     async voteChangeThreshold(threshold) {
       return (await retry(() => proxy.get(`/vote/changeThreshold/${threshold}`))).data
+    },
+    async voteChangeCloseEpoch(closeEpoch) {
+      return (await retry(() => proxy.get(`/vote/changeCloseEpoch/${closeEpoch}`))).data
     }
   }
 }

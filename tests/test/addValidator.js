@@ -17,25 +17,30 @@ module.exports = (newValidator) => {
       nextValidators = [...initialInfo.validators, newValidator]
     })
 
-    it('should start voting process', async function () {
+    it('should start closing epoch process', async function () {
       await controller1.voteStartVoting()
       await delay(5000)
       info = await controller1.getInfo()
       assert.strictEqual(info.bridgeStatus, 'ready', 'Should not change state after one vote')
 
       await controller3.voteStartVoting()
-      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'voting')
-      assert.deepStrictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
-      assert.deepStrictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'closing_epoch')
+      assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
+      assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Next validators are not set correctly')
 
       await controller3.voteStartVoting()
       await delay(5000)
       info = await controller1.getInfo()
-      assert.strictEqual(info.bridgeStatus, 'voting', 'Should not do anything after duplicate vote')
-      assert.deepStrictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
-      assert.deepStrictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
+      assert.strictEqual(info.bridgeStatus, 'closing_epoch', 'Should not do anything after duplicate vote')
+      assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
+      assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Incorrect set of next validators after third vote')
+    })
+
+    it('should finish close epoch process and start voting process', async function () {
+      this.timeout(120000)
+      info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'voting')
     })
 
     it('should add validator', async function () {
@@ -58,10 +63,41 @@ module.exports = (newValidator) => {
       await delay(5000)
       info = await controller1.getInfo()
       assert.strictEqual(info.bridgeStatus, 'voting', 'Should not do anything after duplicate vote')
-      assert.deepStrictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
-      assert.deepStrictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
+      assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
+      assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
       assert.deepStrictEqual(info.nextValidators, nextValidators, 'Incorrect set of next validators after third vote')
+    })
+
+    it('should change close epoch', async function () {
+      await controller1.voteChangeCloseEpoch(false)
+      await delay(5000)
+      info = await controller1.getInfo()
+      assert.strictEqual(info.bridgeStatus, 'voting', 'Should not change state after one vote')
+      assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
+      assert.deepStrictEqual(info.nextValidators, nextValidators, 'Next validators are not set correctly')
+      assert.strictEqual(info.closeEpoch, true, 'Current close epoch is not set correctly')
+      assert.strictEqual(info.nextCloseEpoch, true, 'Next close epoch is not set correctly')
+
+      await controller3.voteChangeCloseEpoch(false)
+      info = await waitPromise(
+        controller1.getInfo,
+        (newInfo) => !newInfo.nextCloseEpoch
+      )
+      assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
+      assert.deepStrictEqual(info.nextValidators, nextValidators, 'Next validators are not set correctly')
+      assert.strictEqual(info.closeEpoch, true, 'Current close epoch is not set correctly')
+
+      await controller3.voteChangeCloseEpoch(false)
+      await delay(5000)
+      info = await controller1.getInfo()
+      assert.strictEqual(info.bridgeStatus, 'voting', 'Should not do anything after duplicate vote')
+      assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
+      assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
+      assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
+      assert.deepStrictEqual(info.nextValidators, nextValidators, 'Incorrect set of next validators after third vote')
+      assert.strictEqual(info.closeEpoch, true, 'Current close epoch is not set correctly')
+      assert.strictEqual(info.nextCloseEpoch, false, 'Next close epoch is not set correctly')
     })
 
     it('should start keygen process', async function () {
@@ -77,8 +113,8 @@ module.exports = (newValidator) => {
       await delay(5000)
       info = await controller1.getInfo()
       assert.strictEqual(info.bridgeStatus, 'keygen', 'Should not do anything after duplicate vote')
-      assert.deepStrictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
-      assert.deepStrictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
+      assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
+      assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.validators, initialInfo.validators, 'Validators are not set correctly')
       assert.deepStrictEqual(info.nextValidators, nextValidators, 'Incorrect set of next validators after third vote')
     })

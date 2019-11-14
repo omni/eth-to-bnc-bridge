@@ -36,7 +36,7 @@ describe('bridge tests', function () {
       bncPrefundedUser = await createUser(FOREIGN_PRIVATE_KEY, 'bnc')
 
       const bnbBalance = await bncPrefundedUser.getBnbBalance()
-      assert.ok(bnbBalance >= 1, `Insufficient BNB balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 1 BNB, got ${bnbBalance}`)
+      assert.ok(bnbBalance >= 10, `Insufficient BNB balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 10 BNB, got ${bnbBalance}`)
       const bepBalance = await bncPrefundedUser.getBepBalance()
       assert.ok(bepBalance >= 2000, `Insufficient BEP2 balance on ${bncPrefundedUser.ethAddress} in Binance network, expected 2000 ${FOREIGN_ASSET}, got ${bepBalance}`)
 
@@ -63,8 +63,17 @@ describe('bridge tests', function () {
       info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.epoch === 1)
     })
 
+    it('should start correct epoch', async function () {
+      assert.deepStrictEqual(info.validators, validatorsConfig, 'Validators are not set correctly')
+      assert.deepStrictEqual(info.nextValidators, validatorsConfig, 'Next validators are not set correctly')
+      assert.strictEqual(info.closeEpoch, true, 'Current close epoch is not set correctly')
+      assert.strictEqual(info.nextCloseEpoch, true, 'Next close epoch is not set correctly')
+      assert.strictEqual(info.threshold, 2, 'Threshold not set correctly')
+      assert.strictEqual(info.nextThreshold, 2, 'Next threshold is not set correctly')
+    })
+
     after(async function () {
-      await bncPrefundedUser.transferBepBnb(info.foreignBridgeAddress, 1000, 0.1)
+      await bncPrefundedUser.transferBepBnb(info.foreignBridgeAddress, 1000, 5)
       await ethPrefundedUser.transferErc(HOME_BRIDGE_ADDRESS, 1000)
     })
   })
