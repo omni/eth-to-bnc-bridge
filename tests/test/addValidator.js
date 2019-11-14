@@ -1,23 +1,31 @@
 const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
-const { getBepBalance, getBncFlags } = require('./utils/bncController')
+const { getBepBalance, getBncFlags, getBncSequence } = require('./utils/bncController')
 
 const { controller1, controller3 } = require('./utils/proxyController')
 
-module.exports = (newValidator) => {
+module.exports = (getUsers, newValidator) => {
   describe('add validator', function () {
     let info
     let initialInfo
     let nextValidators
+    let user
+    let bncBridgeSequence
+    let bncBalance
 
     before(async function () {
       initialInfo = await controller1.getInfo()
+      // eslint-disable-next-line prefer-destructuring
+      user = getUsers()[0]
+      bncBridgeSequence = await getBncSequence(info.foreignBridgeAddress)
+      bncBalance = await user.getBepBalance()
       info = initialInfo
       nextValidators = [...initialInfo.validators, newValidator]
     })
 
     it('should start closing epoch process', async function () {
+      await user.exchangeErc(5)
       await controller1.voteStartVoting()
       await delay(5000)
       info = await controller1.getInfo()
@@ -36,6 +44,16 @@ module.exports = (newValidator) => {
       assert.strictEqual(info.epoch, initialInfo.epoch, 'Current epoch is not set correctly')
       assert.strictEqual(info.nextEpoch, initialInfo.epoch + 1, 'Next epoch is not set correctly')
       assert.deepStrictEqual(info.nextValidators, initialInfo.validators, 'Incorrect set of next validators after third vote')
+    })
+
+    it('should make forced sign', async function () {
+      this.timeout(300000)
+      await waitPromise(
+        () => getBncSequence(info.foreignBridgeAddress),
+        (sequence) => sequence === bncBridgeSequence + 1
+      )
+      const newBncBalance = await user.getBepBalance()
+      assert.strictEqual(newBncBalance, bncBalance + 5, `Balance of ${user.bncAddress} did not updated as expected`)
     })
 
     it('should finish close epoch process and start voting process', async function () {

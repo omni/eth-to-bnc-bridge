@@ -88,7 +88,7 @@ describe('bridge tests', function () {
   testBncToEth(() => users)
   testEthToBnc(() => users)
 
-  testAddValidator(validatorsConfig[1])
+  testAddValidator(() => users, validatorsConfig[1])
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
