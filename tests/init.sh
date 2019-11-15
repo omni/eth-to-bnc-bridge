@@ -19,6 +19,6 @@ N=2 ./demo/validator-demo.sh -d
 N=3 ./demo/validator-demo.sh -d
 
 echo "Waiting until validators are ready"
-until curl -X GET http://localhost:5001 > /dev/null 2>&1; do sleep 1; done
-until curl -X GET http://localhost:5002 > /dev/null 2>&1; do sleep 1; done
-until curl -X GET http://localhost:5003 > /dev/null 2>&1; do sleep 1; done
+until curl -X GET http://localhost:5001/info > /dev/null 2>&1; do sleep 1; done
+until curl -X GET http://localhost:5002/info > /dev/null 2>&1; do sleep 1; done
+until curl -X GET http://localhost:5003/info > /dev/null 2>&1; do sleep 1; done

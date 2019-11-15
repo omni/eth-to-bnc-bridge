@@ -21,35 +21,6 @@ orbs:
           - setup_remote_docker:
               version: 18.09.3
               docker_layer_caching: true
-      save_ganache_data:
-        description: "Save dev environment in workspace"
-        steps:
-          - run:
-              name: "Backup blockchains data using temporary container"
-              command: |
-                mkdir -p ./workspace/ganache_side_data
-                mkdir -p ./workspace/ganache_home_data
-                docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
-                docker cp "tmp:/ganache_side_data/." "./workspace/ganache_side_data"
-                docker cp "tmp:/ganache_home_data/." "./workspace/ganache_home_data"
-                docker kill tmp
-          - persist_to_workspace:
-              root: ./workspace
-              paths:
-                - ganache_side_data
-                - ganache_home_data
-      restore_ganache_data:
-        description: "Restore dev environment from workspace"
-        steps:
-          - run:
-              name: "Restore blockchains data from backup using temporary container"
-              command: |
-                docker volume create ganache_side_data
-                docker volume create ganache_home_data
-                docker run --rm -v "ganache_side_data:/ganache_side_data" -v "ganache_home_data:/ganache_home_data" -itd --name tmp alpine:3.9.4
-                docker cp "./workspace/ganache_side_data/." "tmp:/ganache_side_data"
-                docker cp "./workspace/ganache_home_data/." "tmp:/ganache_home_data"
-                docker kill tmp
       restore_tss_image:
         description: "Restores tss image from cache"
         steps:
@@ -147,23 +118,6 @@ jobs:
           name: "Build tss image"
           command: docker build --cache-from tss -t tss ./src/tss || docker build -t tss ./src/tss
       - bridge/save_tss
-  init_blockchains:
-    executor: bridge/node-dev
-    steps:
-      - bridge/fetch_repo
-      - bridge/setup_docker
-      - run:
-          name: "Stub .keys file"
-          command: touch ./src/test-services/.keys.$TARGET_NETWORK
-      - run:
-          name: "Run dev environment, deploy contracts, prefund accounts"
-          command: |
-            BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
-            cat ./tests/config.json | jq .users[].ethAddress | xargs -I {} ./src/test-services/ethereumSend/run.sh {} 1000
-      - run:
-          name: "Stop dev environment"
-          command: docker kill ganache_side ganache_home
-      - bridge/save_ganache_data
   run_tests:
     executor: bridge/node-dev
     steps:
@@ -172,17 +126,14 @@ jobs:
       - attach_workspace:
           at: ./workspace
       - bridge/load_tss
-      - bridge/restore_ganache_data
       - run:
           name: "Init tests environment"
           command: |
             BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
             ./demo/start-binance-environment.sh
-            cat ./tests/config.json | jq .users[].bncAddress | xargs -I {} ./src/test-services/binanceSend/run.sh {} 300 0.1
             N=1 ./demo/validator-demo.sh -d
             N=2 ./demo/validator-demo.sh -d
             N=3 ./demo/validator-demo.sh -d
-            docker ps
       - run:
           name: "Wait until validator nodes are ready"
           command: |
@@ -214,8 +165,6 @@ workflows:
   main:
     jobs:
       - init_tss
-      - init_blockchains
       - run_tests:
           requires:
             - init_tss
-            - init_blockchains
