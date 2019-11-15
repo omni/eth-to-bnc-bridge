@@ -35,7 +35,7 @@ sleep 2
 
 if [[ -n "$need_to_deploy" ]]; then
     echo "Issuing test asset"
-    ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 1000000000000 --token-name "DEV Token" | jq .Response.log)
+    ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 10000000000000000 --token-name "DEV Token" | jq .Response.log)
     TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
     echo "Issued $TOKEN_SYMBOL"
 
@@ -49,7 +49,8 @@ if [[ -n "$need_to_deploy" ]]; then
     sleep 2
 
     echo "Sending tokens to controlled address"
-    tbnbcli token multi-send --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"1000000000000:BNB,1000000000000:'"$TOKEN_SYMBOL"'"}]'
+    tbnbcli token multi-send  \
+    --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"10000000000000000:BNB,10000000000000000:'"$TOKEN_SYMBOL"'"}]'
 
     sleep 2
 else
