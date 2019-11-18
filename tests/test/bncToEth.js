@@ -17,6 +17,7 @@ module.exports = (getUsers) => {
     })
 
     it('should make correct exchange transactions on eth side', async function () {
+      this.timeout(120000)
       for (let i = 0; i < 3; i += 1) {
         const user = users[i]
         await waitPromise(
