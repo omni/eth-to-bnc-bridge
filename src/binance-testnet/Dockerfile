@@ -1,4 +1,4 @@
-FROM ubuntu:19.10 as build
+FROM ubuntu:19.10
 
 ARG BNC_VERSION=0.6.2
 
