@@ -68,7 +68,7 @@ async function createSender(url, privateKey) {
 
       return {
         txHash: result,
-        gasLimit: tx.gasLimit
+        gasLimit: newTx.gasLimit
       }
     } catch (e) {
       logger.warn('Something failed, %o', e)

@@ -12,7 +12,8 @@ const encode = require('./encode')
 const decode = require('./decode')
 const { createSender, waitForReceipt } = require('./sendTx')
 const logger = require('./logger')
-const { publicKeyToAddress } = require('./crypto')
+const { publicKeyToAddress, padZeros } = require('./crypto')
+const { delay } = require('./wait')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
@@ -148,7 +149,7 @@ async function signupKeygen(req, res) {
 async function signupSign(req, res) {
   logger.debug('SignupSign call')
   const hash = ethers.utils.id(req.body.third)
-  const query = sharedDb.interface.functions.signupSign.encode([hash])
+  const query = sharedDb.interface.functions.signup.encode([hash])
   const { txHash } = await sideSendQuery(query)
   const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
 
@@ -283,11 +284,21 @@ async function voteRemoveValidator(req, res) {
 
 async function transfer(req, res) {
   logger.info('Transfer start')
-  const { hash, to, value } = req.body
+  const {
+    hash, to, value, epoch
+  } = req.body
   if (ethers.utils.isHexString(to, 20)) {
-    logger.info(`Calling transfer to ${to}, ${value} tokens`)
-    const query = bridge.interface.functions.transfer.encode([hash, to, `0x${new BN(value).toString(16)}`])
-    await homeSendQuery(query)
+    logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
+    const message = Buffer.from(padZeros(epoch.toString(16), 64) + hash + to.slice(2) + padZeros(value, 64), 'hex')
+    const signature = await sideWallet.signMessage(message)
+    const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
+    await sideSendQuery(query)
+    await delay(5000)
+    const validators = await bridge.getValidatorsInEpoch(epoch)
+    const signatures = await sharedDb.getSignatures(ethers.utils.hashMessage(message), validators)
+    logger.debug(`Transfer call, message 0x${message.toString('hex')}, signatures ${signatures}`)
+    const query1 = bridge.interface.functions.transfer.encode([`0x${message.toString('hex')}`, signatures])
+    await homeSendQuery(query1)
   }
   res.send()
   logger.info('Transfer end')

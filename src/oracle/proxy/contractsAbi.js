@@ -14,6 +14,7 @@ const bridgeAbi = [
   'function getNextThreshold() view returns (uint)',
   'function getValidators() view returns (address[])',
   'function getNextValidators() view returns (address[])',
+  'function getValidatorsInEpoch(uint _epoch) view returns (address[])',
   'function getCloseEpoch() view returns (bool)',
   'function getNextCloseEpoch() view returns (bool)',
   'function status() view returns (uint)',
@@ -29,14 +30,16 @@ const bridgeAbi = [
   'function voteRemoveValidator(address validator)',
   'function voteChangeThreshold(uint threshold)',
   'function voteChangeCloseEpoch(bool closeEpoch)',
-  'function transfer(bytes32 hash, address to, uint value)'
+  'function transfer(bytes message, bytes signatures)'
 ]
 const sharedDbAbi = [
   'function getSignupAddress(bytes32 hash, address[] validators, uint signupNumber) view returns (address)',
   'function getData(address from, bytes32 hash, bytes32 key) view returns (bytes)',
   'function getSignupNumber(bytes32 hash, address[] validators, address validator) view returns (uint)',
   'function setData(bytes32 hash, bytes32 key, bytes data)',
-  'function signupSign(bytes32 hash)'
+  'function signup(bytes32 hash)',
+  'function addSignature(bytes message, bytes rsv)',
+  'function getSignatures(bytes32 msgHash, address[] validators) view returns (bytes)'
 ]
 
 module.exports = {
