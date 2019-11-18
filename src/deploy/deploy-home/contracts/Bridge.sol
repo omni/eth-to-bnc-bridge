@@ -54,6 +54,7 @@ contract Bridge {
     mapping(bytes32 => uint) public votesCount;
     mapping(bytes32 => bool) public votes;
     mapping(bytes32 => bool) public usedRange;
+    mapping(bytes32 => bool) public handledTx;
 
     Status public status;
 
@@ -146,9 +147,59 @@ contract Bridge {
         emit ExchangeRequest(value, getNonce());
     }
 
-    function transfer(bytes32 hash, address to, uint value) public readyOrClosing currentValidator {
-        if (tryVote(Vote.TRANSFER, hash, to, value)) {
-            tokenContract.transfer(to, value);
+    function transfer(bytes memory message, bytes memory signatures) public {
+        require(message.length == 116, "Incorrect message length");
+        require(signatures.length % 65 == 0, "Incorrect signatures length");
+
+        uint msgEpoch;
+        bytes32 msgId;
+        address msgTo;
+        uint msgValue;
+
+        assembly {
+            msgEpoch := mload(add(message, 32))
+            msgId := mload(add(message, 64))
+            msgTo := mload(add(message, 84))
+            msgValue := mload(add(message, 116))
+        }
+
+        require(msgEpoch <= epoch, "Invalid epoch number");
+        require(!handledTx[msgId], "Tx was already handled");
+        handledTx[msgId] = true;
+
+        address[] memory msgValidators = getValidatorsInEpoch(msgEpoch);
+
+        require(signatures.length / 65 >= getThreshold(msgEpoch), "Not enough signatures");
+
+        bytes32 msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n116", message));
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        for (uint i = 0; i < signatures.length / 65; i++) {
+            uint offset = i * 65;
+
+            assembly {
+                r := mload(add(add(signatures,32),offset))
+                s := mload(add(add(signatures,64),offset))
+                v := byte(0, mload(add(add(signatures,96),offset)))
+            }
+
+            address signer = ecrecover(msgHash, v, r, s);
+            uint j;
+            for (j = 0; j < msgValidators.length; j++) {
+                if (msgValidators[j] == signer) {
+                    delete msgValidators[j];
+                    break;
+                }
+            }
+            require(j != msgValidators.length);
+        }
+        if (tokenContract.balanceOf(address(this)) >= msgValue) {
+            tokenContract.transfer(msgTo, msgValue);
+        } else {
+            tokenContract.approve(msgTo, msgValue);
         }
     }
 
@@ -282,11 +333,15 @@ contract Bridge {
     }
 
     function getValidators() view public returns (address[] memory) {
-        return states[epoch].validators;
+        return getValidatorsInEpoch(epoch);
     }
 
     function getNextValidators() view public returns (address[] memory) {
-        return states[nextEpoch].validators;
+        return getValidatorsInEpoch(nextEpoch);
+    }
+
+    function getValidatorsInEpoch(uint _epoch) view public returns (address[] memory) {
+        return states[_epoch].validators;
     }
 
     function startVoting() public readyOrVoting currentValidator {
