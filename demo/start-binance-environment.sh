@@ -31,12 +31,15 @@ docker build -t testnet-binaries ../src/binance-testnet > /dev/null 2>&1 || true
 echo "Running environment"
 docker-compose -f ../src/binance-testnet/docker-compose.yml up --build -d
 
-sleep 2
-
 if [[ -n "$need_to_deploy" ]]; then
     echo "Issuing test asset"
-    ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 10000000000000000 --token-name "DEV Token" | jq .Response.log)
-    TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
+    TOKEN_SYMBOL=''
+    while [[ -z "$TOKEN_SYMBOL" ]]; do
+        sleep 2
+        ISSUED_LOG=$(tbnbcli token issue --symbol DEV --total-supply 10000000000000000 --token-name "DEV Token" | jq .Response.log)
+        TOKEN_SYMBOL=${ISSUED_LOG:(-8):7}
+    done
+
     echo "Issued $TOKEN_SYMBOL"
 
     sed -i 's/FOREIGN_ASSET=.*$/FOREIGN_ASSET='"$TOKEN_SYMBOL"'/' ../src/test-services/binanceBalance/.env.development
