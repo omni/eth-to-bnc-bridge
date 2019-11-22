@@ -13,29 +13,8 @@ DEPLOY_DIR="`pwd`/src/deploy"
 TEST_SERVICES_DIR="`pwd`/src/test-services"
 DEMO_DIR="`pwd`/demo"
 
-start_dev_blockchain_networks() {
-  echo "Starting side test blockchain"
-
-  docker kill ganache_side > /dev/null 2>&1 || true
-  docker network create blockchain_side > /dev/null 2>&1 || true
-  docker volume create ganache_side_data > /dev/null 2>&1 || true
-  docker run -d --network blockchain_side --rm --name ganache_side -v "ganache_side_data:/app/db" \
-      -p "7545:8545" \
-      trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 33 --db /app/db -b "$BLOCK_TIME" --noVMErrorsOnRPCResponse
-
-  echo "Starting home test blockchain"
-
-  docker kill ganache_home > /dev/null 2>&1 || true
-  docker network create blockchain_home > /dev/null 2>&1 || true
-  docker volume create ganache_home_data > /dev/null 2>&1 || true
-  docker run -d --network blockchain_home --rm --name ganache_home -v "ganache_home_data:/app/db" \
-      -p "8545:8545" \
-      trufflesuite/ganache-cli:latest \
-      -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 44 --db /app/db -b "$BLOCK_TIME" --noVMErrorsOnRPCResponse
-
-  sleep 4
-}
+HOME_NETWORK="ethereum_home_rpc_net"
+SIDE_NETWORK="ethereum_side_rpc_net"
 
 deploy_token() {
   echo "Compiling and deploying erc20"
@@ -45,7 +24,7 @@ deploy_token() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    TOKEN_ADDRESS=$(docker run --network blockchain_home --rm -v "$DEPLOY_DIR/deploy-test/build:/build/build" --env-file "$DEPLOY_DIR/deploy-test/.env.development" \
+    TOKEN_ADDRESS=$(docker run --network "$HOME_NETWORK" --rm -v "$DEPLOY_DIR/deploy-test/build:/build/build" --env-file "$DEPLOY_DIR/deploy-test/.env.development" \
     deploy_test \
     --network home 2>&1 \
     | grep "contract address" \
@@ -67,7 +46,7 @@ deploy_bridge() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    BRIDGE_ADDRESS=$(docker run --network blockchain_home --rm -v "$DEPLOY_DIR/deploy-home/build:/build/build" --env-file "$DEPLOY_DIR/deploy-home/.env.development" \
+    BRIDGE_ADDRESS=$(docker run --network "$HOME_NETWORK" --rm -v "$DEPLOY_DIR/deploy-home/build:/build/build" --env-file "$DEPLOY_DIR/deploy-home/.env.development" \
     deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
@@ -89,7 +68,7 @@ deploy_db() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    SHARED_DB_ADDRESS=$(docker run --network blockchain_side --rm -v "$DEPLOY_DIR/deploy-side/build:/build/build" --env-file "$DEPLOY_DIR/deploy-side/.env.development" \
+    SHARED_DB_ADDRESS=$(docker run --network "$SIDE_NETWORK" --rm -v "$DEPLOY_DIR/deploy-side/build:/build/build" --env-file "$DEPLOY_DIR/deploy-side/.env.development" \
     deploy_side \
     --network side 2>&1 \
     | grep "contract address" \
@@ -131,25 +110,39 @@ deploy_all() {
   sed -i 's/HOME_TOKEN_ADDRESS=.*$/HOME_TOKEN_ADDRESS='"$TOKEN_ADDRESS"'/' "$TEST_SERVICES_DIR/ethereumSend/.env.$TARGET_NETWORK"
 }
 
-
-
-
 if [[ "$TARGET_NETWORK" == "development" ]]; then
 
   if [[ "$(docker volume ls | grep ganache_side_data)" ]] || [[ "$(docker volume ls | grep ganache_home_data)" ]]; then
-    echo "Restarting dev blockchain networks"
+    echo "Restarting ethereum test network"
   else
-    echo "Starting dev blockchain networks and deploying contracts"
+    echo "Creating new ethereum test network"
+
+    echo "Removing old environment"
+    docker kill $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+    docker rm $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
+    docker volume rm ganache_side_data > /dev/null 2>&1 || true
+    docker volume rm ganache_home_data > /dev/null 2>&1 || true
+
+    docker network create ethereum_side_rpc_net > /dev/null 2>&1 || true
+    docker network create ethereum_home_rpc_net > /dev/null 2>&1 || true
+    docker volume create ganache_side_data > /dev/null 2>&1 || true
+    docker volume create ganache_home_data > /dev/null 2>&1 || true
+
     need_to_deploy=true
   fi
 
-  start_dev_blockchain_networks
+  echo "Starting ethereum test environment"
+
+  BLOCK_TIME="$BLOCK_TIME" docker-compose -f ./src/ethereum-testnet/docker-compose.yml up --build -d
+
+  sleep 4
 
   if [[ -n "$need_to_deploy" ]]; then
     deploy_all
   else
     echo "Contracts are already deployed, run clean.sh first if you want to redeploy everything"
   fi
+
 else
   echo "Deploying to the staging blockchain environment"
 

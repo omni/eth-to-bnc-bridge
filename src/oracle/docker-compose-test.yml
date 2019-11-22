@@ -23,8 +23,8 @@ services:
       test_network:
         aliases:
           - local_proxy
-      blockchain_home:
-      blockchain_side:
+      ethereum_home_rpc_net:
+      ethereum_side_rpc_net:
       binance_net:
   keygen:
     image: keygen-client
@@ -96,7 +96,7 @@ services:
       - LOG_LEVEL
     networks:
       - test_network
-      - blockchain_home
+      - ethereum_home_rpc_net
   bnc-watcher:
     build:
       dockerfile: bncWatcher/Dockerfile
@@ -118,9 +118,9 @@ services:
       - binance_net
 networks:
   test_network:
-  blockchain_side:
+  ethereum_side_rpc_net:
     external: true
-  blockchain_home:
+  ethereum_home_rpc_net:
     external: true
   binance_net:
     external: true

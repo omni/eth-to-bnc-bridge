@@ -12,7 +12,7 @@ echo "Using $TARGET_NETWORK network"
 docker build -t side-prefund . > /dev/null
 
 if [[ "$TARGET_NETWORK" == "development" ]]; then
-    docker run --network blockchain_side --rm --env-file ".env.$TARGET_NETWORK" side-prefund $@
+    docker run --network ethereum_side_rpc_net --rm --env-file ".env.$TARGET_NETWORK" side-prefund $@
 else
     docker run --rm --env-file ".env.$TARGET_NETWORK" --env-file "../.keys.$TARGET_NETWORK" side-prefund $@
 fi

@@ -331,21 +331,13 @@ Make sure, to first run demo in development mode, before trying to run it in the
    docker kill binance-testnet_http-api_1
    docker kill binance-testnet_node_1
    docker kill binance-testnet_api-server_1
-   docker kill ganache_home
-   docker kill ganache_side
+   docker kill ethereum-testnet_ganache_home_1
+   docker kill ethereum-testnet_ganache_side_1
+   docker kill ethereum-testnet_side_oracle_1
    ```
-3. Remove virtual networks:
+3. Remove testnets and validators data:
    ```
-   docker network rm binance_net
-   docker network rm blockchain_home
-   docker network rm blockchain_side
-   docker network rm validator1_test_network
-   docker network rm validator2_test_network
-   docker network rm validator3_test_network
-   ```
-4. Remove testnets and validators data:
-   ```
-   TARGET_NETWORK=<network> ./demo/clean.sh
+   TARGET_NETWORK=development ./demo/clean.sh
    ```
 
 #### Testing tools for both sides of the bridge
