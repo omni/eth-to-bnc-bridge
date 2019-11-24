@@ -10,7 +10,11 @@ contract SignupStorage {
         signups[hash][msg.sender] = ++signupsCount[hash];
     }
 
-    function getSignupNumber(bytes32 hash, address[] memory validators, address validator) view public returns (uint) {
+    function getSignupNumber(
+        bytes32 hash,
+        address[] memory validators,
+        address validator
+    ) view public returns (uint) {
         if (signups[hash][validator] == 0)
             return 0;
         uint id = 1;
@@ -22,7 +26,11 @@ contract SignupStorage {
         return id;
     }
 
-    function getSignupAddress(bytes32 hash, address[] memory validators, uint signupNumber) view public returns (address) {
+    function getSignupAddress(
+        bytes32 hash,
+        address[] memory validators,
+        uint signupNumber
+    ) view public returns (address) {
         for (uint i = 0; i < validators.length; i++) {
             if (getSignupNumber(hash, validators, validators[i]) == signupNumber) {
                 return validators[i];
