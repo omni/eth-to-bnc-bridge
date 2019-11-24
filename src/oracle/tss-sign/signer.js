@@ -68,12 +68,16 @@ function restart(req, res) {
   }
 }
 
-async function confirmFundsTransfer() {
-  await proxyClient.post('/confirmFundsTransfer')
+async function confirmFundsTransfer(epoch) {
+  await proxyClient.post('/confirmFundsTransfer', {
+    epoch
+  })
 }
 
-async function confirmCloseEpoch() {
-  await proxyClient.post('/confirmCloseEpoch')
+async function confirmCloseEpoch(epoch) {
+  await proxyClient.post('/confirmCloseEpoch', {
+    epoch
+  })
 }
 
 function getAccountFromFile(file) {
@@ -264,7 +268,7 @@ async function main() {
         const signResult = await sign(keysFile, hash, tx, publicKey, from)
 
         if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
-          await confirmCloseEpoch()
+          await confirmCloseEpoch(closeEpoch)
           break
         }
 
@@ -338,7 +342,7 @@ async function main() {
         const signResult = await sign(keysFile, hash, tx, publicKey, from)
 
         if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
-          await confirmFundsTransfer()
+          await confirmFundsTransfer(epoch)
           break
         }
 

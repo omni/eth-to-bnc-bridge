@@ -1,6 +1,7 @@
 const exec = require('child_process')
 const fs = require('fs')
 const express = require('express')
+const axios = require('axios')
 
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
@@ -11,11 +12,17 @@ const { RABBITMQ_URL, PROXY_URL } = process.env
 
 const app = express()
 
+const proxyClient = axios.create({ baseURL: PROXY_URL })
+
 let currentKeygenEpoch = null
 let ready = false
 
-async function confirmKeygen(keysFile) {
-  exec.execSync(`curl -X POST -H "Content-Type: application/json" -d @"${keysFile}" "${PROXY_URL}/confirmKeygen"`, { stdio: 'pipe' })
+async function confirmKeygen({ x, y }, epoch) {
+  await proxyClient.post('/confirmKeygen', {
+    x,
+    y,
+    epoch
+  })
 }
 
 async function main() {
@@ -51,7 +58,7 @@ async function main() {
         logger.warn(`Generated multisig account in binance chain: ${publicKeyToAddress(publicKey)}`)
 
         logger.info('Sending keys confirmation')
-        await confirmKeygen(keysFile)
+        await confirmKeygen(publicKey, epoch)
       } else {
         logger.warn(`Keygen for epoch ${epoch} failed`)
       }

@@ -13,12 +13,26 @@ const decode = require('./decode')
 const { createSender, waitForReceipt } = require('./sendTx')
 const logger = require('./logger')
 const { publicKeyToAddress, padZeros } = require('./crypto')
-const { delay } = require('./wait')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
   HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
 } = process.env
+
+const Action = {
+  CONFIRM_KEYGEN: 0,
+  CONFIRM_FUNDS_TRANSFER: 1,
+  CONFIRM_CLOSE_EPOCH: 2,
+  VOTE_START_VOTING: 3,
+  VOTE_ADD_VALIDATOR: 4,
+  VOTE_REMOVE_VALIDATOR: 5,
+  VOTE_CHANGE_THRESHOLD: 6,
+  VOTE_CHANGE_RANGE_SIZE: 7,
+  VOTE_CHANGE_CLOSE_EPOCH: 8,
+  VOTE_START_KEYGEN: 9,
+  VOTE_CANCEL_KEYGEN: 10,
+  TRANSFER: 11
+}
 
 const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
@@ -35,9 +49,7 @@ const httpClient = axios.create({ baseURL: FOREIGN_URL })
 
 const lock = new AsyncLock()
 
-let homeValidatorNonce
 let sideValidatorNonce
-let homeSender
 let sideSender
 
 const app = express()
@@ -56,21 +68,6 @@ function sideSendQuery(query) {
     })
     if (senderResponse !== true) {
       sideValidatorNonce += 1
-    }
-    return senderResponse
-  })
-}
-
-function homeSendQuery(query) {
-  return lock.acquire('home', async () => {
-    logger.debug('Sending home query')
-    const senderResponse = await homeSender({
-      data: query,
-      to: HOME_BRIDGE_ADDRESS,
-      nonce: homeValidatorNonce
-    })
-    if (senderResponse !== true) {
-      homeValidatorNonce += 1
     }
     return senderResponse
   })
@@ -173,112 +170,136 @@ async function signupSign(req, res) {
   logger.debug('SignupSign end')
 }
 
+function encodeParam(param) {
+  switch (typeof param) {
+    case 'string':
+      if (param.startsWith('0x')) {
+        return Buffer.from(param.slice(2), 'hex')
+      }
+      return Buffer.from(padZeros(param, 64), 'hex')
+    case 'number':
+      return Buffer.from(padZeros(new BN(param).toString(16), 64), 'hex')
+    case 'boolean':
+      return Buffer.from([param ? 1 : 0])
+    default:
+      return null
+  }
+}
+
+function buildMessage(type, ...params) {
+  logger.debug(`${type}, %o`, params)
+  return Buffer.concat([
+    Buffer.from([type]),
+    ...params.map(encodeParam)
+  ])
+}
+
+async function processMessage(message) {
+  const signature = await sideWallet.signMessage(message)
+  logger.debug('Adding signature to shared db contract')
+  const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
+  await sideSendQuery(query)
+}
+
 async function confirmKeygen(req, res) {
   logger.debug('Confirm keygen call')
-  const { x, y } = req.body[5]
-  const query = bridge.interface.functions.confirmKeygen.encode([`0x${x}`, `0x${y}`])
-  await homeSendQuery(query)
+  const { x, y, epoch } = req.body
+  const message = buildMessage(Action.CONFIRM_KEYGEN, epoch, x, y)
+  await processMessage(message)
   res.send()
   logger.debug('Confirm keygen end')
 }
 
 async function confirmFundsTransfer(req, res) {
   logger.debug('Confirm funds transfer call')
-  const query = bridge.interface.functions.confirmFundsTransfer.encode([])
-  await homeSendQuery(query)
+  const { epoch } = req.body
+  const message = buildMessage(Action.CONFIRM_FUNDS_TRANSFER, epoch)
+  await processMessage(message)
   res.send()
   logger.debug('Confirm funds transfer end')
 }
 
 async function confirmCloseEpoch(req, res) {
   logger.debug('Confirm close epoch call')
-  const query = bridge.interface.functions.confirmCloseEpoch.encode([])
-  await homeSendQuery(query)
+  const { epoch } = req.body
+  const message = buildMessage(Action.CONFIRM_CLOSE_EPOCH, epoch)
+  await processMessage(message)
   res.send()
   logger.debug('Confirm close epoch end')
 }
 
-async function sendVote(query, req, res, waitFlag = false) {
-  try {
-    const sentQuery = await homeSendQuery(query)
-    let { txHash, gasLimit } = sentQuery
-    if (txHash) {
-      while (waitFlag) {
-        const { status, gasUsed } = await waitForReceipt(HOME_RPC_URL, txHash)
-        if (status === '0x1') {
-          logger.debug('Receipt status is OK')
-          break
-        }
-        if (gasLimit === gasUsed) {
-          logger.info('Sending vote failed due to out of gas revert, retrying with more gas')
-          const nextTx = await homeSendQuery(query)
-          txHash = nextTx.txHash
-          gasLimit = nextTx.gasLimit
-        } else {
-          logger.warn(`Vote tx was reverted, txHash ${txHash}`)
-          break
-        }
-      }
-    }
-    if (sentQuery) {
-      res.send('Voted\n')
-      logger.info('Voted successfully')
-    } else {
-      res.send('Failed\n')
-      logger.info('Failed to vote')
-    }
-  } catch (e) {
-    logger.debug(e)
-  }
-}
-
 async function voteStartVoting(req, res) {
   logger.info('Voting for starting new epoch voting process')
-  const query = bridge.interface.functions.startVoting.encode([])
-  await sendVote(query, req, res, true)
+  const epoch = boundX(await bridge.epoch())
+  const message = buildMessage(Action.VOTE_START_VOTING, epoch)
+  await processMessage(message)
+  res.send('Voted\n')
+  logger.info('Voted successfully')
 }
 
 async function voteStartKeygen(req, res) {
   logger.info('Voting for starting new epoch keygen')
-  const query = bridge.interface.functions.voteStartKeygen.encode([])
-  await sendVote(query, req, res)
+  const epoch = boundX(await bridge.epoch())
+  const message = buildMessage(Action.VOTE_START_KEYGEN, epoch)
+  await processMessage(message)
+  res.send('Voted\n')
+  logger.info('Voted successfully')
 }
 
 async function voteCancelKeygen(req, res) {
   logger.info('Voting for cancelling new epoch keygen')
-  const query = bridge.interface.functions.voteCancelKeygen.encode([])
-  await sendVote(query, req, res)
+  const epoch = boundX(await bridge.nextEpoch())
+  const message = buildMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
+  await processMessage(message)
+  res.send('Voted\n')
+  logger.info('Voted successfully')
 }
 
 async function voteAddValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for adding new validator')
-    const query = bridge.interface.functions.voteAddValidator.encode([req.params.validator])
-    await sendVote(query, req, res)
+    const epoch = boundX(await bridge.epoch())
+    const message = buildMessage(Action.VOTE_ADD_VALIDATOR, epoch, req.params.validator)
+    await processMessage(message)
+    res.send('Voted\n')
+    logger.info('Voted successfully')
   }
 }
 
 async function voteChangeThreshold(req, res) {
   if (/^[0-9]+$/.test(req.params.threshold)) {
     logger.info('Voting for changing threshold')
-    const query = bridge.interface.functions.voteChangeThreshold.encode([req.params.threshold])
-    await sendVote(query, req, res)
+    const epoch = boundX(await bridge.epoch())
+    const message = buildMessage(
+      Action.VOTE_CHANGE_THRESHOLD,
+      epoch,
+      parseInt(req.params.threshold, 10)
+    )
+    await processMessage(message)
+    res.send('Voted\n')
+    logger.info('Voted successfully')
   }
 }
 
 async function voteChangeCloseEpoch(req, res) {
   if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
     logger.info('Voting for changing close epoch')
-    const query = bridge.interface.functions.voteChangeCloseEpoch.encode([req.params.closeEpoch === 'true'])
-    await sendVote(query, req, res)
+    const epoch = boundX(await bridge.epoch())
+    const message = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, epoch, req.params.closeEpoch === 'true')
+    await processMessage(message)
+    res.send('Voted\n')
+    logger.info('Voted successfully')
   }
 }
 
 async function voteRemoveValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for removing validator')
-    const query = bridge.interface.functions.voteRemoveValidator.encode([req.params.validator])
-    await sendVote(query, req, res, true)
+    const epoch = boundX(await bridge.epoch())
+    const message = buildMessage(Action.VOTE_REMOVE_VALIDATOR, epoch, req.params.validator)
+    await processMessage(message)
+    res.send('Voted\n')
+    logger.info('Voted successfully')
   }
 }
 
@@ -289,16 +310,9 @@ async function transfer(req, res) {
   } = req.body
   if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
-    const message = Buffer.from(padZeros(epoch.toString(16), 64) + hash + to.slice(2) + padZeros(value, 64), 'hex')
-    const signature = await sideWallet.signMessage(message)
-    const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
-    await sideSendQuery(query)
-    await delay(5000)
-    const validators = await bridge.getValidatorsInEpoch(epoch)
-    const signatures = await sharedDb.getSignatures(ethers.utils.hashMessage(message), validators)
-    logger.debug(`Transfer call, message 0x${message.toString('hex')}, signatures ${signatures}`)
-    const query1 = bridge.interface.functions.transfer.encode([`0x${message.toString('hex')}`, signatures])
-    await homeSendQuery(query1)
+    const message = buildMessage(Action.TRANSFER, epoch, hash, to, value)
+    logger.info(`Message for sign: ${message.toString('hex')}`)
+    await processMessage(message)
   }
   res.send()
   logger.info('Transfer end')
@@ -313,12 +327,6 @@ function getForeignBalances(address) {
       return prev
     }, {}))
     .catch(() => ({}))
-}
-
-function getVotesCount(nextEpoch, voteType) {
-  return bridge.votesCount(
-    ethers.utils.keccak256(ethers.utils.solidityPack(['uint8', 'uint256'], [voteType, nextEpoch]))
-  ).then(boundX)
 }
 
 async function info(req, res) {
@@ -347,14 +355,6 @@ async function info(req, res) {
       token.balanceOf(HOME_BRIDGE_ADDRESS)
         .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
-    const [
-      confirmationsForFundsTransfer, votesForVoting, votesForKeygen, votesForCancelKeygen
-    ] = await Promise.all([
-      getVotesCount(nextEpoch, 1),
-      getVotesCount(nextEpoch, 2),
-      getVotesCount(nextEpoch, 7),
-      getVotesCount(nextEpoch, 8)
-    ])
     const foreignAddress = publicKeyToAddress({
       x,
       y
@@ -378,11 +378,7 @@ async function info(req, res) {
       homeBalance,
       foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
       foreignBalanceNative: parseFloat(balances.BNB) || 0,
-      bridgeStatus: decodeStatus(status),
-      votesForVoting,
-      votesForKeygen,
-      votesForCancelKeygen,
-      confirmationsForFundsTransfer
+      bridgeStatus: decodeStatus(status)
     }
     logger.trace('%o', msg)
     res.send(msg)
@@ -416,10 +412,8 @@ votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
 
 async function main() {
-  homeValidatorNonce = await homeWallet.getTransactionCount()
   sideValidatorNonce = await sideWallet.getTransactionCount()
 
-  homeSender = await createSender(HOME_RPC_URL, VALIDATOR_PRIVATE_KEY)
   sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
 
   logger.warn(`My validator address in home and side networks is ${validatorAddress}`)

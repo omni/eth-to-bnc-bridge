@@ -14,7 +14,6 @@ const bridgeAbi = [
   'function getNextThreshold() view returns (uint)',
   'function getValidators() view returns (address[])',
   'function getNextValidators() view returns (address[])',
-  'function getValidatorsInEpoch(uint _epoch) view returns (address[])',
   'function getCloseEpoch() view returns (bool)',
   'function getNextCloseEpoch() view returns (bool)',
   'function status() view returns (uint)',
@@ -29,8 +28,7 @@ const bridgeAbi = [
   'function voteAddValidator(address validator)',
   'function voteRemoveValidator(address validator)',
   'function voteChangeThreshold(uint threshold)',
-  'function voteChangeCloseEpoch(bool closeEpoch)',
-  'function transfer(bytes message, bytes signatures)'
+  'function voteChangeCloseEpoch(bool closeEpoch)'
 ]
 const sharedDbAbi = [
   'function getSignupAddress(bytes32 hash, address[] validators, uint signupNumber) view returns (address)',
