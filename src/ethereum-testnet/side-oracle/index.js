@@ -8,10 +8,11 @@ const SIDE_MAX_FETCH_RANGE_SIZE = parseInt(process.env.SIDE_MAX_FETCH_RANGE_SIZE
 const bridgeAbi = [
   'function applyMessage(bytes message, bytes signatures)',
   'function getThreshold(uint epoch) view returns (uint)',
-  'function getValidatorsInEpoch(uint epoch) view returns (address[])'
+  'function getValidators(uint epoch) view returns (address[])'
 ]
 const sharedDbAbi = [
   'event NewMessage(bytes32 msgHash)',
+  'function signedMessages(bytes32 hash) view returns (bytes)',
   'function getSignatures(bytes32 msgHash, address[] validators) view returns (bytes)'
 ]
 
@@ -29,16 +30,21 @@ async function delay(ms) {
 
 async function handleNewMessage(event) {
   const { msgHash } = event.values
-  const message = (await sharedDb.signedMessages(msgHash))[0]
-  const epoch = parseInt(message.slice(30, 3).toString('hex'), 16)
+  const message = await sharedDb.signedMessages(msgHash)
+  const epoch = parseInt(message.slice(4, 68), 16)
   const [threshold, validators] = await Promise.all([
     bridge.getThreshold(epoch),
-    bridge.getValidatorsInEpoch(epoch)
+    bridge.getValidators(epoch)
   ])
 
   while (true) {
     const signatures = await sharedDb.getSignatures(msgHash, validators)
-    if (signatures.length / 65 >= threshold) {
+    if (signatures.length === 2) {
+      console.log('Skipping event')
+      break
+    }
+    if ((signatures.length - 2) / 130 >= threshold) {
+      console.log('Sending applyMessage request')
       const tx = await bridge.applyMessage(message, signatures, {
         gasLimit: 1000000,
         nonce
@@ -54,10 +60,9 @@ async function initialize() {
   await delay(5000)
   sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
   homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
-  bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeProvider)
-  sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
-
   homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
+  bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
+  sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
 
   nonce = await homeWallet.getTransactionCount()
 }
@@ -77,19 +82,15 @@ async function loop() {
     address: SIDE_SHARED_DB_ADDRESS,
     fromBlock: blockNumber,
     toBlock: endBlock,
-    topics: []
+    topics: [
+      sharedDb.interface.events.NewMessage.topic
+    ]
   }))
 
   for (let i = 0; i < bridgeEvents.length; i += 1) {
-    const event = bridge.interface.parseLog(bridgeEvents[i])
+    const event = sharedDb.interface.parseLog(bridgeEvents[i])
     console.log('Consumed event', event, bridgeEvents[i])
-    switch (event.name) {
-      case 'NewMessage':
-        await handleNewMessage(event)
-        break
-      default:
-        console.log('Unknown event %o', event)
-    }
+    await handleNewMessage(event)
   }
 
   blockNumber = endBlock + 1
