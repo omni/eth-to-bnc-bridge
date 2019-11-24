@@ -65,11 +65,6 @@ contract MessageHandler is Government, MessageDecoder {
             require(message.length == 117, "Incorrect message length");
             (address to, uint value) = _decodeTransfer(message);
             _transfer(to, value);
-            // 0b
-            // 0000000000000000000000000000000000000000000000000000000000000001
-            // 73824c9dc9318568f803a7fd6a147d67f0c1c328f0ed955456ed7357e6b470f8
-            // ad6c8127143032d843a260c5d379d8d9b3d51f15
-            // 0000000000000000000000000000000000000000000000004563918244f40000
         } else {
             revert("Unknown message action");
         }

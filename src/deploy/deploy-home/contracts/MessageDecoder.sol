@@ -13,7 +13,7 @@ contract MessageDecoder {
 
     function _decodeBoolean(bytes memory message) pure internal returns (bool a) {
         assembly {
-            a := mload(add(message, 34))
+            a := and(mload(add(message, 34)), 1)
         }
     }
 
