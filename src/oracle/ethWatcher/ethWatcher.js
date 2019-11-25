@@ -25,8 +25,8 @@ const bridgeAbi = [
   'event ForceSign()',
   'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getParties(uint16 epoch) view returns (uint16)',
-  'function getRangeSize() view returns (uint16)',
-  'function getValidators() view returns (address[])'
+  'function getRangeSize(uint16 epoch) view returns (uint16)',
+  'function getValidators(uint16 epoch) view returns (address[])'
 ]
 const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, provider)
 const validatorAddress = ethers.utils.computeAddress(`0x${VALIDATOR_PRIVATE_KEY}`)
@@ -176,8 +176,8 @@ async function processEpochStart(event) {
   epoch = event.values.epoch
   epochStart = blockNumber
   logger.info(`Epoch ${epoch} started`)
-  rangeSize = await bridge.getRangeSize()
-  isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)
+  rangeSize = await bridge.getRangeSize(epoch)
+  isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
@@ -236,10 +236,10 @@ async function initialize() {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`), 10) || 0
   }
-  rangeSize = await bridge.getRangeSize()
+  rangeSize = await bridge.getRangeSize(epoch)
   logger.debug(`Range size ${rangeSize}`)
   logger.debug('Checking if current validator')
-  isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)
+  isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {

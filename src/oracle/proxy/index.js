@@ -421,19 +421,24 @@ app.post('/transfer', transfer)
 votesProxyApp.get('/vote/startVoting', voteStartVoting)
 votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
 votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
+
+votesProxyApp.use('/vote', (req, res, next) => {
+  if (/^[0-9]+$/.test(req.query.attempt)) {
+    req.attempt = parseInt(req.query.attempt, 10).toString(16)
+    logger.debug(`Vote attempt 0x${req.attempt}`)
+    next()
+  } else if (!req.query.attempt) {
+    req.attempt = '0'
+    logger.debug('Vote attempt 0x00')
+    next()
+  }
+})
+
 votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
 votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
-
-votesProxyApp.use('/vote', (req, res, next) => {
-  if (/^[0-9]*$/.test(req.query.attempt)) {
-    req.attempt = req.query.attempt ? parseInt(req.query.attempt, 10).toString(16) : '0'
-    logger.debug(`Vote attempt 0x${req.attempt}`)
-    next()
-  }
-})
 
 async function main() {
   sideValidatorNonce = await sideWallet.getTransactionCount()
