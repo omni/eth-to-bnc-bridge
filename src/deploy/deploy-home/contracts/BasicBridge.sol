@@ -3,26 +3,26 @@ pragma solidity ^0.5.0;
 import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
 
 contract BasicBridge {
-    uint constant UPPER_BOUND = uint(-1);
+    uint32 constant UPPER_BOUND = 0xffffffff;
 
-    event EpochEnd(uint indexed epoch);
-    event EpochClose(uint indexed epoch);
+    event EpochEnd(uint16 indexed epoch);
+    event EpochClose(uint16 indexed epoch);
     event ForceSign();
-    event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch);
-    event NewEpochCancelled(uint indexed epoch);
-    event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch);
-    event EpochStart(uint indexed epoch, uint x, uint y);
+    event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch);
+    event NewEpochCancelled(uint16 indexed epoch);
+    event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch);
+    event EpochStart(uint16 indexed epoch, uint x, uint y);
 
     struct State {
         address[] validators;
-        uint threshold;
-        uint rangeSize;
-        uint startBlock;
-        uint endBlock;
-        uint nonce;
+        uint32 startBlock;
+        uint32 endBlock;
+        uint32 nonce;
+        uint16 threshold;
+        uint16 rangeSize;
+        bool closeEpoch;
         uint x;
         uint y;
-        bool closeEpoch;
     }
 
     enum Status {
@@ -33,15 +33,15 @@ contract BasicBridge {
         FUNDS_TRANSFER // funds transfer, cannot be cancelled
     }
 
-    mapping(uint => State) states;
+    mapping(uint16 => State) public states;
 
     Status public status;
 
-    uint public epoch;
-    uint public nextEpoch;
+    uint16 public epoch;
+    uint16 public nextEpoch;
 
-    uint minTxLimit;
-    uint maxTxLimit;
+    uint96 minTxLimit;
+    uint96 maxTxLimit;
 
     IERC20 public tokenContract;
 
@@ -55,18 +55,8 @@ contract BasicBridge {
         _;
     }
 
-    modifier readyOrClosing {
-        require(status == Status.READY || status == Status.CLOSING_EPOCH, "Not in ready or closing epoch state");
-        _;
-    }
-
     modifier voting {
         require(status == Status.VOTING, "Not in voting state");
-        _;
-    }
-
-    modifier readyOrVoting {
-        require(status == Status.READY || status == Status.VOTING, "Not in ready or voting state");
         _;
     }
 
@@ -80,60 +70,55 @@ contract BasicBridge {
         _;
     }
 
-    modifier currentValidator {
-        require(getPartyId() != 0, "Not a current validator");
-        _;
-    }
-
-    function getParties() view public returns (uint) {
+    function getParties() view public returns (uint16) {
         return getParties(epoch);
     }
 
-    function getNextParties() view public returns (uint) {
+    function getNextParties() view public returns (uint16) {
         return getParties(nextEpoch);
     }
 
-    function getParties(uint _epoch) view public returns (uint) {
-        return states[_epoch].validators.length;
+    function getParties(uint16 _epoch) view public returns (uint16) {
+        return uint16(states[_epoch].validators.length);
     }
 
-    function getThreshold() view public returns (uint) {
+    function getThreshold() view public returns (uint16) {
         return getThreshold(epoch);
     }
 
-    function getNextThreshold() view public returns (uint) {
+    function getNextThreshold() view public returns (uint16) {
         return getThreshold(nextEpoch);
     }
 
-    function getThreshold(uint _epoch) view public returns (uint) {
+    function getThreshold(uint16 _epoch) view public returns (uint16) {
         return states[_epoch].threshold;
     }
 
-    function getStartBlock() view public returns (uint) {
+    function getStartBlock() view public returns (uint32) {
         return getStartBlock(epoch);
     }
 
-    function getStartBlock(uint _epoch) view public returns (uint) {
+    function getStartBlock(uint16 _epoch) view public returns (uint32) {
         return states[_epoch].startBlock;
     }
 
-    function getRangeSize() view public returns (uint) {
+    function getRangeSize() view public returns (uint16) {
         return getRangeSize(epoch);
     }
 
-    function getNextRangeSize() view public returns (uint) {
+    function getNextRangeSize() view public returns (uint16) {
         return getRangeSize(nextEpoch);
     }
 
-    function getRangeSize(uint _epoch) view public returns (uint) {
+    function getRangeSize(uint16 _epoch) view public returns (uint16) {
         return states[_epoch].rangeSize;
     }
 
-    function getNonce() view public returns (uint) {
+    function getNonce() view public returns (uint32) {
         return getNonce(epoch);
     }
 
-    function getNonce(uint _epoch) view public returns (uint) {
+    function getNonce(uint16 _epoch) view public returns (uint32) {
         return states[_epoch].nonce;
     }
 
@@ -153,24 +138,24 @@ contract BasicBridge {
         return getCloseEpoch(nextEpoch);
     }
 
-    function getCloseEpoch(uint _epoch) view public returns (bool) {
+    function getCloseEpoch(uint16 _epoch) view public returns (bool) {
         return states[_epoch].closeEpoch;
     }
 
-    function getPartyId() view public returns (uint) {
+    function getPartyId() view public returns (uint16) {
         address[] memory validators = getValidators();
         for (uint i = 0; i < getParties(); i++) {
             if (validators[i] == msg.sender)
-                return i + 1;
+                return uint16(i + 1);
         }
         return 0;
     }
 
-    function getNextPartyId(address a) view public returns (uint) {
+    function getNextPartyId(address a) view public returns (uint16) {
         address[] memory validators = getNextValidators();
         for (uint i = 0; i < getNextParties(); i++) {
             if (validators[i] == a)
-                return i + 1;
+                return uint16(i + 1);
         }
         return 0;
     }
@@ -183,7 +168,7 @@ contract BasicBridge {
         return getValidators(nextEpoch);
     }
 
-    function getValidators(uint _epoch) view public returns (address[] memory) {
+    function getValidators(uint16 _epoch) view public returns (address[] memory) {
         return states[_epoch].validators;
     }
 }

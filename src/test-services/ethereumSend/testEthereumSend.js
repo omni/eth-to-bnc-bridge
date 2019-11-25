@@ -9,7 +9,7 @@ const tokenAbi = [
   'function approve(address to, uint256 value)'
 ]
 const bridgeAbi = [
-  'function exchange(uint value)'
+  'function exchange(uint96 value)'
 ]
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || HOME_PRIVATE_KEY

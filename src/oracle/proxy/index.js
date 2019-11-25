@@ -6,7 +6,7 @@ const ethers = require('ethers')
 
 const { tokenAbi, bridgeAbi, sharedDbAbi } = require('./contractsAbi')
 const {
-  Ok, Err, decodeStatus, boundX
+  Ok, Err, decodeStatus
 } = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
@@ -128,8 +128,8 @@ async function set(req, res) {
 
 async function signupKeygen(req, res) {
   logger.debug('SignupKeygen call')
-  const epoch = (await bridge.nextEpoch()).toNumber()
-  const partyId = (await bridge.getNextPartyId(validatorAddress)).toNumber()
+  const epoch = await bridge.nextEpoch()
+  const partyId = await bridge.getNextPartyId(validatorAddress)
 
   if (partyId === 0) {
     res.send(Err({ message: 'Not a validator' }))
@@ -161,7 +161,7 @@ async function signupSign(req, res) {
   }
 
   const validators = await bridge.getValidators()
-  const id = (await sharedDb.getSignupNumber(hash, validators, validatorAddress)).toNumber()
+  const id = await sharedDb.getSignupNumber(hash, validators, validatorAddress)
 
   res.send(Ok({
     uuid: hash,
@@ -176,9 +176,9 @@ function encodeParam(param) {
       if (param.startsWith('0x')) {
         return Buffer.from(param.slice(2), 'hex')
       }
-      return Buffer.from(padZeros(param, 64), 'hex')
+      return Buffer.from(param, 'hex')
     case 'number':
-      return Buffer.from(padZeros(new BN(param).toString(16), 64), 'hex')
+      return Buffer.from(padZeros(param.toString(16), 4), 'hex')
     case 'boolean':
       return Buffer.from([param ? 1 : 0])
     default:
@@ -204,7 +204,7 @@ async function processMessage(message) {
 async function confirmKeygen(req, res) {
   logger.debug('Confirm keygen call')
   const { x, y, epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_KEYGEN, epoch, x, y)
+  const message = buildMessage(Action.CONFIRM_KEYGEN, epoch, padZeros(x, 64), padZeros(y, 64))
   await processMessage(message)
   res.send()
   logger.debug('Confirm keygen end')
@@ -230,7 +230,7 @@ async function confirmCloseEpoch(req, res) {
 
 async function voteStartVoting(req, res) {
   logger.info('Voting for starting new epoch voting process')
-  const epoch = boundX(await bridge.epoch())
+  const epoch = await bridge.epoch()
   const message = buildMessage(Action.VOTE_START_VOTING, epoch)
   await processMessage(message)
   res.send('Voted\n')
@@ -239,7 +239,7 @@ async function voteStartVoting(req, res) {
 
 async function voteStartKeygen(req, res) {
   logger.info('Voting for starting new epoch keygen')
-  const epoch = boundX(await bridge.epoch())
+  const epoch = await bridge.epoch()
   const message = buildMessage(Action.VOTE_START_KEYGEN, epoch)
   await processMessage(message)
   res.send('Voted\n')
@@ -248,7 +248,7 @@ async function voteStartKeygen(req, res) {
 
 async function voteCancelKeygen(req, res) {
   logger.info('Voting for cancelling new epoch keygen')
-  const epoch = boundX(await bridge.nextEpoch())
+  const epoch = await bridge.nextEpoch()
   const message = buildMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
   await processMessage(message)
   res.send('Voted\n')
@@ -258,8 +258,8 @@ async function voteCancelKeygen(req, res) {
 async function voteAddValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for adding new validator')
-    const epoch = boundX(await bridge.epoch())
-    const message = buildMessage(Action.VOTE_ADD_VALIDATOR, epoch, req.params.validator)
+    const epoch = await bridge.epoch()
+    const message = buildMessage(Action.VOTE_ADD_VALIDATOR, epoch, req.params.validator, padZeros('', 18))
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -269,12 +269,8 @@ async function voteAddValidator(req, res) {
 async function voteChangeThreshold(req, res) {
   if (/^[0-9]+$/.test(req.params.threshold)) {
     logger.info('Voting for changing threshold')
-    const epoch = boundX(await bridge.epoch())
-    const message = buildMessage(
-      Action.VOTE_CHANGE_THRESHOLD,
-      epoch,
-      parseInt(req.params.threshold, 10)
-    )
+    const epoch = await bridge.epoch()
+    const message = buildMessage(Action.VOTE_CHANGE_THRESHOLD, epoch, parseInt(req.params.threshold, 10), padZeros('', 54))
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -284,8 +280,8 @@ async function voteChangeThreshold(req, res) {
 async function voteChangeCloseEpoch(req, res) {
   if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
     logger.info('Voting for changing close epoch')
-    const epoch = boundX(await bridge.epoch())
-    const message = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, epoch, req.params.closeEpoch === 'true')
+    const epoch = await bridge.epoch()
+    const message = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, epoch, req.params.closeEpoch === 'true', padZeros('', 56))
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -295,8 +291,8 @@ async function voteChangeCloseEpoch(req, res) {
 async function voteRemoveValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for removing validator')
-    const epoch = boundX(await bridge.epoch())
-    const message = buildMessage(Action.VOTE_REMOVE_VALIDATOR, epoch, req.params.validator)
+    const epoch = await bridge.epoch()
+    const message = buildMessage(Action.VOTE_REMOVE_VALIDATOR, epoch, req.params.validator, padZeros('', 18))
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -310,7 +306,7 @@ async function transfer(req, res) {
   } = req.body
   if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
-    const message = buildMessage(Action.TRANSFER, epoch, hash, to, value)
+    const message = buildMessage(Action.TRANSFER, epoch, hash, to, padZeros(value, 24))
     logger.info(`Message for sign: ${message.toString('hex')}`)
     await processMessage(message)
   }
@@ -339,19 +335,19 @@ async function info(req, res) {
     ] = await Promise.all([
       bridge.getX().then((value) => new BN(value).toString(16)),
       bridge.getY().then((value) => new BN(value).toString(16)),
-      bridge.epoch().then(boundX),
-      bridge.getRangeSize().then(boundX),
-      bridge.getNextRangeSize().then(boundX),
+      bridge.epoch(),
+      bridge.getRangeSize(),
+      bridge.getNextRangeSize(),
       bridge.getCloseEpoch(),
       bridge.getNextCloseEpoch(),
-      bridge.getStartBlock().then(boundX),
-      bridge.getNonce().then(boundX),
-      bridge.nextEpoch().then(boundX),
-      bridge.getThreshold().then(boundX),
-      bridge.getNextThreshold().then(boundX),
+      bridge.getStartBlock(),
+      bridge.getNonce(),
+      bridge.nextEpoch(),
+      bridge.getThreshold(),
+      bridge.getNextThreshold(),
       bridge.getValidators(),
       bridge.getNextValidators(),
-      bridge.status().then(boundX),
+      bridge.status(),
       token.balanceOf(HOME_BRIDGE_ADDRESS)
         .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])

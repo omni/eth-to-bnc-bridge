@@ -15,17 +15,17 @@ const HOME_MAX_FETCH_RANGE_SIZE = parseInt(process.env.HOME_MAX_FETCH_RANGE_SIZE
 
 const provider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 const bridgeAbi = [
-  'event ExchangeRequest(uint value, uint nonce)',
-  'event EpochEnd(uint indexed epoch)',
-  'event NewEpoch(uint indexed oldEpoch, uint indexed newEpoch)',
-  'event NewEpochCancelled(uint indexed epoch)',
-  'event NewFundsTransfer(uint indexed oldEpoch, uint indexed newEpoch)',
-  'event EpochStart(uint indexed epoch, uint x, uint y)',
-  'event EpochClose(uint indexed epoch)',
+  'event ExchangeRequest(uint96 value, uint32 nonce)',
+  'event EpochEnd(uint16 indexed epoch)',
+  'event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
+  'event NewEpochCancelled(uint16 indexed epoch)',
+  'event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
+  'event EpochStart(uint16 indexed epoch, uint256 x, uint256 y)',
+  'event EpochClose(uint16 indexed epoch)',
   'event ForceSign()',
-  'function getThreshold(uint epoch) view returns (uint)',
-  'function getParties(uint epoch) view returns (uint)',
-  'function getRangeSize() view returns (uint)',
+  'function getThreshold(uint16 epoch) view returns (uint16)',
+  'function getParties(uint16 epoch) view returns (uint16)',
+  'function getRangeSize() view returns (uint16)',
   'function getValidators() view returns (address[])'
 ]
 const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, provider)
@@ -91,18 +91,18 @@ async function resetFutureMessages(queue) {
 }
 
 async function sendKeygen(event) {
-  const newEpoch = event.values.newEpoch.toNumber()
+  const { newEpoch } = event.values
   keygenQueue.send({
     epoch: newEpoch,
     blockNumber,
-    threshold: (await bridge.getThreshold(newEpoch)).toNumber(),
-    parties: (await bridge.getParties(newEpoch)).toNumber()
+    threshold: await bridge.getThreshold(newEpoch),
+    parties: await bridge.getParties(newEpoch)
   })
   logger.debug('Sent keygen start event')
 }
 
 function sendKeygenCancellation(event) {
-  const eventEpoch = event.values.epoch.toNumber()
+  const eventEpoch = event.values.epoch
   cancelKeygenQueue.send({
     epoch: eventEpoch,
     blockNumber
@@ -111,15 +111,14 @@ function sendKeygenCancellation(event) {
 }
 
 async function sendSignFundsTransfer(event) {
-  const newEpoch = event.values.newEpoch.toNumber()
-  const oldEpoch = event.values.oldEpoch.toNumber()
+  const { newEpoch, oldEpoch } = event.values
   signQueue.send({
     epoch: oldEpoch,
     blockNumber,
     newEpoch,
     nonce: foreignNonce[oldEpoch],
-    threshold: (await bridge.getThreshold(oldEpoch)).toNumber(),
-    parties: (await bridge.getParties(oldEpoch)).toNumber()
+    threshold: await bridge.getThreshold(oldEpoch),
+    parties: await bridge.getParties(oldEpoch)
   })
   logger.debug('Sent sign funds transfer event')
   foreignNonce[oldEpoch] += 1
@@ -150,7 +149,7 @@ async function sendSign(event, transactionHash) {
       y: publicKey.substr(68, 64)
     }),
     value: (new BN(event.values.value)).dividedBy(10 ** 18).toFixed(8, 3),
-    nonce: event.values.nonce.toNumber()
+    nonce: event.values.nonce
   }
 
   exchangeQueue.send(msgToQueue)
@@ -166,18 +165,18 @@ async function sendStartSign() {
     epoch,
     blockNumber,
     nonce: foreignNonce[epoch],
-    threshold: (await bridge.getThreshold(epoch)).toNumber(),
-    parties: (await bridge.getParties(epoch)).toNumber()
+    threshold: await bridge.getThreshold(epoch),
+    parties: await bridge.getParties(epoch)
   })
   foreignNonce[epoch] += 1
   redisTx.incr(`foreignNonce${epoch}`)
 }
 
 async function processEpochStart(event) {
-  epoch = event.values.epoch.toNumber()
+  epoch = event.values.epoch
   epochStart = blockNumber
   logger.info(`Epoch ${epoch} started`)
-  rangeSize = (await bridge.getRangeSize()).toNumber()
+  rangeSize = await bridge.getRangeSize()
   isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
@@ -194,8 +193,8 @@ async function sendEpochClose() {
     closeEpoch: epoch,
     blockNumber,
     nonce: foreignNonce[epoch],
-    threshold: (await bridge.getThreshold(epoch)).toNumber(),
-    parties: (await bridge.getParties(epoch)).toNumber()
+    threshold: await bridge.getThreshold(epoch),
+    parties: await bridge.getParties(epoch)
   })
   foreignNonce[epoch] += 1
   redisTx.incr(`foreignNonce${epoch}`)
@@ -220,7 +219,7 @@ async function initialize() {
     topics: bridge.filters.EpochStart().topics
   })).map((log) => bridge.interface.parseLog(log))
 
-  epoch = events.length ? events[events.length - 1].values.epoch.toNumber() : 0
+  epoch = events.length ? events[events.length - 1].values.epoch : 0
   logger.info(`Current epoch ${epoch}`)
   epochStart = events.length ? events[events.length - 1].blockNumber : 1
   const saved = (parseInt(await redis.get('homeBlock'), 10) + 1) || parseInt(HOME_START_BLOCK, 10)
@@ -237,7 +236,7 @@ async function initialize() {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`), 10) || 0
   }
-  rangeSize = (await bridge.getRangeSize()).toNumber()
+  rangeSize = await bridge.getRangeSize()
   logger.debug(`Range size ${rangeSize}`)
   logger.debug('Checking if current validator')
   isCurrentValidator = (await bridge.getValidators()).includes(validatorAddress)

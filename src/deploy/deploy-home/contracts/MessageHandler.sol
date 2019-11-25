@@ -9,7 +9,7 @@ contract MessageHandler is Government, MessageDecoder {
     mapping(bytes32 => bool) public handledMessages;
 
     function applyMessage(bytes memory message, bytes memory signatures) public {
-        (bytes32 msgHash, uint msgEpoch) = checkSignedMessage(message, signatures);
+        (bytes32 msgHash, uint16 msgEpoch) = checkSignedMessage(message, signatures);
         handledMessages[msgHash] = true;
 
         Action msgAction = Action(uint8(message[0]));
@@ -23,77 +23,78 @@ contract MessageHandler is Government, MessageDecoder {
         }
 
         if (msgAction == Action.CONFIRM_KEYGEN) {
-            require(message.length == 97, "Incorrect message length");
+            // [3,34] - x, [35,66] - y
+            require(message.length == 67, "Incorrect message length");
             (uint x, uint y) = _decodeKeygen(message);
             _confirmKeygen(x, y);
         } else if (msgAction == Action.CONFIRM_FUNDS_TRANSFER) {
-            require(message.length == 33, "Incorrect message length");
+            require(message.length == 3, "Incorrect message length");
             _confirmFundsTransfer();
         } else if (msgAction == Action.CONFIRM_CLOSE_EPOCH) {
-            require(message.length == 33, "Incorrect message length");
+            require(message.length == 3, "Incorrect message length");
             _confirmCloseEpoch();
         } else if (msgAction == Action.VOTE_START_VOTING) {
-            require(message.length == 33, "Incorrect message length");
+            require(message.length == 3, "Incorrect message length");
             _startVoting();
         } else if (msgAction == Action.VOTE_ADD_VALIDATOR) {
-            require(message.length == 53, "Incorrect message length");
+            // [3,22] - address, [23,31] - extra data
+            require(message.length == 32, "Incorrect message length");
             address validator = _decodeAddress(message);
             _addValidator(validator);
         } else if (msgAction == Action.VOTE_REMOVE_VALIDATOR) {
-            require(message.length == 53, "Incorrect message length");
+            // [3,22] - address, [23,31] - extra data
+            require(message.length == 32, "Incorrect message length");
             address validator = _decodeAddress(message);
             _removeValidator(validator);
         } else if (msgAction == Action.VOTE_CHANGE_THRESHOLD) {
-            require(message.length == 65, "Incorrect message length");
-            uint threshold = _decodeNumber(message);
+            // [3,4] - threshold, [5,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint16 threshold = _decodeUint16(message);
             _changeThreshold(threshold);
         } else if (msgAction == Action.VOTE_CHANGE_RANGE_SIZE) {
-            require(message.length == 65, "Incorrect message length");
-            uint rangeSize = _decodeNumber(message);
+            // [3,4] - rangeSize, [5,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint16 rangeSize = _decodeUint16(message);
             _changeRangeSize(rangeSize);
         } else if (msgAction == Action.VOTE_CHANGE_CLOSE_EPOCH) {
-            require(message.length == 34, "Incorrect message length");
+            // [3] - closeEpoch, [4,31] - extra data
+            require(message.length == 32, "Incorrect message length");
             bool closeEpoch = _decodeBoolean(message);
             _changeCloseEpoch(closeEpoch);
         } else if (msgAction == Action.VOTE_START_KEYGEN) {
-            require(message.length == 33, "Incorrect message length");
+            require(message.length == 3, "Incorrect message length");
             _startKeygen();
         } else if (msgAction == Action.VOTE_CANCEL_KEYGEN) {
-            require(message.length == 33, "Incorrect message length");
+            require(message.length == 3, "Incorrect message length");
             _cancelKeygen();
         } else if (msgAction == Action.TRANSFER) {
-            require(message.length == 117, "Incorrect message length");
-            (address to, uint value) = _decodeTransfer(message);
+            // [3,34] - txHash, [35,54] - address, [55,66] - value
+            require(message.length == 67, "Incorrect message length");
+            (address to, uint96 value) = _decodeTransfer(message);
             _transfer(to, value);
         } else {
             revert("Unknown message action");
         }
     }
 
-    function checkSignedMessage(bytes memory message, bytes memory signatures) view public returns (bytes32, uint) {
+    function checkSignedMessage(bytes memory message, bytes memory signatures) view public returns (bytes32, uint16) {
         require(signatures.length % SIGNATURE_SIZE == 0, "Incorrect signatures length");
 
         bytes32 msgHash;
-        if (message.length == 33) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n33", message));
-        } else if (message.length == 34) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n34", message));
-        } else if (message.length == 53) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n53", message));
-        } else if (message.length == 65) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n65", message));
-        } else if (message.length == 97) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n97", message));
-        } else if (message.length == 117) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n117", message));
+        if (message.length == 3) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
+        } else if (message.length == 32) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        } else if (message.length == 67) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
         } else {
             revert("Incorrect message length");
         }
         require(!handledMessages[msgHash], "Tx was already handled");
 
-        uint msgEpoch;
+        uint16 msgEpoch;
         assembly {
-            msgEpoch := mload(add(message, 33))
+            msgEpoch := mload(add(message, 3))
         }
         require(msgEpoch <= nextEpoch, "Invalid epoch number");
 

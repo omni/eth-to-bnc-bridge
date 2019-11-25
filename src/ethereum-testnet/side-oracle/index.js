@@ -7,8 +7,8 @@ const SIDE_MAX_FETCH_RANGE_SIZE = parseInt(process.env.SIDE_MAX_FETCH_RANGE_SIZE
 
 const bridgeAbi = [
   'function applyMessage(bytes message, bytes signatures)',
-  'function getThreshold(uint epoch) view returns (uint)',
-  'function getValidators(uint epoch) view returns (address[])'
+  'function getThreshold(uint16 epoch) view returns (uint16)',
+  'function getValidators(uint16 epoch) view returns (address[])'
 ]
 const sharedDbAbi = [
   'event NewMessage(bytes32 msgHash)',
@@ -31,7 +31,7 @@ async function delay(ms) {
 async function handleNewMessage(event) {
   const { msgHash } = event.values
   const message = await sharedDb.signedMessages(msgHash)
-  const epoch = parseInt(message.slice(4, 68), 16)
+  const epoch = parseInt(message.slice(4, 8), 16)
   const [threshold, validators] = await Promise.all([
     bridge.getThreshold(epoch),
     bridge.getValidators(epoch)
@@ -49,7 +49,8 @@ async function handleNewMessage(event) {
         gasLimit: 1000000,
         nonce
       })
-      await tx.wait()
+      const receipt = await tx.wait()
+      console.log(`Used gas: ${receipt.gasUsed.toNumber()}`)
       nonce += 1
       break
     }
@@ -89,7 +90,7 @@ async function loop() {
 
   for (let i = 0; i < bridgeEvents.length; i += 1) {
     const event = sharedDb.interface.parseLog(bridgeEvents[i])
-    console.log('Consumed event', event, bridgeEvents[i])
+    console.log('Consumed event', event)
     await handleNewMessage(event)
   }
 

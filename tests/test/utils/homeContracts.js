@@ -9,7 +9,7 @@ const abiToken = [
   'function allowance(address owner, address spender) view returns (uint)'
 ]
 const abiBridge = [
-  'function exchange(uint value)'
+  'function exchange(uint96 value)'
 ]
 
 const provider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)

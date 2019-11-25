@@ -15,18 +15,12 @@ contract SignedMessageStorage {
         require(rsv.length == 65, "Incorrect signature length");
 
         bytes32 msgHash;
-        if (message.length == 33) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n33", message));
-        } else if (message.length == 34) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n34", message));
-        } else if (message.length == 53) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n53", message));
-        } else if (message.length == 65) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n65", message));
-        } else if (message.length == 97) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n97", message));
-        } else if (message.length == 117) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n117", message));
+        if (message.length == 3) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
+        } else if (message.length == 32) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        } else if (message.length == 67) {
+            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
         } else {
             revert("Incorrect message length");
         }

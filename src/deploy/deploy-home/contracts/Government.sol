@@ -24,7 +24,7 @@ contract Government is BasicBridge {
         states[nextEpoch].nonce = UPPER_BOUND;
         if (nextEpoch == 1) {
             status = Status.READY;
-            states[nextEpoch].startBlock = block.number;
+            states[nextEpoch].startBlock = uint32(block.number);
             epoch = nextEpoch;
             emit EpochStart(epoch, x, y);
         }
@@ -38,7 +38,7 @@ contract Government is BasicBridge {
         require(epoch > 0, "First epoch does not need funds transfer");
 
         status = Status.READY;
-        states[nextEpoch].startBlock = block.number;
+        states[nextEpoch].startBlock = uint32(block.number);
         epoch = nextEpoch;
         emit EpochStart(epoch, getX(), getY());
     }
@@ -49,7 +49,7 @@ contract Government is BasicBridge {
     }
 
     function _startVoting() internal ready {
-        states[epoch].endBlock = block.number;
+        states[epoch].endBlock = uint32(block.number);
         nextEpoch++;
         states[nextEpoch].threshold = getThreshold();
         states[nextEpoch].validators = getValidators();
@@ -76,23 +76,24 @@ contract Government is BasicBridge {
     function _removeValidator(address validator) internal voting {
         require(getNextPartyId(validator) != 0, "Already not a validator");
 
-        for (uint i = 0; i < getNextParties() - 1; i++) {
+        uint16 lastPartyId = getNextParties() - 1;
+        for (uint i = 0; i < lastPartyId; i++) {
             if (states[nextEpoch].validators[i] == validator) {
-                states[nextEpoch].validators[i] = getNextValidators()[getNextParties() - 1];
+                states[nextEpoch].validators[i] = getNextValidators()[lastPartyId];
                 break;
             }
         }
-        delete states[nextEpoch].validators[getNextParties() - 1];
+        delete states[nextEpoch].validators[lastPartyId];
         states[nextEpoch].validators.length--;
     }
 
-    function _changeThreshold(uint threshold) internal voting {
+    function _changeThreshold(uint16 threshold) internal voting {
         require(threshold > 0, "Invalid threshold value");
 
         states[nextEpoch].threshold = threshold;
     }
 
-    function _changeRangeSize(uint rangeSize) internal voting {
+    function _changeRangeSize(uint16 rangeSize) internal voting {
         require(rangeSize > 0, "Invalid range size");
 
         states[nextEpoch].rangeSize = rangeSize;
@@ -116,7 +117,7 @@ contract Government is BasicBridge {
         emit NewEpochCancelled(nextEpoch);
     }
 
-    function _transfer(address to, uint value) internal {
+    function _transfer(address to, uint96 value) internal {
         if (tokenContract.balanceOf(address(this)) >= value) {
             tokenContract.transfer(to, value);
         } else {

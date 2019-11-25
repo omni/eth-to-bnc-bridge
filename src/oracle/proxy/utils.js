@@ -23,17 +23,8 @@ function decodeStatus(status) {
   }
 }
 
-function boundX(x) {
-  try {
-    return x.toNumber()
-  } catch (e) {
-    return -1
-  }
-}
-
 module.exports = {
   Ok,
   Err,
-  decodeStatus,
-  boundX
+  decodeStatus
 }
