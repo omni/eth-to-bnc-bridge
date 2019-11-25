@@ -9,6 +9,12 @@ const { publicKeyToAddress } = require('./crypto')
 const { delay } = require('./wait')
 
 const { RABBITMQ_URL, PROXY_URL } = process.env
+const KEYGEN_ATTEMPT_TIMEOUT = parseInt(process.env.KEYGEN_ATTEMPT_TIMEOUT, 10)
+const KEYGEN_EPOCH_CHECK_INTERVAL = parseInt(process.env.KEYGEN_EPOCH_CHECK_INTERVAL, 10)
+
+const KEYGEN_OK = 0
+const KEYGEN_EPOCH_INTERRUPT = 1
+const KEYGEN_FAILED = 2
 
 const app = express()
 
@@ -34,6 +40,54 @@ function writeParams(parties, threshold) {
   }))
 }
 
+function killKeygen() {
+  exec.execSync('pkill gg18_keygen || true')
+}
+
+function keygen(keysFile, epoch) {
+  let restartTimeoutId
+  let epochDaemonIntervalId
+  let epochInterrupt
+
+  return new Promise((resolve) => {
+    const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], (error) => {
+      logger.trace('Keygen entrypoint exited, %o', error)
+      clearTimeout(restartTimeoutId)
+      clearInterval(epochDaemonIntervalId)
+      currentKeygenEpoch = null
+      if (fs.existsSync(keysFile)) {
+        logger.info(`Finished keygen for epoch ${epoch}`)
+        resolve(KEYGEN_OK)
+      } else {
+        logger.warn(`Keygen for epoch ${epoch} failed, will start new attempt`)
+        resolve(epochInterrupt ? KEYGEN_EPOCH_INTERRUPT : KEYGEN_FAILED)
+      }
+    })
+    cmd.stdout.on('data', (data) => {
+      const str = data.toString()
+      if (str.includes('Got all party signups')) {
+        restartTimeoutId = setTimeout(killKeygen, KEYGEN_ATTEMPT_TIMEOUT)
+      }
+      logger.debug(str)
+    })
+    cmd.stderr.on('data', (data) => logger.debug(data.toString()))
+
+    // Kill keygen if keygen for current epoch is already confirmed
+    epochDaemonIntervalId = setInterval(async () => {
+      logger.info(`Checking if bridge has confirmations keygen for epoch ${epoch}`)
+      const { bridgeEpoch, bridgeStatus } = (await proxyClient.get('/status')).data
+      logger.trace(`Current bridge epoch: ${bridgeEpoch}, current bridge status: ${bridgeStatus}`)
+      if (bridgeEpoch > epoch || bridgeStatus > 3) {
+        logger.info(`Bridge has already confirmed keygen for epoch ${epoch}`)
+        epochInterrupt = true
+        // Additional delay, maybe keygen will eventually finish
+        await delay(5000)
+        killKeygen()
+      }
+    }, KEYGEN_EPOCH_CHECK_INTERVAL)
+  })
+}
+
 async function keygenConsumer(msg) {
   const { epoch, parties, threshold } = JSON.parse(msg.content)
   logger.info(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
@@ -44,23 +98,26 @@ async function keygenConsumer(msg) {
   currentKeygenEpoch = epoch
 
   writeParams(parties, threshold)
-  const cmd = exec.execFile('./keygen-entrypoint.sh', [PROXY_URL, keysFile], async () => {
-    currentKeygenEpoch = null
-    if (fs.existsSync(keysFile)) {
-      logger.info(`Finished keygen for epoch ${epoch}`)
+
+  while (true) {
+    const keygenResult = await keygen(keysFile, epoch)
+
+    if (keygenResult === KEYGEN_OK) {
       const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
       logger.warn(`Generated multisig account in binance chain: ${publicKeyToAddress(publicKey)}`)
 
       logger.info('Sending keys confirmation')
       await confirmKeygen(publicKey, epoch)
-    } else {
-      logger.warn(`Keygen for epoch ${epoch} failed`)
+      break
+    } else if (keygenResult === KEYGEN_EPOCH_INTERRUPT) {
+      logger.warn('Keygen was interrupted by epoch daemon')
+      break
     }
-    logger.debug('Ack for keygen message')
-    channel.ack(msg)
-  })
-  cmd.stdout.on('data', (data) => logger.debug(data.toString()))
-  cmd.stderr.on('data', (data) => logger.debug(data.toString()))
+
+    await delay(1000)
+  }
+  logger.info('Acking message')
+  channel.ack(msg)
 }
 
 async function main() {
@@ -81,7 +138,7 @@ async function main() {
     logger.info(`Consumed new cancel event for epoch ${epoch} keygen`)
     if (currentKeygenEpoch === epoch) {
       logger.info('Cancelling current keygen')
-      exec.execSync('pkill gg18_keygen || true')
+      killKeygen()
     }
     channel.ack(msg)
   })

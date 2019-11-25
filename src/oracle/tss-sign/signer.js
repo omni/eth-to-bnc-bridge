@@ -213,6 +213,8 @@ function sign(keysFile, tx, publicKey, signerAddress) {
       if (sequence > tx.tx.sequence) {
         logger.info('Account already has needed nonce, cancelling current sign process')
         nonceInterrupt = true
+        // Additional delay, maybe signer will eventually finish
+        await delay(5000)
         killSigner()
       }
     }, SIGN_NONCE_CHECK_INTERVAL)

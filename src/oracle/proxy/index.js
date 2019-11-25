@@ -73,6 +73,19 @@ function sideSendQuery(query) {
   })
 }
 
+async function status(req, res) {
+  logger.debug('Status call')
+  const [bridgeEpoch, bridgeStatus] = await Promise.all([
+    bridge.epoch(),
+    bridge.status()
+  ])
+  res.send({
+    bridgeEpoch,
+    bridgeStatus
+  })
+  logger.debug('Status end')
+}
+
 async function get(req, res) {
   logger.debug('Get call, %o', req.body.key)
   const round = req.body.key.second
@@ -131,12 +144,26 @@ async function signupKeygen(req, res) {
   const epoch = await bridge.nextEpoch()
   const partyId = await bridge.getNextPartyId(validatorAddress)
 
+  logger.debug('Checking previous attempts')
+  let attempt = 1
+  let uuid
+  while (true) {
+    uuid = `k${epoch}_${attempt}`
+    const data = await sharedDb.getData(validatorAddress, ethers.utils.id(uuid), ethers.utils.id('round1_0'))
+    if (data.length === 2) {
+      break
+    }
+    logger.trace(`Attempt ${attempt} is already used`)
+    attempt += 1
+  }
+  logger.debug(`Using attempt ${attempt}`)
+
   if (partyId === 0) {
     res.send(Err({ message: 'Not a validator' }))
     logger.debug('Not a validator')
   } else {
     res.send(Ok({
-      uuid: `k${epoch}`,
+      uuid,
       number: partyId
     }))
     logger.debug('SignupKeygen end')
@@ -287,6 +314,22 @@ async function voteChangeThreshold(req, res) {
   }
 }
 
+async function voteChangeRangeSize(req, res) {
+  if (/^[0-9]+$/.test(req.params.rangeSize)) {
+    logger.info('Voting for changing range size')
+    const epoch = await bridge.epoch()
+    const message = buildMessage(
+      Action.VOTE_CHANGE_RANGE_SIZE,
+      epoch,
+      parseInt(req.params.rangeSize, 10),
+      padZeros(req.attempt, 54)
+    )
+    await processMessage(message)
+    res.send('Voted\n')
+    logger.info('Voted successfully')
+  }
+}
+
 async function voteChangeCloseEpoch(req, res) {
   if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
     logger.info('Voting for changing close epoch')
@@ -350,7 +393,7 @@ async function info(req, res) {
   try {
     const [
       x, y, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch, epochStartBlock,
-      foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, status,
+      foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, bridgeStatus,
       homeBalance
     ] = await Promise.all([
       bridge.getX().then((value) => new BN(value).toString(16)),
@@ -394,7 +437,7 @@ async function info(req, res) {
       homeBalance,
       foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
       foreignBalanceNative: parseFloat(balances.BNB) || 0,
-      bridgeStatus: decodeStatus(status)
+      bridgeStatus: decodeStatus(bridgeStatus)
     }
     logger.trace('%o', msg)
     res.send(msg)
@@ -407,6 +450,8 @@ async function info(req, res) {
   }
   logger.debug('Info end')
 }
+
+app.get('/status', status)
 
 app.post('/get', get)
 app.post('/set', set)
@@ -437,6 +482,7 @@ votesProxyApp.use('/vote', (req, res, next) => {
 votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
+votesProxyApp.get('/vote/changeRangeSize/:rangeSize', voteChangeRangeSize)
 votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
 

@@ -31,6 +31,8 @@ services:
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
+      - KEYGEN_ATTEMPT_TIMEOUT
+      - KEYGEN_EPOCH_CHECK_INTERVAL
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
