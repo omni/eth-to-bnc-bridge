@@ -25,5 +25,5 @@ docker cp "tests:/tests/results.xml" "./tests/results.xml" > /dev/null 2>&1 || t
 
 echo "Killing all remaining docker containers"
 docker kill $(docker ps | grep validator[1-3]_ | awk '{print $1}') > /dev/null 2>&1 || true
-docker kill ganache_home ganache_side > /dev/null 2>&1 || true
+docker kill $(docker ps | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
 docker kill $(docker ps | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true

@@ -259,7 +259,12 @@ async function voteAddValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for adding new validator')
     const epoch = await bridge.epoch()
-    const message = buildMessage(Action.VOTE_ADD_VALIDATOR, epoch, req.params.validator, padZeros('', 18))
+    const message = buildMessage(
+      Action.VOTE_ADD_VALIDATOR,
+      epoch,
+      req.params.validator,
+      padZeros(req.attempt, 18)
+    )
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -270,7 +275,12 @@ async function voteChangeThreshold(req, res) {
   if (/^[0-9]+$/.test(req.params.threshold)) {
     logger.info('Voting for changing threshold')
     const epoch = await bridge.epoch()
-    const message = buildMessage(Action.VOTE_CHANGE_THRESHOLD, epoch, parseInt(req.params.threshold, 10), padZeros('', 54))
+    const message = buildMessage(
+      Action.VOTE_CHANGE_THRESHOLD,
+      epoch,
+      parseInt(req.params.threshold, 10),
+      padZeros(req.attempt, 54)
+    )
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -281,7 +291,12 @@ async function voteChangeCloseEpoch(req, res) {
   if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
     logger.info('Voting for changing close epoch')
     const epoch = await bridge.epoch()
-    const message = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, epoch, req.params.closeEpoch === 'true', padZeros('', 56))
+    const message = buildMessage(
+      Action.VOTE_CHANGE_CLOSE_EPOCH,
+      epoch,
+      req.params.closeEpoch === 'true',
+      padZeros(req.attempt, 56)
+    )
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -292,7 +307,12 @@ async function voteRemoveValidator(req, res) {
   if (ethers.utils.isHexString(req.params.validator, 20)) {
     logger.info('Voting for removing validator')
     const epoch = await bridge.epoch()
-    const message = buildMessage(Action.VOTE_REMOVE_VALIDATOR, epoch, req.params.validator, padZeros('', 18))
+    const message = buildMessage(
+      Action.VOTE_REMOVE_VALIDATOR,
+      epoch,
+      req.params.validator,
+      padZeros(req.attempt, 18)
+    )
     await processMessage(message)
     res.send('Voted\n')
     logger.info('Voted successfully')
@@ -406,6 +426,14 @@ votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
 votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
+
+votesProxyApp.use('/vote', (req, res, next) => {
+  if (/^[0-9]*$/.test(req.query.attempt)) {
+    req.attempt = req.query.attempt ? parseInt(req.query.attempt, 10).toString(16) : '0'
+    logger.debug(`Vote attempt 0x${req.attempt}`)
+    next()
+  }
+})
 
 async function main() {
   sideValidatorNonce = await sideWallet.getTransactionCount()
