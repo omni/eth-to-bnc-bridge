@@ -309,7 +309,7 @@ async function consumer(msg) {
   writeParams(parties, threshold)
   let attempt = 1
 
-  const { tx, exchanges } = buildTx(from, account, data, attempt)
+  const { tx, exchanges } = await buildTx(from, account, data, attempt)
 
   while (tx !== null) {
     const signResult = await sign(keysFile, tx, publicKey, from)

@@ -18,7 +18,7 @@ services:
       - '8545:8545'
     volumes:
       - 'ganache_home_data:/app/db'
-  side_oracle:
+  side-oracle:
     build: side-oracle
     image: side-oracle
     env_file: side-oracle/.env.development

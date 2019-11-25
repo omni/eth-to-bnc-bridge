@@ -333,7 +333,7 @@ Make sure, to first run demo in development mode, before trying to run it in the
    docker kill binance-testnet_api-server_1
    docker kill ethereum-testnet_ganache_home_1
    docker kill ethereum-testnet_ganache_side_1
-   docker kill ethereum-testnet_side_oracle_1
+   docker kill ethereum-testnet_side-oracle_1
    ```
 3. Remove testnets and validators data:
    ```

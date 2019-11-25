@@ -92,9 +92,10 @@ orbs:
           - run:
               name: "Save ganache logs"
               command: |
-                mkdir -p ./artifacts/logs/ganache
-                docker logs ganache_home > ./artifacts/logs/ganache/home.log
-                docker logs ganache_side > ./artifacts/logs/ganache/side.log
+                mkdir -p ./artifacts/logs/ethereum
+                docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log
+                docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ganache/ganache_home.log
+                docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ganache/ganache_side.log
               when: always
           - run:
               name: "Save binance logs"
