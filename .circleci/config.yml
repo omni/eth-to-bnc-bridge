@@ -90,7 +90,7 @@ orbs:
           - save_docker_logs:
               validator: 3
           - run:
-              name: "Save ganache logs"
+              name: "Save ethereum logs"
               command: |
                 mkdir -p ./artifacts/logs/ethereum
                 docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log

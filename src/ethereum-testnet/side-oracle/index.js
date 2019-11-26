@@ -58,14 +58,22 @@ async function handleNewMessage(event) {
 }
 
 async function initialize() {
-  await delay(5000)
-  sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
-  homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
-  homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
-  bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
-  sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
+  while (true) {
+    try {
+      sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
+      homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 
-  nonce = await homeWallet.getTransactionCount()
+      homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
+      bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
+      sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
+
+      nonce = await homeWallet.getTransactionCount()
+      break
+    } catch (e) {
+      console.log('Cannot create providers')
+      await delay(1000)
+    }
+  }
 }
 
 async function loop() {
