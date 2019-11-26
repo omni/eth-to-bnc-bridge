@@ -1,0 +1,13 @@
+{
+  "name": "tests",
+  "version": "0.0.1",
+  "dependencies": {
+    "ethers": "4.0.38",
+    "axios": "0.19.0",
+    "@binance-chain/javascript-sdk": "2.16.1",
+    "bignumber.js": "9.0.0"
+  },
+  "engines": {
+    "node": ">=10.6.0"
+  }
+}

@@ -6,6 +6,6 @@ COPY package.json /test/
 
 RUN npm install
 
-COPY testGetEthereumBalance.js IERC20.json /test/
+COPY testGetEthereumBalance.js /test/
 
 ENTRYPOINT ["node", "testGetEthereumBalance.js"]

@@ -9,8 +9,6 @@ RUN npm install truffle-hdwallet-provider
 
 RUN truffle obtain --solc 0.5.9
 
-COPY truffle-config-build.js /build/truffle-config.js
-
 RUN mkdir temp \
  && cd temp \
  && truffle init \
@@ -19,6 +17,7 @@ RUN mkdir temp \
  && cd .. \
  && rm -rf temp
 
+COPY truffle-config-build.js /build/truffle-config.js
 COPY contracts/openzeppelin-solidity /build/contracts/openzeppelin-solidity
 
 RUN truffle compile

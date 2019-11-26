@@ -9,26 +9,23 @@ services:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
-      - HOME_CHAIN_ID
       - SIDE_RPC_URL
       - SIDE_SHARED_DB_ADDRESS
-      - SIDE_CHAIN_ID
       - VALIDATOR_PRIVATE_KEY
       - FOREIGN_URL
       - FOREIGN_ASSET
       - LOG_LEVEL
-      - "GAS_LIMIT_FACTOR=3"
-      - "MAX_GAS_LIMIT=6000000"
-    volumes:
-      - '../deploy/deploy-test/build/contracts/IERC20.json:/proxy/contracts_data/IERC20.json'
-      - '../deploy/deploy-home/build/contracts/Bridge.json:/proxy/contracts_data/Bridge.json'
-      - '../deploy/deploy-side/build/contracts/SharedDB.json:/proxy/contracts_data/SharedDB.json'
+      - 'GAS_LIMIT_FACTOR=3'
+      - 'MAX_GAS_LIMIT=6000000'
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
-      - test_network
-      - blockchain_home
-      - blockchain_side
+      test_network:
+        aliases:
+          - local_proxy
+      ethereum_home_rpc_net:
+      ethereum_side_rpc_net:
+      binance_net:
   keygen:
     image: keygen-client
     build:
@@ -36,10 +33,14 @@ services:
       context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
+      - KEYGEN_ATTEMPT_TIMEOUT
+      - KEYGEN_EPOCH_CHECK_INTERVAL
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
+    ports:
+      - '${KEYGEN_RESTART_PORT}:8001'
     networks:
       - test_network
   signer:
@@ -49,10 +50,13 @@ services:
       context: .
     environment:
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
       - FOREIGN_CHAIN_ID
       - FOREIGN_URL
       - FOREIGN_ASSET
+      - SIGN_ATTEMPT_TIMEOUT
+      - SIGN_NONCE_CHECK_INTERVAL
+      - SEND_TIMEOUT
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
@@ -60,12 +64,14 @@ services:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
       - test_network
+      - binance_net
   redis:
-    image: redis:5.0.5-alpine
+    image: redis
+    build:
+      dockerfile: redis/Dockerfile
+      context: .
     volumes:
       - '${PWD}/${TARGET_NETWORK}/db:/data'
-      - './configs/redis.conf:/usr/local/etc/redis/redis.conf'
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     networks:
       - test_network
   rabbitmq:
@@ -86,17 +92,15 @@ services:
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
-      - HOME_CHAIN_ID
       - HOME_START_BLOCK
       - BLOCKS_RANGE_SIZE
       - VALIDATOR_PRIVATE_KEY
+      - HOME_MAX_FETCH_RANGE_SIZE
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
-    volumes:
-      - '../deploy/deploy-home/build/contracts/Bridge.json:/watcher/contracts_data/Bridge.json'
     networks:
       - test_network
-      - blockchain_home
+      - ethereum_home_rpc_net
   bnc-watcher:
     build:
       dockerfile: bncWatcher/Dockerfile
@@ -106,15 +110,21 @@ services:
       - FOREIGN_URL
       - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
+      - 'PROXY_URL=http://local_proxy:8001'
+      - FOREIGN_FETCH_MAX_TIME_INTERVAL
+      - FOREIGN_FETCH_INTERVAL
+      - FOREIGN_FETCH_BLOCK_TIME_OFFSET
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - test_network
+      - binance_net
 networks:
   test_network:
-  blockchain_side:
+  ethereum_side_rpc_net:
     external: true
-  blockchain_home:
+  ethereum_home_rpc_net:
+    external: true
+  binance_net:
     external: true

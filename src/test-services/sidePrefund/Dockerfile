@@ -6,6 +6,6 @@ COPY package.json /test/
 
 RUN npm install
 
-COPY testEthereumSend.js /test/
+COPY testSidePrefund.js /test/
 
-ENTRYPOINT ["node", "testEthereumSend.js"]
+ENTRYPOINT ["node", "testSidePrefund.js"]

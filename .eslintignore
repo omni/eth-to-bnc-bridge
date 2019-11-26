@@ -1,0 +1,8 @@
+node_modules/
+data/
+demo/validator*/development
+demo/validator*/staging
+src/deploy/deploy/*/build
+src/deploy/deploy-home/contracts/openzeppelin-solidity
+src/deploy/deploy-test/contracts/openzeppelin-solidity
+src/tss/multi-party-ecdsa
