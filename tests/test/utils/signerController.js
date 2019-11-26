@@ -3,14 +3,14 @@ const axios = require('axios')
 function createController(validatorId) {
   const url = `http://validator${validatorId}_signer_1:8001/`
 
-  const sideClient = axios.create({
+  const signerClient = axios.create({
     baseURL: url,
     timeout: 10000
   })
 
   return {
     async restart() {
-      await sideClient.get('/restart')
+      await signerClient.get('/restart')
     }
   }
 }

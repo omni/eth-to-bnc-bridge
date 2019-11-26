@@ -44,6 +44,12 @@ function killKeygen() {
   exec.execSync('pkill gg18_keygen || true')
 }
 
+function restart(req, res) {
+  logger.info('Manual cancelling current keygen attempt')
+  killKeygen()
+  res.send('Done')
+}
+
 function keygen(keysFile, epoch) {
   let restartTimeoutId
   let epochDaemonIntervalId
@@ -144,7 +150,7 @@ async function main() {
   })
 }
 
-
+app.get('/restart', restart)
 app.get('/start', (req, res) => {
   logger.info('Ready to start')
   ready = true

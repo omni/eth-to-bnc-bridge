@@ -39,6 +39,8 @@ services:
       - LOG_LEVEL
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
+    ports:
+      - '${KEYGEN_RESTART_PORT}:8001'
     networks:
       - test_network
   signer:

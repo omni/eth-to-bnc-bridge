@@ -2,16 +2,21 @@ const assert = require('assert')
 
 const { waitPromise, delay } = require('./utils/wait')
 const { getBepBalance, getBncFlags } = require('./utils/bncController')
-
+const { getNonce } = require('./utils/sideController')
 const { controller1, controller2, controller3 } = require('./utils/proxyController')
+const { keygenController1 } = require('./utils/keygenController')
+
+const { validators } = require('../config')
 
 module.exports = (newThreshold) => {
   describe('change threshold', function () {
     let info
     let initialInfo
+    let validatorNonce
 
     before(async function () {
       initialInfo = await controller1.getInfo()
+      validatorNonce = await getNonce(validators[0])
       info = initialInfo
     })
 
@@ -89,8 +94,17 @@ module.exports = (newThreshold) => {
       assert.strictEqual(info.nextThreshold, newThreshold, 'Next threshold is not set correctly')
     })
 
-    it('should finish keygen process and start funds transfer', async function () {
+    it('should start keys generation', async function () {
       this.timeout(120000)
+      await waitPromise(
+        () => getNonce(validators[0]),
+        (nonce) => nonce > validatorNonce + 2
+      )
+    })
+
+    it('should restart keygen generation and regenerate keys properly, should start funds transfer', async function () {
+      this.timeout(360000)
+      await keygenController1.restart()
       info = await waitPromise(controller1.getInfo, (newInfo) => newInfo.bridgeStatus === 'funds_transfer')
       const flags = await getBncFlags(initialInfo.foreignBridgeAddress)
       assert.strictEqual(flags, 0, 'Foreign bridge flags are not set correctly')
