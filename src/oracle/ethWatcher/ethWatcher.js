@@ -23,6 +23,8 @@ const bridgeAbi = [
   'event EpochStart(uint16 indexed epoch, uint256 x, uint256 y)',
   'event EpochClose(uint16 indexed epoch)',
   'event ForceSign()',
+  'function getX(uint16 epoch) view returns (uint256)',
+  'function getY(uint16 epoch) view returns (uint256)',
   'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getParties(uint16 epoch) view returns (uint16)',
   'function getRangeSize(uint16 epoch) view returns (uint16)',
@@ -92,11 +94,15 @@ async function resetFutureMessages(queue) {
 
 async function sendKeygen(event) {
   const { newEpoch } = event.values
+  const [threshold, parties] = await Promise.all([
+    bridge.getThreshold(newEpoch),
+    bridge.getParties(newEpoch)
+  ])
   keygenQueue.send({
     epoch: newEpoch,
     blockNumber,
-    threshold: await bridge.getThreshold(newEpoch),
-    parties: await bridge.getParties(newEpoch)
+    threshold,
+    parties
   })
   logger.debug('Sent keygen start event')
 }
@@ -112,13 +118,26 @@ function sendKeygenCancellation(event) {
 
 async function sendSignFundsTransfer(event) {
   const { newEpoch, oldEpoch } = event.values
+  const [
+    x, y, threshold, parties
+  ] = await Promise.all([
+    bridge.getX(newEpoch).then((value) => new BN(value).toString(16)),
+    bridge.getY(newEpoch).then((value) => new BN(value).toString(16)),
+    bridge.getThreshold(oldEpoch),
+    bridge.getParties(oldEpoch)
+  ])
+  const recipient = publicKeyToAddress({
+    x,
+    y
+  })
   signQueue.send({
     epoch: oldEpoch,
     blockNumber,
     newEpoch,
     nonce: foreignNonce[oldEpoch],
-    threshold: await bridge.getThreshold(oldEpoch),
-    parties: await bridge.getParties(oldEpoch)
+    recipient,
+    threshold,
+    parties
   })
   logger.debug('Sent sign funds transfer event')
   foreignNonce[oldEpoch] += 1
@@ -161,12 +180,16 @@ async function sendSign(event, transactionHash) {
 }
 
 async function sendStartSign() {
+  const [threshold, parties] = await Promise.all([
+    bridge.getThreshold(epoch),
+    bridge.getParties(epoch)
+  ])
   signQueue.send({
     epoch,
     blockNumber,
     nonce: foreignNonce[epoch],
-    threshold: await bridge.getThreshold(epoch),
-    parties: await bridge.getParties(epoch)
+    threshold,
+    parties
   })
   foreignNonce[epoch] += 1
   redisTx.incr(`foreignNonce${epoch}`)
@@ -189,12 +212,16 @@ async function processEpochStart(event) {
 
 async function sendEpochClose() {
   logger.debug(`Consumed epoch ${epoch} close event`)
+  const [threshold, parties] = await Promise.all([
+    bridge.getThreshold(epoch),
+    bridge.getParties(epoch)
+  ])
   signQueue.send({
     closeEpoch: epoch,
     blockNumber,
     nonce: foreignNonce[epoch],
-    threshold: await bridge.getThreshold(epoch),
-    parties: await bridge.getParties(epoch)
+    threshold,
+    parties
   })
   foreignNonce[epoch] += 1
   redisTx.incr(`foreignNonce${epoch}`)

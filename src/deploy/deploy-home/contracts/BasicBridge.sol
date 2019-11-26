@@ -123,11 +123,19 @@ contract BasicBridge {
     }
 
     function getX() view public returns (uint) {
-        return states[epoch].x;
+        return getX(epoch);
+    }
+
+    function getX(uint16 _epoch) view public returns (uint) {
+        return states[_epoch].x;
     }
 
     function getY() view public returns (uint) {
-        return states[epoch].y;
+        return getY(epoch);
+    }
+
+    function getY(uint16 _epoch) view public returns (uint) {
+        return states[_epoch].y;
     }
 
     function getCloseEpoch() view public returns (bool) {
