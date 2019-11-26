@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/k1rill-fedoseev/eth-to-bnc-bridge/tree/dev.svg?style=svg)](https://circleci.com/gh/k1rill-fedoseev/eth-to-bnc-bridge/tree/dev)
+
 ## Ethereum to Binance Chain bridge
 
 This repository contains a proof-of-concept for ERC20-to-BEP2 bridge.

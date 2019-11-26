@@ -1,0 +1,172 @@
+version: 2.1
+orbs:
+  bridge:
+    executors:
+      node-dev:
+        docker:
+          - image: circleci/node:10.15
+        environment:
+          TARGET_NETWORK: development
+    commands:
+      fetch_repo:
+        description: "Checkout and init submodules"
+        steps:
+          - checkout
+          - run:
+              name: "Initialize submodules"
+              command: git submodule update --init
+      setup_docker:
+        description: "Set up remote docker engine"
+        steps:
+          - setup_remote_docker:
+              version: 18.09.3
+              docker_layer_caching: true
+      restore_tss_image:
+        description: "Restores tss image from cache"
+        steps:
+          - restore_cache:
+              name: "Restore tss image from cache"
+              key: "tss-v1-{{ .Branch }}"
+          - load_tss
+      save_tss:
+        description: "Save tss image to workspace"
+        steps:
+          - run:
+              name: "Save tss image to archive"
+              command: |
+                mkdir -p ./workspace
+                docker save tss | gzip > ./workspace/tss.tar.gz
+          - persist_to_workspace:
+              name: "Save tss image to workspace"
+              root: ./workspace
+              paths:
+                - tss.tar.gz
+          - save_cache:
+              name: "Save tss image to cache"
+              paths:
+                - ./workspace/tss.tar.gz
+              key: "tss-v1-{{ .Branch }}"
+      load_tss:
+        description: "Load tss image from workspace"
+        steps:
+          - run:
+              name: "Load tss image from archive"
+              command: docker load -i ./workspace/tss.tar.gz || true
+      save_docker_logs:
+        description: "Save docker logs"
+        parameters:
+          validator:
+            type: integer
+            default: 1
+        steps:
+          - run:
+              name: "Saving validator<< parameters.validator >> logs"
+              command: |
+                mkdir -p ./artifacts/logs/validator<< parameters.validator >>
+                docker logs validator<< parameters.validator >>_rabbitmq_1 > ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
+                docker logs validator<< parameters.validator >>_redis_1 > ./artifacts/logs/validator<< parameters.validator >>/redis.log
+                docker logs validator<< parameters.validator >>_proxy_1 > ./artifacts/logs/validator<< parameters.validator >>/proxy.log
+                docker logs validator<< parameters.validator >>_eth-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/eth-watcher.log
+                docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
+                docker logs validator<< parameters.validator >>_signer_1 > ./artifacts/logs/validator<< parameters.validator >>/signer.log
+                docker logs validator<< parameters.validator >>_keygen_1 > ./artifacts/logs/validator<< parameters.validator >>/keygen.log
+              when: always
+      save_artifacts:
+        description: "Save and upload tests results, save validator logs to artifacts"
+        steps:
+          - run:
+              name: "Save tests results"
+              command: |
+                mkdir -p ./artifacts/test_results/mocha
+                docker cp "tests:/tests/results.xml" "./artifacts/test_results/mocha/results.xml"
+              when: always
+          - store_test_results:
+              path: ./artifacts/test_results/mocha
+              when: always
+          - save_docker_logs:
+              validator: 1
+          - save_docker_logs:
+              validator: 2
+          - save_docker_logs:
+              validator: 3
+          - run:
+              name: "Save ethereum logs"
+              command: |
+                mkdir -p ./artifacts/logs/ethereum
+                docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log
+                docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ethereum/ganache_home.log
+                docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ethereum/ganache_side.log
+              when: always
+          - run:
+              name: "Save binance logs"
+              command: |
+                mkdir -p ./artifacts/logs/binance
+                docker logs binance-testnet_node_1 > ./artifacts/logs/binance/node.log
+                docker logs binance-testnet_api-server_1 > ./artifacts/logs/binance/api-server.log
+                docker logs binance-testnet_http-api_1 > ./artifacts/logs/binance/http-api.log
+              when: always
+          - store_artifacts:
+              path: ./artifacts
+              destination: artifacts
+              when: always
+jobs:
+  init_tss:
+    executor: bridge/node-dev
+    steps:
+      - bridge/fetch_repo
+      - bridge/setup_docker
+      - bridge/restore_tss_image
+      - run:
+          name: "Build tss image"
+          command: docker build --cache-from tss -t tss ./src/tss || docker build -t tss ./src/tss
+      - bridge/save_tss
+  run_tests:
+    executor: bridge/node-dev
+    steps:
+      - bridge/fetch_repo
+      - bridge/setup_docker
+      - attach_workspace:
+          at: ./workspace
+      - bridge/load_tss
+      - run:
+          name: "Init tests environment"
+          command: |
+            BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
+            ./demo/start-binance-environment.sh
+            N=1 ./demo/validator-demo.sh -d
+            N=2 ./demo/validator-demo.sh -d
+            N=3 ./demo/validator-demo.sh -d
+      - run:
+          name: "Wait until validator nodes are ready"
+          command: |
+            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
+          no_output_timeout: 3m
+      - run:
+          name: "Build and prepare tests container"
+          command: |
+            docker build -t tests ./tests
+            docker create --env-file ./tests/.env --name tests tests
+            docker network connect binance_net tests
+            docker network connect ethereum_side_rpc_net tests
+            docker network connect ethereum_home_rpc_net tests
+            docker network connect validator1_test_network tests
+            docker network connect validator2_test_network tests
+            docker network connect validator3_test_network tests
+      - run:
+          name: "Run tests"
+          command: docker start -a tests
+      - run:
+          name: "Check alive docker containers"
+          command: docker ps
+          when: always
+      - bridge/save_artifacts
+workflows:
+  version: 2
+  main:
+    jobs:
+      - init_tss
+      - run_tests:
+          requires:
+            - init_tss
