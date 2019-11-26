@@ -27,7 +27,6 @@ const SIGN_OK = 0
 const SIGN_NONCE_INTERRUPT = 1
 const SIGN_FAILED = 2
 
-let nextAttempt = null
 let cancelled
 let ready = false
 let exchangeQueue
@@ -58,13 +57,10 @@ function killSigner() {
 }
 
 function restart(req, res) {
-  if (/^[0-9]+$/.test(req.params.attempt)) {
-    logger.info(`Manual cancelling current sign attempt, starting ${req.params.attempt} attempt`)
-    nextAttempt = parseInt(req.params.attempt, 10)
-    killSigner()
-    cancelled = true
-    res.send('Done')
-  }
+  logger.info('Manual cancelling current sign attempt')
+  killSigner()
+  cancelled = true
+  res.send('Done')
 }
 
 async function confirmFundsTransfer(epoch) {
@@ -225,15 +221,14 @@ function getAccountBalance(account, asset) {
   return account.balances.find((token) => token.symbol === asset).free
 }
 
-async function buildTx(from, account, data, txAttempt) {
+async function buildTx(from, account, data) {
   const { closeEpoch, newEpoch, nonce } = data
 
   const txOptions = {
     from,
     accountNumber: account.account_number,
     sequence: nonce,
-    asset: FOREIGN_ASSET,
-    memo: `Attempt ${txAttempt}`
+    asset: FOREIGN_ASSET
   }
   let exchanges
 
@@ -309,9 +304,8 @@ async function consumer(msg) {
   }
 
   writeParams(parties, threshold)
-  let attempt = 1
 
-  const { tx, exchanges } = await buildTx(from, account, data, attempt)
+  const { tx, exchanges } = await buildTx(from, account, data)
 
   while (tx !== null) {
     const signResult = await sign(keysFile, tx, publicKey, from)
@@ -328,11 +322,7 @@ async function consumer(msg) {
       break
     }
 
-    // signer either failed, or timed out after parties signup
-    attempt = nextAttempt || attempt + 1
-    nextAttempt = null
-    logger.warn(`Sign failed, starting next attempt ${attempt}`)
-    tx.tx.memo = `Attempt ${attempt}`
+    logger.warn('Sign failed, starting next attempt')
     await delay(1000)
   }
   logger.info('Acking message')
@@ -354,7 +344,7 @@ async function main() {
   signQueue.consume(consumer)
 }
 
-app.get('/restart/:attempt', restart)
+app.get('/restart', restart)
 app.get('/start', (req, res) => {
   logger.info('Ready to start')
   ready = true

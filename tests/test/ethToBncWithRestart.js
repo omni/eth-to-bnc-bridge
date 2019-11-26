@@ -11,7 +11,7 @@ const { validators } = require('../config')
 
 const { HOME_BRIDGE_ADDRESS } = process.env
 
-module.exports = (getUsers, newAttempt) => {
+module.exports = (getUsers) => {
   describe('exchange of tokens in eth => bnc direction with restart', function () {
     let info
     let users
@@ -53,9 +53,9 @@ module.exports = (getUsers, newAttempt) => {
     it('should restart signature generation and regenerate signature properly', async function () {
       this.timeout(360000)
       if (newValidatorNonces[0] > validatorNonces[0] + 2) {
-        await signerController1.restart(newAttempt)
+        await signerController1.restart()
       } else {
-        await signerController2.restart(newAttempt)
+        await signerController2.restart()
       }
       await waitPromise(
         () => getBncSequence(info.foreignBridgeAddress),

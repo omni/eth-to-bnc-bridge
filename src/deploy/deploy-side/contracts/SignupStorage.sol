@@ -1,13 +1,24 @@
 pragma solidity ^0.5.0;
 
 contract SignupStorage {
-    mapping(bytes32 => uint16) public signupsCount;
-    mapping(bytes32 => mapping(address => uint16)) public signups;
+    struct SignupsCounter {
+        uint16 count;
+        mapping(address => uint16) id;
+    }
+    mapping(bytes32 => SignupsCounter) public signups;
 
     function signup(bytes32 hash) public {
-        require(signups[hash][msg.sender] == 0, "Already signuped");
+        require(signups[hash].id[msg.sender] == 0, "Already signuped");
 
-        signups[hash][msg.sender] = ++signupsCount[hash];
+        signups[hash].id[msg.sender] = ++signups[hash].count;
+    }
+
+    function isSignuped(bytes32 hash) public view returns (bool) {
+        return isSignuped(hash, msg.sender);
+    }
+
+    function isSignuped(bytes32 hash, address validator) public view returns (bool) {
+        return signups[hash].id[validator] > 0;
     }
 
     function getSignupNumber(
@@ -15,12 +26,12 @@ contract SignupStorage {
         address[] memory validators,
         address validator
     ) view public returns (uint16) {
-        if (signups[hash][validator] == 0)
+        if (signups[hash].id[validator] == 0)
             return 0;
         uint16 id = 1;
         for (uint i = 0; i < validators.length; i++) {
-            uint16 vid = signups[hash][validators[i]];
-            if (vid > 0 && vid < signups[hash][validator])
+            uint16 vid = signups[hash].id[validators[i]];
+            if (vid > 0 && vid < signups[hash].id[validator])
                 id++;
         }
         return id;

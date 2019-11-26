@@ -172,7 +172,24 @@ async function signupKeygen(req, res) {
 
 async function signupSign(req, res) {
   logger.debug('SignupSign call')
-  const hash = ethers.utils.id(req.body.third)
+  const msgHash = req.body.third
+
+  logger.debug('Checking previous attempts')
+  let attempt = 1
+  let uuid
+  let hash
+  while (true) {
+    uuid = `${msgHash}_${attempt}`
+    hash = ethers.utils.id(uuid)
+    const data = await sharedDb.isSignuped(hash)
+    if (!data) {
+      break
+    }
+    logger.trace(`Attempt ${attempt} is already used`)
+    attempt += 1
+  }
+  logger.debug(`Using attempt ${attempt}`)
+
   const query = sharedDb.interface.functions.signup.encode([hash])
   const { txHash } = await sideSendQuery(query)
   const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)

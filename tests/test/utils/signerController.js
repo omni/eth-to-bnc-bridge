@@ -9,8 +9,8 @@ function createController(validatorId) {
   })
 
   return {
-    async restart(attempt) {
-      return (await sideClient.get(`/restart/${attempt}`)).data
+    async restart() {
+      await sideClient.get('/restart')
     }
   }
 }

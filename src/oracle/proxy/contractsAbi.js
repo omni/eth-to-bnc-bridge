@@ -24,6 +24,7 @@ const sharedDbAbi = [
   'function getSignupAddress(bytes32 hash, address[] validators, uint16 signupNumber) view returns (address)',
   'function getData(address from, bytes32 hash, bytes32 key) view returns (bytes)',
   'function getSignupNumber(bytes32 hash, address[] validators, address validator) view returns (uint16)',
+  'function isSignuped(bytes32 hash) view returns (bool)',
   'function setData(bytes32 hash, bytes32 key, bytes data)',
   'function signup(bytes32 hash)',
   'function addSignature(bytes message, bytes rsv)',

@@ -72,12 +72,12 @@ describe('bridge tests', function () {
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
-  testEthToBncWithRestart(() => users, 99)
+  testEthToBncWithRestart(() => users)
 
   testChangeThreshold(3)
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
-  testEthToBncWithRestart(() => users, 2)
+  testEthToBncWithRestart(() => users)
   testEthToBnc(() => users)
 })
