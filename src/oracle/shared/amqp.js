@@ -1,31 +1,26 @@
 const amqp = require('amqplib')
 
 const logger = require('./logger')
-
-function _connectRabbit (url) {
-  return amqp.connect(url).catch(() => {
-    logger.debug('Failed to connect to rabbitmqServer, reconnecting')
-    return new Promise(resolve =>
-      setTimeout(() => resolve(_connectRabbit(url)), 2000)
-    )
-  })
-}
+const { retry } = require('./wait')
 
 async function connectRabbit(url) {
-  const connection = await _connectRabbit(url)
-  return await connection.createChannel()
+  logger.info('Connecting to RabbitMQ server')
+  return (await retry(() => amqp.connect(url))).createChannel()
 }
 
-async function assertQueue (channel, name) {
+async function assertQueue(channel, name) {
   const queue = await channel.assertQueue(name)
   return {
     name: queue.queue,
-    send: msg => channel.sendToQueue(queue.queue, Buffer.from(JSON.stringify(msg)), {
+    send: (msg) => channel.sendToQueue(queue.queue, Buffer.from(JSON.stringify(msg)), {
       persistent: true
     }),
-    get: consumer => channel.get(queue.queue, consumer),
-    consume: consumer => channel.consume(queue.queue, consumer)
+    get: (consumer) => channel.get(queue.queue, consumer),
+    consume: (consumer) => channel.consume(queue.queue, consumer)
   }
 }
 
-module.exports = { connectRabbit, assertQueue }
+module.exports = {
+  connectRabbit,
+  assertQueue
+}

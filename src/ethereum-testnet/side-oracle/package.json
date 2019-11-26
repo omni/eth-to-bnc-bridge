@@ -1,0 +1,10 @@
+{
+  "name": "side-oracle",
+  "version": "0.0.1",
+  "dependencies": {
+    "ethers": "4.0.33"
+  },
+  "engines": {
+    "node": ">=10.6.0"
+  }
+}

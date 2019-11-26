@@ -9,4 +9,8 @@ TARGET_NETWORK=${TARGET_NETWORK:=development}
 
 docker build -t binance-balance . > /dev/null
 
-docker run --rm --env-file ".env.$TARGET_NETWORK" binance-balance $@
+if [[ "$TARGET_NETWORK" == "development" ]]; then
+    docker run --rm --network binance_net --env-file ".env.$TARGET_NETWORK" binance-balance $@
+else
+    docker run --rm --env-file ".env.$TARGET_NETWORK" binance-balance $@
+fi

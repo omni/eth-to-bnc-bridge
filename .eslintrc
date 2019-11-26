@@ -1,0 +1,18 @@
+{
+  "extends": [
+    "plugin:node/recommended",
+    "airbnb-base"
+  ],
+  "plugins": [
+    "node"
+  ],
+  "rules": {
+    "semi": [1, "never"],
+    "comma-dangle": [1, "never"],
+    "node/no-missing-require": 0,
+    "import/no-unresolved": 0,
+    "no-return-await": 0,
+    "no-await-in-loop": 0,
+    "no-constant-condition": 0
+  }
+}

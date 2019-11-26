@@ -1,0 +1,42 @@
+version: '3.0'
+services:
+  node:
+    build: node
+    image: bnc-testnet
+    networks:
+      - binance_rpc_net
+    ports:
+      - '26657:26657'
+    volumes:
+      - 'binance_marketdata:/root/.bnbchaind/marketdata'
+      - 'binance_data:/root/.bnbchaind/data'
+  api-server:
+    build: api-server
+    image: bnc-api-server
+    networks:
+      - binance_rpc_net
+    ports:
+      - '8080:8080'
+    command: ["http://node:26657"]
+  http-api:
+    build: http-api
+    image: bnc-http-api
+    environment:
+      FOREIGN_RPC_URL: 'http://node:26657'
+      FOREIGN_API_SERVER_URL: 'http://api-server:8080'
+    networks:
+      - binance_net
+      - binance_rpc_net
+    ports:
+      - '8000:8000'
+    volumes:
+      - 'binance_marketdata:/http-api/marketdata'
+networks:
+  binance_net:
+    external: true
+  binance_rpc_net:
+volumes:
+  binance_marketdata:
+    external: true
+  binance_data:
+    external: true

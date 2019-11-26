@@ -1,5 +1,4 @@
-const Web3 = require('web3')
-const utils = require('ethers').utils
+const ethers = require('ethers')
 const BN = require('bignumber.js')
 const axios = require('axios')
 
@@ -7,39 +6,63 @@ const logger = require('./logger')
 const redis = require('./db')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress } = require('./crypto')
+const { delay, retry } = require('./wait')
 
-const abiBridge = require('./contracts_data/Bridge.json').abi
+const {
+  HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY
+} = process.env
+const HOME_MAX_FETCH_RANGE_SIZE = parseInt(process.env.HOME_MAX_FETCH_RANGE_SIZE, 10)
 
-const { HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY } = process.env
+const provider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
+const bridgeAbi = [
+  'event ExchangeRequest(uint96 value, uint32 nonce)',
+  'event EpochEnd(uint16 indexed epoch)',
+  'event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
+  'event NewEpochCancelled(uint16 indexed epoch)',
+  'event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
+  'event EpochStart(uint16 indexed epoch, uint256 x, uint256 y)',
+  'event EpochClose(uint16 indexed epoch)',
+  'event ForceSign()',
+  'function getThreshold(uint16 epoch) view returns (uint16)',
+  'function getParties(uint16 epoch) view returns (uint16)',
+  'function getRangeSize(uint16 epoch) view returns (uint16)',
+  'function getValidators(uint16 epoch) view returns (address[])'
+]
+const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, provider)
+const validatorAddress = ethers.utils.computeAddress(`0x${VALIDATOR_PRIVATE_KEY}`)
 
-const homeWeb3 = new Web3(HOME_RPC_URL)
-const bridge = new homeWeb3.eth.Contract(abiBridge, HOME_BRIDGE_ADDRESS)
-const validatorAddress = homeWeb3.eth.accounts.privateKeyToAccount(`0x${VALIDATOR_PRIVATE_KEY}`).address
-
+const foreignNonce = []
 let channel
 let exchangeQueue
 let signQueue
 let keygenQueue
 let cancelKeygenQueue
+let epochTimeIntervalsQueue
+let chainId
 let blockNumber
-let foreignNonce = []
 let epoch
 let epochStart
 let redisTx
 let rangeSize
 let lastTransactionBlockNumber
 let isCurrentValidator
+let activeEpoch
 
-async function resetFutureMessages (queue) {
+async function getBlockTimestamp(n) {
+  return (await provider.getBlock(n, false)).timestamp
+}
+
+async function resetFutureMessages(queue) {
   logger.debug(`Resetting future messages in queue ${queue.name}`)
   const { messageCount } = await channel.checkQueue(queue.name)
   if (messageCount) {
     logger.info(`Filtering ${messageCount} reloaded messages from queue ${queue.name}`)
     const backup = await assertQueue(channel, `${queue.name}.backup`)
-    do {
+    while (true) {
       const message = await queue.get()
-      if (message === false)
+      if (message === false) {
         break
+      }
       const data = JSON.parse(message.content)
       if (data.blockNumber < blockNumber) {
         logger.debug('Saving message %o', data)
@@ -48,173 +71,76 @@ async function resetFutureMessages (queue) {
         logger.debug('Dropping message %o', data)
       }
       channel.ack(message)
-    } while (true)
+    }
 
     logger.debug('Dropped messages came from future')
 
-    do {
+    while (true) {
       const message = await backup.get()
-      if (message === false)
+      if (message === false) {
         break
+      }
       const data = JSON.parse(message.content)
       logger.debug('Requeuing message %o', data)
       queue.send(data)
       channel.ack(message)
-    } while (true)
+    }
 
     logger.debug('Redirected messages back to initial queue')
   }
 }
 
-async function initialize () {
-  channel = await connectRabbit(RABBITMQ_URL)
-  exchangeQueue = await assertQueue(channel, 'exchangeQueue')
-  signQueue = await assertQueue(channel, 'signQueue')
-  keygenQueue = await assertQueue(channel, 'keygenQueue')
-  cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
-
-  const events = await bridge.getPastEvents('EpochStart', {
-    fromBlock: 1
-  })
-  epoch = events.length ? events[events.length - 1].returnValues.epoch.toNumber() : 0
-  logger.info(`Current epoch ${epoch}`)
-  epochStart = events.length ? events[events.length - 1].blockNumber : 1
-  const saved = (parseInt(await redis.get('homeBlock')) + 1) || parseInt(HOME_START_BLOCK)
-  if (epochStart > saved) {
-    logger.info(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
-    blockNumber = epochStart
-    rangeSize = (await bridge.methods.getRangeSize().call()).toNumber()
-    await redis.multi()
-      .set('homeBlock', blockNumber - 1)
-      .set(`foreignNonce${epoch}`, 0)
-      .exec()
-    foreignNonce[epoch] = 0
-  } else {
-    logger.info('Restoring epoch and block number from local db')
-    blockNumber = saved
-    foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`)) || 0
-  }
-  isCurrentValidator = (await bridge.methods.getValidators().call()).includes(validatorAddress)
-  if (isCurrentValidator) {
-    logger.info(`${validatorAddress} is a current validator`)
-  } else {
-    logger.info(`${validatorAddress} is not a current validator`)
-  }
-
-  await resetFutureMessages(keygenQueue)
-  await resetFutureMessages(cancelKeygenQueue)
-  await resetFutureMessages(exchangeQueue)
-  await resetFutureMessages(signQueue)
-  logger.debug(`Sending start commands`)
-  await axios.get('http://keygen:8001/start')
-  await axios.get('http://signer:8001/start')
-}
-
-async function main () {
-  logger.debug(`Watching events in block #${blockNumber}`)
-  if (await homeWeb3.eth.getBlock(blockNumber) === null) {
-    logger.debug('No block')
-    await new Promise(r => setTimeout(r, 1000))
-    return
-  }
-
-  redisTx = redis.multi()
-
-  const bridgeEvents = await bridge.getPastEvents('allEvents', {
-    fromBlock: blockNumber,
-    toBlock: blockNumber
-  })
-
-  for (const event of bridgeEvents) {
-    switch (event.event) {
-      case 'NewEpoch':
-        await sendKeygen(event)
-        break
-      case 'NewEpochCancelled':
-        sendKeygenCancellation(event)
-        break
-      case 'NewFundsTransfer':
-        isCurrentValidator && await sendSignFundsTransfer(event)
-        break
-      case 'ExchangeRequest':
-        isCurrentValidator && await sendSign(event)
-        break
-      case 'EpochStart':
-        await processEpochStart(event)
-        break
-    }
-  }
-
-  if ((blockNumber + 1 - epochStart) % rangeSize === 0) {
-    logger.info('Reached end of the current block range')
-
-    if (lastTransactionBlockNumber > blockNumber - rangeSize) {
-      logger.info('Sending message to start signature generation for the ended range')
-      await sendStartSign()
-    }
-  }
-
-  blockNumber++
-  // Exec redis tx
-  await redisTx.incr('homeBlock').exec()
-  await redis.save()
-}
-
-initialize().then(async () => {
-  while (true) {
-    await main()
-  }
-})
-
-async function sendKeygen (event) {
-  const newEpoch = event.returnValues.newEpoch.toNumber()
+async function sendKeygen(event) {
+  const { newEpoch } = event.values
   keygenQueue.send({
     epoch: newEpoch,
     blockNumber,
-    threshold: (await bridge.methods.getThreshold(newEpoch).call()).toNumber(),
-    parties: (await bridge.methods.getParties(newEpoch).call()).toNumber()
+    threshold: await bridge.getThreshold(newEpoch),
+    parties: await bridge.getParties(newEpoch)
   })
   logger.debug('Sent keygen start event')
 }
 
-function sendKeygenCancellation (event) {
-  const epoch = event.returnValues.epoch.toNumber()
+function sendKeygenCancellation(event) {
+  const eventEpoch = event.values.epoch
   cancelKeygenQueue.send({
-    epoch,
+    epoch: eventEpoch,
     blockNumber
   })
   logger.debug('Sent keygen cancellation event')
 }
 
-async function sendSignFundsTransfer (event) {
-  const newEpoch = event.returnValues.newEpoch.toNumber()
-  const oldEpoch = event.returnValues.oldEpoch.toNumber()
+async function sendSignFundsTransfer(event) {
+  const { newEpoch, oldEpoch } = event.values
   signQueue.send({
     epoch: oldEpoch,
     blockNumber,
     newEpoch,
     nonce: foreignNonce[oldEpoch],
-    threshold: (await bridge.methods.getThreshold(oldEpoch).call()).toNumber(),
-    parties: (await bridge.methods.getParties(oldEpoch).call()).toNumber()
+    threshold: await bridge.getThreshold(oldEpoch),
+    parties: await bridge.getParties(oldEpoch)
   })
   logger.debug('Sent sign funds transfer event')
-  foreignNonce[oldEpoch]++
+  foreignNonce[oldEpoch] += 1
   redisTx.incr(`foreignNonce${oldEpoch}`)
 }
 
-async function sendSign (event) {
-  const tx = await homeWeb3.eth.getTransaction(event.transactionHash)
-  const msg = utils.serializeTransaction({
+async function sendSign(event, transactionHash) {
+  const tx = await provider.getTransaction(transactionHash)
+  const msg = ethers.utils.serializeTransaction({
     nonce: tx.nonce,
-    gasPrice: `0x${new BN(tx.gasPrice).toString(16)}`,
-    gasLimit: `0x${new BN(tx.gas).toString(16)}`,
+    gasPrice: tx.gasPrice,
+    gasLimit: tx.gasLimit,
     to: tx.to,
-    value: `0x${new BN(tx.value).toString(16)}`,
-    data: tx.input,
-    chainId: await homeWeb3.eth.net.getId()
+    data: tx.data,
+    chainId
   })
-  const hash = homeWeb3.utils.sha3(msg)
-  const publicKey = utils.recoverPublicKey(hash, { r: tx.r, s: tx.s, v: tx.v })
+  const hash = ethers.utils.keccak256(msg)
+  const publicKey = ethers.utils.recoverPublicKey(hash, {
+    r: tx.r,
+    s: tx.s,
+    v: tx.v
+  })
   const msgToQueue = {
     epoch,
     blockNumber,
@@ -222,8 +148,8 @@ async function sendSign (event) {
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: (new BN(event.returnValues.value)).dividedBy(10 ** 18).toFixed(8, 3),
-    nonce: event.returnValues.nonce.toNumber()
+    value: (new BN(event.values.value)).dividedBy(10 ** 18).toFixed(8, 3),
+    nonce: event.values.nonce
   }
 
   exchangeQueue.send(msgToQueue)
@@ -234,23 +160,24 @@ async function sendSign (event) {
   logger.debug(`Set lastTransactionBlockNumber to ${blockNumber}`)
 }
 
-async function sendStartSign () {
-  redisTx.incr(`foreignNonce${epoch}`)
+async function sendStartSign() {
   signQueue.send({
     epoch,
     blockNumber,
-    nonce: foreignNonce[epoch]++,
-    threshold: (await bridge.methods.getThreshold(epoch).call()).toNumber(),
-    parties: (await bridge.methods.getParties(epoch).call()).toNumber()
+    nonce: foreignNonce[epoch],
+    threshold: await bridge.getThreshold(epoch),
+    parties: await bridge.getParties(epoch)
   })
+  foreignNonce[epoch] += 1
+  redisTx.incr(`foreignNonce${epoch}`)
 }
 
-async function processEpochStart (event) {
-  epoch = event.returnValues.epoch.toNumber()
+async function processEpochStart(event) {
+  epoch = event.values.epoch
   epochStart = blockNumber
   logger.info(`Epoch ${epoch} started`)
-  rangeSize = (await bridge.methods.getRangeSize().call()).toNumber()
-  isCurrentValidator = (await bridge.methods.getValidators().call()).includes(validatorAddress)
+  rangeSize = await bridge.getRangeSize(epoch)
+  isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
@@ -259,3 +186,195 @@ async function processEpochStart (event) {
   logger.info(`Updated range size to ${rangeSize}`)
   foreignNonce[epoch] = 0
 }
+
+async function sendEpochClose() {
+  logger.debug(`Consumed epoch ${epoch} close event`)
+  signQueue.send({
+    closeEpoch: epoch,
+    blockNumber,
+    nonce: foreignNonce[epoch],
+    threshold: await bridge.getThreshold(epoch),
+    parties: await bridge.getParties(epoch)
+  })
+  foreignNonce[epoch] += 1
+  redisTx.incr(`foreignNonce${epoch}`)
+}
+
+async function initialize() {
+  channel = await connectRabbit(RABBITMQ_URL)
+  exchangeQueue = await assertQueue(channel, 'exchangeQueue')
+  signQueue = await assertQueue(channel, 'signQueue')
+  keygenQueue = await assertQueue(channel, 'keygenQueue')
+  cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
+  epochTimeIntervalsQueue = await assertQueue(channel, 'epochTimeIntervalsQueue')
+
+  activeEpoch = !!(await redis.get('activeEpoch'))
+
+  chainId = (await provider.getNetwork()).chainId
+
+  const events = (await provider.getLogs({
+    address: HOME_BRIDGE_ADDRESS,
+    fromBlock: 1,
+    toBlock: 'latest',
+    topics: bridge.filters.EpochStart().topics
+  })).map((log) => bridge.interface.parseLog(log))
+
+  epoch = events.length ? events[events.length - 1].values.epoch : 0
+  logger.info(`Current epoch ${epoch}`)
+  epochStart = events.length ? events[events.length - 1].blockNumber : 1
+  const saved = (parseInt(await redis.get('homeBlock'), 10) + 1) || parseInt(HOME_START_BLOCK, 10)
+  if (epochStart > saved) {
+    logger.info(`Data in db is outdated, starting from epoch ${epoch}, block #${epochStart}`)
+    blockNumber = epochStart
+    await redis.multi()
+      .set('homeBlock', blockNumber - 1)
+      .set(`foreignNonce${epoch}`, 0)
+      .exec()
+    foreignNonce[epoch] = 0
+  } else {
+    logger.info('Restoring epoch and block number from local db')
+    blockNumber = saved
+    foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`), 10) || 0
+  }
+  rangeSize = await bridge.getRangeSize(epoch)
+  logger.debug(`Range size ${rangeSize}`)
+  logger.debug('Checking if current validator')
+  isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
+  if (isCurrentValidator) {
+    logger.info(`${validatorAddress} is a current validator`)
+  } else {
+    logger.info(`${validatorAddress} is not a current validator`)
+  }
+
+  await resetFutureMessages(keygenQueue)
+  await resetFutureMessages(cancelKeygenQueue)
+  await resetFutureMessages(exchangeQueue)
+  await resetFutureMessages(signQueue)
+  await resetFutureMessages(epochTimeIntervalsQueue)
+  logger.debug('Sending start commands')
+  await axios.get('http://keygen:8001/start')
+  await axios.get('http://signer:8001/start')
+}
+
+async function loop() {
+  const latestBlockNumber = await provider.getBlockNumber()
+  if (latestBlockNumber < blockNumber) {
+    logger.debug(`No block after ${latestBlockNumber}`)
+    await delay(2000)
+    return
+  }
+
+  const endBlock = Math.min(latestBlockNumber, blockNumber + HOME_MAX_FETCH_RANGE_SIZE - 1)
+
+  redisTx = redis.multi()
+
+  logger.debug(`Watching events in blocks #${blockNumber}-${endBlock}`)
+
+  const bridgeEvents = (await provider.getLogs({
+    address: HOME_BRIDGE_ADDRESS,
+    fromBlock: blockNumber,
+    toBlock: endBlock,
+    topics: []
+  }))
+
+  for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
+    const rangeOffset = (curBlockNumber + 1 - epochStart) % rangeSize
+    const rangeStart = curBlockNumber - (rangeOffset || rangeSize)
+    let epochTimeUpdated = false
+    while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
+      const event = bridge.interface.parseLog(bridgeEvents[i])
+      logger.trace('Consumed event %o %o', event, bridgeEvents[i])
+      switch (event.name) {
+        case 'NewEpoch':
+          if ((await bridge.getValidators(event.values.newEpoch)).includes(validatorAddress)) {
+            await sendKeygen(event)
+          }
+          break
+        case 'NewEpochCancelled':
+          if ((await bridge.getValidators(event.values.epoch)).includes(validatorAddress)) {
+            sendKeygenCancellation(event)
+          }
+          break
+        case 'NewFundsTransfer':
+          if (isCurrentValidator) {
+            await sendSignFundsTransfer(event)
+          }
+          break
+        case 'ExchangeRequest':
+          if (isCurrentValidator) {
+            await sendSign(event, bridgeEvents[i].transactionHash)
+          }
+          break
+        case 'EpochStart':
+          await processEpochStart(event)
+          await redis.set('activeEpoch', true)
+          activeEpoch = true
+          epochTimeIntervalsQueue.send({
+            blockNumber: curBlockNumber,
+            startTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
+            epoch
+          })
+          epochTimeUpdated = true
+          break
+        case 'EpochEnd':
+          logger.debug(`Consumed epoch ${epoch} end event`)
+          await redis.set('activeEpoch', false)
+          activeEpoch = false
+          epochTimeIntervalsQueue.send({
+            blockNumber: curBlockNumber,
+            prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
+            epoch
+          })
+          break
+        case 'EpochClose':
+          if (isCurrentValidator) {
+            await sendEpochClose()
+          }
+          break
+        case 'ForceSign':
+          if (isCurrentValidator && lastTransactionBlockNumber > rangeStart) {
+            logger.debug('Consumed force sign event')
+            lastTransactionBlockNumber = 0
+            redisTx.set('lastTransactionBlockNumber', 0)
+            await sendStartSign()
+          }
+          break
+        default:
+          logger.warn('Unknown event %o', event)
+      }
+      i += 1
+    }
+
+    if (curBlockNumber === endBlock && !epochTimeUpdated && epoch > 0 && activeEpoch) {
+      epochTimeIntervalsQueue.send({
+        blockNumber: curBlockNumber,
+        prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
+        epoch
+      })
+    }
+
+    if (rangeOffset === 0) {
+      logger.info('Reached end of the current block range')
+
+      if (isCurrentValidator && lastTransactionBlockNumber > curBlockNumber - rangeSize) {
+        logger.info('Sending message to start signature generation for the ended range')
+        await sendStartSign()
+      }
+    }
+  }
+
+  blockNumber = endBlock + 1
+  // Exec redis tx
+  await redisTx.set('homeBlock', endBlock).exec()
+  await redis.save()
+}
+
+async function main() {
+  await initialize()
+
+  while (true) {
+    await loop()
+  }
+}
+
+main()

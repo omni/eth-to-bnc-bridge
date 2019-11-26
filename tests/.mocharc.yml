@@ -1,0 +1,6 @@
+exit: true
+timeout: 60000
+bail: true
+reporter: mocha-multi-reporters
+reporter-option:
+  - configFile=./reportersConfig.json

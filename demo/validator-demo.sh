@@ -23,4 +23,4 @@ fi
 # load env for particular environment
 source ".env.$TARGET_NETWORK"
 
-docker-compose -p "$NAME" -f ../../src/oracle/docker-compose-test.yml up ${DCU_FLAGS}
+docker-compose -p "$NAME" -f ../../src/oracle/docker-compose-test.yml up ${DCU_FLAGS} $@

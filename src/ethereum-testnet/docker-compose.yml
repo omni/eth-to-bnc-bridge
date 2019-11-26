@@ -1,0 +1,37 @@
+version: '3.0'
+services:
+  ganache_side:
+    image: trufflesuite/ganache-cli:latest
+    command: ["-m", "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat", "-i", "33", "--db", "/app/db", "-b", "${BLOCK_TIME}", "--noVMErrorsOnRPCResponse"]
+    networks:
+      - ethereum_side_rpc_net
+    ports:
+      - '7545:8545'
+    volumes:
+      - 'ganache_side_data:/app/db'
+  ganache_home:
+    image: trufflesuite/ganache-cli:latest
+    command: ["-m", "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat", "-i", "44", "--db", "/app/db", "-b", "${BLOCK_TIME}", "--noVMErrorsOnRPCResponse"]
+    networks:
+      - ethereum_home_rpc_net
+    ports:
+      - '8545:8545'
+    volumes:
+      - 'ganache_home_data:/app/db'
+  side-oracle:
+    build: side-oracle
+    image: side-oracle
+    env_file: side-oracle/.env.development
+    networks:
+      - ethereum_side_rpc_net
+      - ethereum_home_rpc_net
+networks:
+  ethereum_side_rpc_net:
+    external: true
+  ethereum_home_rpc_net:
+    external: true
+volumes:
+  ganache_side_data:
+    external: true
+  ganache_home_data:
+    external: true

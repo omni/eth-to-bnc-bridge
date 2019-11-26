@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "privateKey": "7ed93ad7753e00b52265a73dfbbcd2296256772965323fcb9a6320b5cd084b89",
+      "ethAddress": "0x4db6b4bd0a3fdc03b027a60f1c48f05c572312aa",
+      "bncAddress": "tbnb14r3z8xk7qsar3vwj05w8cd8gqwk7g6gfurlt5l"
+    },
+    {
+      "privateKey": "2ad6e3a232ad3ea058b61352302118a99085600ff8b6eec4ccf0066a33756231",
+      "ethAddress": "0xf7ca4aed1795e424433498cef43f6a3825c88731",
+      "bncAddress": "tbnb1efjg7xt98t67ql2cmwjc5860lgayet9l8m55ym"
+    },
+    {
+      "privateKey": "eb6dd328677b3fa2822fb8e834507e569bda52e8ffa49266df0f2de239c4ec98",
+      "ethAddress": "0xad6c8127143032d843a260c5d379d8d9b3d51f15",
+      "bncAddress": "tbnb12epcy4p7ktas0nlyrfuektcyh0e83dwzuq73f4"
+    }
+  ],
+  "validators": [
+    "0x99Eb3D86663c6Db090eFFdBC20510Ca9f836DCE3",
+    "0xAa006899B0EC407De930bA8A166DEfe59bBfd3DC",
+    "0x6352e3e6038e05b9da00C84AE851308f9774F883"
+  ]
+}
