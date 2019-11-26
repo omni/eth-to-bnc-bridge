@@ -63,6 +63,9 @@ async function initialize() {
       sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
       homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 
+      await sideProvider.getNetwork()
+      await homeProvider.getNetwork()
+
       homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
       bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
       sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
