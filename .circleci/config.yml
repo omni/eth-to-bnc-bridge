@@ -94,8 +94,8 @@ orbs:
               command: |
                 mkdir -p ./artifacts/logs/ethereum
                 docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log
-                docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ganache/ganache_home.log
-                docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ganache/ganache_side.log
+                docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ethereum/ganache_home.log
+                docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ethereum/ganache_side.log
               when: always
           - run:
               name: "Save binance logs"
@@ -107,6 +107,7 @@ orbs:
               when: always
           - store_artifacts:
               path: ./artifacts
+              destination: artifacts
               when: always
 jobs:
   init_tss:

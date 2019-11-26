@@ -286,10 +286,14 @@ async function loop() {
       logger.trace('Consumed event %o %o', event, bridgeEvents[i])
       switch (event.name) {
         case 'NewEpoch':
-          await sendKeygen(event)
+          if ((await bridge.getValidators(event.values.newEpoch)).includes(validatorAddress)) {
+            await sendKeygen(event)
+          }
           break
         case 'NewEpochCancelled':
-          sendKeygenCancellation(event)
+          if ((await bridge.getValidators(event.values.epoch)).includes(validatorAddress)) {
+            sendKeygenCancellation(event)
+          }
           break
         case 'NewFundsTransfer':
           if (isCurrentValidator) {
