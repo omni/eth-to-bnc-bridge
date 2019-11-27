@@ -222,7 +222,9 @@ function getAccountBalance(account, asset) {
 }
 
 async function buildTx(from, account, data) {
-  const { closeEpoch, newEpoch, nonce } = data
+  const {
+    closeEpoch, newEpoch, nonce, recipient: to
+  } = data
 
   const txOptions = {
     from,
@@ -237,13 +239,6 @@ async function buildTx(from, account, data) {
 
     txOptions.flags = 0x01
   } else if (newEpoch) {
-    const newKeysFile = `/keys/keys${newEpoch}.store`
-    const to = getAccountFromFile(newKeysFile).address
-
-    if (to === '') {
-      return { tx: null }
-    }
-
     logger.info(`Building corresponding transaction for transferring all funds, nonce ${nonce}, recipient ${to}`)
     const fee = await getFee()
 
