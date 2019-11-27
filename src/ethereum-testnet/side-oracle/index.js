@@ -65,18 +65,18 @@ async function initialize() {
 
       await sideProvider.getNetwork()
       await homeProvider.getNetwork()
-
-      homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
-      bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
-      sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
-
-      nonce = await homeWallet.getTransactionCount()
       break
     } catch (e) {
       console.log('Cannot create providers')
       await delay(1000)
     }
   }
+
+  homeWallet = new ethers.Wallet(HOME_PRIVATE_KEY, homeProvider)
+  bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
+  sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
+
+  nonce = await homeWallet.getTransactionCount()
 }
 
 async function loop() {

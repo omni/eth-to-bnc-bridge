@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/k1rill-fedoseev/eth-to-bnc-bridge/tree/master.svg?style=svg)](https://circleci.com/gh/k1rill-fedoseev/eth-to-bnc-bridge/tree/master)
+[![CircleCI](https://circleci.com/gh/poanetwork/eth-to-bnc-bridge/tree/master.svg?style=svg)](https://circleci.com/gh/poanetwork/eth-to-bnc-bridge/tree/master)
 
 ## Ethereum to Binance Chain bridge
 
