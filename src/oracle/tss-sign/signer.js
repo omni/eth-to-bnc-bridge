@@ -7,20 +7,20 @@ const express = require('express')
 const logger = require('./logger')
 const { connectRabbit, assertQueue } = require('./amqp')
 const { publicKeyToAddress, sha256 } = require('./crypto')
-const { delay, retry } = require('./wait')
+const { delay } = require('./wait')
+const { getAccount, getFee, sendTx } = require('./binanceClient')
 
 const Transaction = require('./tx')
 
 const app = express()
 
 const {
-  RABBITMQ_URL, FOREIGN_URL, PROXY_URL, FOREIGN_ASSET
+  RABBITMQ_URL, PROXY_URL, FOREIGN_ASSET
 } = process.env
 const SIGN_ATTEMPT_TIMEOUT = parseInt(process.env.SIGN_ATTEMPT_TIMEOUT, 10)
 const SIGN_NONCE_CHECK_INTERVAL = parseInt(process.env.SIGN_NONCE_CHECK_INTERVAL, 10)
 const SEND_TIMEOUT = parseInt(process.env.SEND_TIMEOUT, 10)
 
-const httpClient = axios.create({ baseURL: FOREIGN_URL })
 const proxyClient = axios.create({ baseURL: PROXY_URL })
 
 const SIGN_OK = 0
@@ -88,19 +88,6 @@ function getAccountFromFile(file) {
   }
 }
 
-async function getAccount(address) {
-  logger.info(`Getting account ${address} data`)
-  const response = await retry(() => httpClient.get(`/api/v1/account/${address}`))
-  return response.data
-}
-
-async function getFee() {
-  logger.info('Getting fees')
-  const response = await retry(() => httpClient.get('/api/v1/fees'))
-  const multiTransferFee = response.data.find((fee) => fee.multi_transfer_fee).multi_transfer_fee
-  return new BN(multiTransferFee * 2).div(10 ** 8)
-}
-
 async function waitForAccountNonce(address, nonce) {
   cancelled = false
   logger.info(`Waiting for account ${address} to have nonce ${nonce}`)
@@ -114,31 +101,6 @@ async function waitForAccountNonce(address, nonce) {
   }
   logger.info('Account nonce is OK')
   return !cancelled
-}
-
-async function sendTx(tx) {
-  while (true) {
-    try {
-      return await httpClient.post('/api/v1/broadcast?sync=true', tx, {
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      })
-    } catch (err) {
-      logger.trace('Error, response data %o', err.response.data)
-      if (err.response.data.message.includes('Tx already exists in cache')) {
-        logger.debug('Tx already exists in cache')
-        return true
-      }
-      if (err.response.data.message.includes(' < ')) {
-        logger.warn('Insufficient funds, waiting for funds')
-        await delay(60000)
-      } else {
-        logger.info('Something failed, restarting: %o', err.response)
-        await delay(10000)
-      }
-    }
-  }
 }
 
 function sign(keysFile, tx, publicKey, signerAddress) {
@@ -302,7 +264,7 @@ async function consumer(msg) {
 
   const { tx, exchanges } = await buildTx(from, account, data)
 
-  while (tx !== null) {
+  while (true) {
     const signResult = await sign(keysFile, tx, publicKey, from)
 
     if (signResult === SIGN_OK || signResult === SIGN_NONCE_INTERRUPT) {
