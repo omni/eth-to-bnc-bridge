@@ -1,7 +1,7 @@
 FROM ubuntu:19.10
 
 RUN apt-get update && \
-    apt-get install -y curl build-essential git openssl pkg-config libssl-dev libgmp3-dev
+    apt-get install -y curl build-essential openssl pkg-config libssl-dev libgmp3-dev
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly-2019-08-28 -y
 ENV PATH=/root/.cargo/bin:$PATH

@@ -3,7 +3,7 @@ FROM node:10.16.0-alpine
 WORKDIR /watcher
 
 RUN apk update && \
-    apk add libssl1.1 libressl-dev curl
+    apk add libressl-dev
 
 COPY ./ethWatcher/package.json /watcher/
 

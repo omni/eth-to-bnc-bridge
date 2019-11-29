@@ -3,7 +3,7 @@ FROM node:10.16.0-slim
 WORKDIR /tss
 
 RUN apt-get update && \
-    apt-get install -y libssl1.1 libssl-dev curl procps
+    apt-get install -y libssl-dev procps
 
 COPY ./tss-keygen/package.json /tss/
 
