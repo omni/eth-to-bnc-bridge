@@ -62,10 +62,12 @@ contract MessageHandler is Government, MessageDecoder {
             bool closeEpoch = _decodeBoolean(message);
             _changeCloseEpoch(closeEpoch);
         } else if (msgAction == Action.VOTE_START_KEYGEN) {
-            require(message.length == 3, "Incorrect message length");
+            // [3-31] - extra data
+            require(message.length == 32, "Incorrect message length");
             _startKeygen();
         } else if (msgAction == Action.VOTE_CANCEL_KEYGEN) {
-            require(message.length == 3, "Incorrect message length");
+            // [3-31] - extra data
+            require(message.length == 32, "Incorrect message length");
             _cancelKeygen();
         } else if (msgAction == Action.TRANSFER) {
             // [3,34] - txHash, [35,54] - address, [55,66] - value

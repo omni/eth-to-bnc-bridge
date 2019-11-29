@@ -9,6 +9,7 @@ const testBncToEth = require('./bncToEth')
 const testRemoveValidator = require('./removeValidator')
 const testAddValidator = require('./addValidator')
 const testChangeThreshold = require('./changeThreshold')
+const testCancelKeygen = require('./cancelKeygen')
 
 const usersConfig = require('../config').users
 const validatorsConfig = require('../config').validators
@@ -80,4 +81,9 @@ describe('bridge tests', function () {
   testBncToEth(() => users)
   testEthToBncWithRestart(() => users)
   testEthToBnc(() => users)
+
+  testCancelKeygen()
+
+  testEthToBnc(() => users)
+  testBncToEth(() => users)
 })

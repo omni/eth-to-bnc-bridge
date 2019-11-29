@@ -23,6 +23,7 @@ const proxyClient = axios.create({ baseURL: PROXY_URL })
 let channel
 let currentKeygenEpoch = null
 let ready = false
+let cancelled
 
 async function confirmKeygen({ x, y }, epoch) {
   await proxyClient.post('/confirmKeygen', {
@@ -65,7 +66,7 @@ function keygen(keysFile, epoch) {
         logger.info(`Finished keygen for epoch ${epoch}`)
         resolve(KEYGEN_OK)
       } else {
-        logger.warn(`Keygen for epoch ${epoch} failed, will start new attempt`)
+        logger.warn(`Keygen for epoch ${epoch} failed`)
         resolve(epochInterrupt ? KEYGEN_EPOCH_INTERRUPT : KEYGEN_FAILED)
       }
     })
@@ -96,6 +97,7 @@ function keygen(keysFile, epoch) {
 
 async function keygenConsumer(msg) {
   const { epoch, parties, threshold } = JSON.parse(msg.content)
+  cancelled = false
   logger.info(`Consumed new epoch event, starting keygen for epoch ${epoch}`)
 
   const keysFile = `/keys/keys${epoch}.store`
@@ -118,6 +120,11 @@ async function keygenConsumer(msg) {
     } else if (keygenResult === KEYGEN_EPOCH_INTERRUPT) {
       logger.warn('Keygen was interrupted by epoch daemon')
       break
+    } else if (cancelled) {
+      logger.info('Keygen was cancelled by bridge validators')
+      break
+    } else {
+      logger.info('Restarting keygen with new attempt')
     }
 
     await delay(1000)
@@ -144,6 +151,7 @@ async function main() {
     logger.info(`Consumed new cancel event for epoch ${epoch} keygen`)
     if (currentKeygenEpoch === epoch) {
       logger.info('Cancelling current keygen')
+      cancelled = true
       killKeygen()
     }
     channel.ack(msg)

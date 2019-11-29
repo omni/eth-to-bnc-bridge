@@ -17,8 +17,10 @@ function createController(validatorId) {
     async voteStartVoting() {
       return (await retry(() => proxy.get('/vote/startVoting'))).data
     },
-    async voteStartKeygen() {
-      return (await retry(() => proxy.get('/vote/startKeygen'))).data
+    async voteStartKeygen(attempt = 0) {
+      return (await retry(() => proxy.get('/vote/startKeygen', {
+        params: { attempt }
+      }))).data
     },
     async voteAddValidator(validatorAddress) {
       return (await retry(() => proxy.get(`/vote/addValidator/${validatorAddress}`))).data
@@ -31,6 +33,9 @@ function createController(validatorId) {
     },
     async voteChangeCloseEpoch(closeEpoch) {
       return (await retry(() => proxy.get(`/vote/changeCloseEpoch/${closeEpoch}`))).data
+    },
+    async voteCancelKeygen() {
+      return (await retry(() => proxy.get('/vote/cancelKeygen'))).data
     }
   }
 }

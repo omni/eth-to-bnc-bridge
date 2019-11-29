@@ -227,13 +227,21 @@ async function voteStartVoting(req, res) {
 
 async function voteStartKeygen(req, res) {
   const epoch = await bridge.epoch()
-  await processMessage(Action.VOTE_START_KEYGEN, epoch)
+  await processMessage(
+    Action.VOTE_START_KEYGEN,
+    epoch,
+    padZeros(req.attempt.toString(16), 58)
+  )
   res.send('Voted\n')
 }
 
 async function voteCancelKeygen(req, res) {
   const epoch = await bridge.nextEpoch()
-  await processMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
+  await processMessage(
+    Action.VOTE_CANCEL_KEYGEN,
+    epoch,
+    padZeros(req.attempt.toString(16), 58)
+  )
   res.send('Voted\n')
 }
 
@@ -386,10 +394,11 @@ app.post('/transfer', transfer)
 votesProxyApp.use('/', logRequest)
 
 votesProxyApp.get('/vote/startVoting', voteStartVoting)
-votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
-votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 
 votesProxyApp.use('/vote', parseNumber(true, 'attempt', 0))
+
+votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
+votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 votesProxyApp.get('/vote/addValidator/:validator', parseAddress('validator'), voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', parseAddress('validator'), voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', parseNumber(false, 'threshold'), voteChangeThreshold)
