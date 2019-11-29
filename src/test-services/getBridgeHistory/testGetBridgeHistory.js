@@ -7,7 +7,6 @@ const HOME_START_BLOCK = parseInt(process.env.HOME_START_BLOCK, 10)
 
 const bridgeAbi = [
   'event AppliedMessage(bytes message)',
-  'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getValidators(uint16 epoch) view returns (address[])'
 ]
 const sharedDbAbi = [
@@ -139,6 +138,14 @@ function processEvent(event) {
   }
 }
 
+const epochValidators = []
+async function getEpochValidators(epoch) {
+  if (!epochValidators[epoch]) {
+    epochValidators[epoch] = await bridge.getValidators(epoch)
+  }
+  return epochValidators[epoch]
+}
+
 async function fetchSignatures(event) {
   const { message } = event.values
 
@@ -146,15 +153,13 @@ async function fetchSignatures(event) {
 
   const msgHash = ethers.utils.hashMessage(Buffer.from(message.slice(2), 'hex'))
 
-  const [threshold, validators] = await Promise.all([
-    bridge.getThreshold(epoch),
-    bridge.getValidators(epoch)
-  ])
+  const validators = await getEpochValidators(epoch)
 
   const signatures = await sharedDb.getSignatures(msgHash, validators)
   const signers = []
-  for (let i = 0; i < threshold; i += 1) {
-    validators.push(signatures.slice(2 + i * 130, 132 + i * 130))
+  for (let i = 0; i < validators.length; i += 1) {
+    const signature = signatures.slice(2 + i * 130, 132 + i * 130)
+    signers.push(ethers.utils.recoverAddress(msgHash, `0x${signature}`))
   }
   return signers
 }
@@ -176,7 +181,7 @@ async function main() {
     const event = events[i]
     const log = processEvent(event)
     if (WITH_SIGNATURES) {
-      log.signatures = fetchSignatures(sharedDb, event)
+      log.signatures = await fetchSignatures(event)
     }
     console.log(JSON.stringify(log))
   }
