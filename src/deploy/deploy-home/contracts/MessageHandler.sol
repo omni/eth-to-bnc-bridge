@@ -6,6 +6,8 @@ import "./MessageDecoder.sol";
 contract MessageHandler is Government, MessageDecoder {
     uint constant SIGNATURE_SIZE = 65;
 
+    event AppliedMessage(bytes message);
+
     mapping(bytes32 => bool) public handledMessages;
 
     function applyMessage(bytes memory message, bytes memory signatures) public {
@@ -77,6 +79,8 @@ contract MessageHandler is Government, MessageDecoder {
         } else {
             revert("Unknown message action");
         }
+
+        emit AppliedMessage(message);
     }
 
     function checkSignedMessage(bytes memory message, bytes memory signatures) view public returns (bytes32, uint16) {

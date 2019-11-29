@@ -1,0 +1,10 @@
+{
+  "name": "get-bridge-history",
+  "version": "0.0.1",
+  "dependencies": {
+    "ethers": "4.0.37"
+  },
+  "engines": {
+    "node": ">=10.6.0"
+  }
+}

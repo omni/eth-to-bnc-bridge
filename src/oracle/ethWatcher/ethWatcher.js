@@ -311,63 +311,65 @@ async function loop() {
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
       const event = bridge.interface.parseLog(bridgeEvents[i])
       logger.trace('Consumed event %o %o', event, bridgeEvents[i])
-      switch (event.name) {
-        case 'NewEpoch':
-          if ((await bridge.getValidators(event.values.newEpoch)).includes(validatorAddress)) {
-            await sendKeygen(event)
-          }
-          break
-        case 'NewEpochCancelled':
-          if ((await bridge.getValidators(event.values.epoch)).includes(validatorAddress)) {
-            sendKeygenCancellation(event)
-          }
-          break
-        case 'NewFundsTransfer':
-          if (isCurrentValidator) {
-            await sendSignFundsTransfer(event)
-          }
-          break
-        case 'ExchangeRequest':
-          if (isCurrentValidator) {
-            await sendSign(event, bridgeEvents[i].transactionHash)
-          }
-          break
-        case 'EpochStart':
-          await processEpochStart(event)
-          await redis.set('activeEpoch', true)
-          activeEpoch = true
-          epochTimeIntervalsQueue.send({
-            blockNumber: curBlockNumber,
-            startTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
-            epoch
-          })
-          epochTimeUpdated = true
-          break
-        case 'EpochEnd':
-          logger.debug(`Consumed epoch ${epoch} end event`)
-          await redis.set('activeEpoch', false)
-          activeEpoch = false
-          epochTimeIntervalsQueue.send({
-            blockNumber: curBlockNumber,
-            prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
-            epoch
-          })
-          break
-        case 'EpochClose':
-          if (isCurrentValidator) {
-            await sendEpochClose()
-          }
-          break
-        case 'ForceSign':
-          if (isCurrentValidator && lastTransactionBlockNumber > rangeStart) {
-            logger.debug('Consumed force sign event')
-            lastTransactionBlockNumber = 0
-            redisTx.set('lastTransactionBlockNumber', 0)
-            await sendStartSign()
-          }
-          break
-        default:
-          logger.warn('Unknown event %o', event)
+      if (event) {
+        switch (event.name) {
+          case 'NewEpoch':
+            if ((await bridge.getValidators(event.values.newEpoch)).includes(validatorAddress)) {
+              await sendKeygen(event)
+            }
+            break
+          case 'NewEpochCancelled':
+            if ((await bridge.getValidators(event.values.epoch)).includes(validatorAddress)) {
+              sendKeygenCancellation(event)
+            }
+            break
+          case 'NewFundsTransfer':
+            if (isCurrentValidator) {
+              await sendSignFundsTransfer(event)
+            }
+            break
+          case 'ExchangeRequest':
+            if (isCurrentValidator) {
+              await sendSign(event, bridgeEvents[i].transactionHash)
+            }
+            break
+          case 'EpochStart':
+            await processEpochStart(event)
+            await redis.set('activeEpoch', true)
+            activeEpoch = true
+            epochTimeIntervalsQueue.send({
+              blockNumber: curBlockNumber,
+              startTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
+              epoch
+            })
+            epochTimeUpdated = true
+            break
+          case 'EpochEnd':
+            logger.debug(`Consumed epoch ${epoch} end event`)
+            await redis.set('activeEpoch', false)
+            activeEpoch = false
+            epochTimeIntervalsQueue.send({
+              blockNumber: curBlockNumber,
+              prolongedTime: await retry(() => getBlockTimestamp(curBlockNumber)) * 1000,
+              epoch
+            })
+            break
+          case 'EpochClose':
+            if (isCurrentValidator) {
+              await sendEpochClose()
+            }
+            break
+          case 'ForceSign':
+            if (isCurrentValidator && lastTransactionBlockNumber > rangeStart) {
+              logger.debug('Consumed force sign event')
+              lastTransactionBlockNumber = 0
+              redisTx.set('lastTransactionBlockNumber', 0)
+              await sendStartSign()
+            }
+            break
+          default:
+            logger.warn('Unknown event %o', event)
+        }
       }
       i += 1
     }
