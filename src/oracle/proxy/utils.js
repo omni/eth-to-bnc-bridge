@@ -1,4 +1,4 @@
-const { padZeros } = require('./crypto')
+const { padZeros } = require('../shared/crypto')
 
 const Action = {
   CONFIRM_KEYGEN: 0,

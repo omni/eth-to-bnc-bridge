@@ -2,8 +2,8 @@ const axios = require('axios')
 const ethers = require('ethers')
 const BN = require('bignumber.js')
 
-const logger = require('./logger')
-const { delay, retry } = require('./wait')
+const logger = require('../shared/logger')
+const { delay, retry } = require('../shared/wait')
 
 const { GAS_LIMIT_FACTOR, MAX_GAS_LIMIT } = process.env
 

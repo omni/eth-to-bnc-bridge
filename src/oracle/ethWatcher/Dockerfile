@@ -9,6 +9,7 @@ COPY ./ethWatcher/package.json /watcher/
 
 RUN npm install
 
-COPY ./ethWatcher/ethWatcher.js ./shared/db.js ./shared/logger.js ./shared/amqp.js ./shared/crypto.js ./shared/wait.js /watcher/
+COPY ./ethWatcher/ethWatcher.js /watcher/src/
+COPY ./shared/db.js ./shared/logger.js ./shared/amqp.js ./shared/crypto.js ./shared/wait.js /watcher/shared/
 
-ENTRYPOINT ["node", "ethWatcher.js"]
+ENTRYPOINT ["node", "src/ethWatcher.js"]

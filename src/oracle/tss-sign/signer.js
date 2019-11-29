@@ -4,11 +4,11 @@ const BN = require('bignumber.js')
 const axios = require('axios')
 const express = require('express')
 
-const logger = require('./logger')
-const { connectRabbit, assertQueue } = require('./amqp')
-const { publicKeyToAddress, sha256 } = require('./crypto')
-const { delay } = require('./wait')
-const { getAccount, getFee, sendTx } = require('./binanceClient')
+const logger = require('../shared/logger')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
+const { publicKeyToAddress, sha256 } = require('../shared/crypto')
+const { delay } = require('../shared/wait')
+const { getAccount, getFee, sendTx } = require('../shared/binanceClient')
 
 const Transaction = require('./tx')
 

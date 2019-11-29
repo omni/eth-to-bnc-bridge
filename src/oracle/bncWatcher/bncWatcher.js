@@ -3,12 +3,12 @@ const BN = require('bignumber.js')
 const fs = require('fs')
 const { computeAddress } = require('ethers').utils
 
-const logger = require('./logger')
-const redis = require('./db')
-const { publicKeyToAddress } = require('./crypto')
-const { delay } = require('./wait')
-const { connectRabbit, assertQueue } = require('./amqp')
-const { getTx, getBlockTime, fetchNewTransactions } = require('./binanceClient')
+const logger = require('../shared/logger')
+const redis = require('../shared/db')
+const { publicKeyToAddress } = require('../shared/crypto')
+const { delay } = require('../shared/wait')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
+const { getTx, getBlockTime, fetchNewTransactions } = require('../shared/binanceClient')
 
 const {
   PROXY_URL, RABBITMQ_URL

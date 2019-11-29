@@ -2,11 +2,11 @@ const ethers = require('ethers')
 const BN = require('bignumber.js')
 const axios = require('axios')
 
-const logger = require('./logger')
-const redis = require('./db')
-const { connectRabbit, assertQueue } = require('./amqp')
-const { publicKeyToAddress } = require('./crypto')
-const { delay, retry } = require('./wait')
+const logger = require('../shared/logger')
+const redis = require('../shared/db')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
+const { publicKeyToAddress } = require('../shared/crypto')
+const { delay, retry } = require('../shared/wait')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY

@@ -10,12 +10,12 @@ const {
 const encode = require('./encode')
 const decode = require('./decode')
 const { createSender, waitForReceipt } = require('./sendTx')
-const logger = require('./logger')
-const { publicKeyToAddress, padZeros } = require('./crypto')
+const logger = require('../shared/logger')
+const { publicKeyToAddress, padZeros } = require('../shared/crypto')
 const {
   parseNumber, parseAddress, parseBool, logRequest
 } = require('./expressUtils')
-const { getForeignBalances } = require('./binanceClient')
+const { getForeignBalances } = require('../shared/binanceClient')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,

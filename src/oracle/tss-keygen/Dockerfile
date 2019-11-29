@@ -9,10 +9,12 @@ COPY ./tss-keygen/package.json /tss/
 
 RUN npm install
 
-COPY ./tss-keygen/keygen-entrypoint.sh ./tss-keygen/keygen.js ./shared/logger.js ./shared/amqp.js ./shared/crypto.js ./shared/wait.js /tss/
-
 COPY --from=tss /tss/target/release/gg18_keygen_client /tss/
+
+COPY ./tss-keygen/keygen-entrypoint.sh /tss/
+COPY ./tss-keygen/keygen.js /tss/src/
+COPY ./shared/logger.js ./shared/amqp.js ./shared/crypto.js ./shared/wait.js /tss/shared/
 
 RUN mkdir /keys
 
-ENTRYPOINT ["node", "keygen.js"]
+ENTRYPOINT ["node", "src/keygen.js"]

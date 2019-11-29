@@ -1,6 +1,6 @@
 const ethers = require('ethers')
 
-const logger = require('./logger')
+const logger = require('../shared/logger')
 
 function parseNumber(fromQuery, field, defaultValue = null) {
   return (req, res, next) => {
