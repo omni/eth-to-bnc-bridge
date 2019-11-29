@@ -1,51 +1,36 @@
 const express = require('express')
 const AsyncLock = require('async-lock')
-const axios = require('axios')
 const BN = require('bignumber.js')
 const ethers = require('ethers')
 
 const { tokenAbi, bridgeAbi, sharedDbAbi } = require('./contractsAbi')
 const {
-  Ok, Err, decodeStatus
+  Ok, Err, decodeStatus, encodeParam, Action
 } = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
 const { createSender, waitForReceipt } = require('./sendTx')
-const logger = require('./logger')
-const { publicKeyToAddress, padZeros } = require('./crypto')
+const logger = require('../shared/logger')
+const { publicKeyToAddress, padZeros } = require('../shared/crypto')
+const {
+  parseNumber, parseAddress, parseBool, logRequest
+} = require('./expressUtils')
+const { getForeignBalances } = require('../shared/binanceClient')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
-  HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
+  HOME_TOKEN_ADDRESS, FOREIGN_ASSET
 } = process.env
-
-const Action = {
-  CONFIRM_KEYGEN: 0,
-  CONFIRM_FUNDS_TRANSFER: 1,
-  CONFIRM_CLOSE_EPOCH: 2,
-  VOTE_START_VOTING: 3,
-  VOTE_ADD_VALIDATOR: 4,
-  VOTE_REMOVE_VALIDATOR: 5,
-  VOTE_CHANGE_THRESHOLD: 6,
-  VOTE_CHANGE_RANGE_SIZE: 7,
-  VOTE_CHANGE_CLOSE_EPOCH: 8,
-  VOTE_START_KEYGEN: 9,
-  VOTE_CANCEL_KEYGEN: 10,
-  TRANSFER: 11
-}
 
 const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
 const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
-const homeWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, homeProvider)
 const sideWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, sideProvider)
 
-const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeWallet)
-const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
+const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeProvider)
+const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeProvider)
 const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideWallet)
 
-const validatorAddress = homeWallet.address
-
-const httpClient = axios.create({ baseURL: FOREIGN_URL })
+const validatorAddress = sideWallet.address
 
 const lock = new AsyncLock()
 
@@ -74,7 +59,6 @@ function sideSendQuery(query) {
 }
 
 async function status(req, res) {
-  logger.debug('Status call')
   const [bridgeEpoch, bridgeStatus] = await Promise.all([
     bridge.epoch(),
     bridge.status()
@@ -83,11 +67,9 @@ async function status(req, res) {
     bridgeEpoch,
     bridgeStatus
   })
-  logger.debug('Status end')
 }
 
 async function get(req, res) {
-  logger.debug('Get call, %o', req.body.key)
   const round = req.body.key.second
   const uuid = req.body.key.third
   let from
@@ -117,12 +99,9 @@ async function get(req, res) {
   } else {
     setTimeout(() => res.send(Err(null)), 1000)
   }
-
-  logger.debug('Get end')
 }
 
 async function set(req, res) {
-  logger.debug('Set call')
   const round = req.body.key.second
   const uuid = req.body.key.third
   const to = Number(req.body.key.fourth)
@@ -136,11 +115,9 @@ async function set(req, res) {
   await sideSendQuery(query)
 
   res.send(Ok(null))
-  logger.debug('Set end')
 }
 
 async function signupKeygen(req, res) {
-  logger.debug('SignupKeygen call')
   const epoch = await bridge.nextEpoch()
   const partyId = await bridge.getNextPartyId(validatorAddress)
 
@@ -166,12 +143,10 @@ async function signupKeygen(req, res) {
       uuid,
       number: partyId
     }))
-    logger.debug('SignupKeygen end')
   }
 }
 
 async function signupSign(req, res) {
-  logger.debug('SignupSign call')
   const msgHash = req.body.third
 
   logger.debug('Checking previous attempts')
@@ -211,34 +186,15 @@ async function signupSign(req, res) {
     uuid: hash,
     number: id
   }))
-  logger.debug('SignupSign end')
 }
 
-function encodeParam(param) {
-  switch (typeof param) {
-    case 'string':
-      if (param.startsWith('0x')) {
-        return Buffer.from(param.slice(2), 'hex')
-      }
-      return Buffer.from(param, 'hex')
-    case 'number':
-      return Buffer.from(padZeros(param.toString(16), 4), 'hex')
-    case 'boolean':
-      return Buffer.from([param ? 1 : 0])
-    default:
-      return null
-  }
-}
-
-function buildMessage(type, ...params) {
-  logger.debug(`${type}, %o`, params)
-  return Buffer.concat([
+async function processMessage(type, ...params) {
+  logger.debug(`Building message ${type}, %o`, params)
+  const message = Buffer.concat([
     Buffer.from([type]),
     ...params.map(encodeParam)
   ])
-}
 
-async function processMessage(message) {
   const signature = await sideWallet.signMessage(message)
   logger.debug('Adding signature to shared db contract')
   const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
@@ -246,137 +202,94 @@ async function processMessage(message) {
 }
 
 async function confirmKeygen(req, res) {
-  logger.debug('Confirm keygen call')
   const { x, y, epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_KEYGEN, epoch, padZeros(x, 64), padZeros(y, 64))
-  await processMessage(message)
+  await processMessage(Action.CONFIRM_KEYGEN, epoch, padZeros(x, 64), padZeros(y, 64))
   res.send()
-  logger.debug('Confirm keygen end')
 }
 
 async function confirmFundsTransfer(req, res) {
-  logger.debug('Confirm funds transfer call')
   const { epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_FUNDS_TRANSFER, epoch)
-  await processMessage(message)
+  await processMessage(Action.CONFIRM_FUNDS_TRANSFER, epoch)
   res.send()
-  logger.debug('Confirm funds transfer end')
 }
 
 async function confirmCloseEpoch(req, res) {
-  logger.debug('Confirm close epoch call')
   const { epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_CLOSE_EPOCH, epoch)
-  await processMessage(message)
+  await processMessage(Action.CONFIRM_CLOSE_EPOCH, epoch)
   res.send()
-  logger.debug('Confirm close epoch end')
 }
 
 async function voteStartVoting(req, res) {
-  logger.info('Voting for starting new epoch voting process')
   const epoch = await bridge.epoch()
-  const message = buildMessage(Action.VOTE_START_VOTING, epoch)
-  await processMessage(message)
+  await processMessage(Action.VOTE_START_VOTING, epoch)
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteStartKeygen(req, res) {
-  logger.info('Voting for starting new epoch keygen')
   const epoch = await bridge.epoch()
-  const message = buildMessage(Action.VOTE_START_KEYGEN, epoch)
-  await processMessage(message)
+  await processMessage(Action.VOTE_START_KEYGEN, epoch)
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteCancelKeygen(req, res) {
-  logger.info('Voting for cancelling new epoch keygen')
   const epoch = await bridge.nextEpoch()
-  const message = buildMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
-  await processMessage(message)
+  await processMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteAddValidator(req, res) {
-  if (ethers.utils.isHexString(req.params.validator, 20)) {
-    logger.info('Voting for adding new validator')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_ADD_VALIDATOR,
-      epoch,
-      req.params.validator,
-      padZeros(req.attempt, 18)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.VOTE_ADD_VALIDATOR,
+    epoch,
+    req.validator,
+    padZeros(req.attempt.toString(16), 18)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeThreshold(req, res) {
-  if (/^[0-9]+$/.test(req.params.threshold)) {
-    logger.info('Voting for changing threshold')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_THRESHOLD,
-      epoch,
-      parseInt(req.params.threshold, 10),
-      padZeros(req.attempt, 54)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.VOTE_CHANGE_THRESHOLD,
+    epoch,
+    req.threshold,
+    padZeros(req.attempt.toString(16), 54)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeRangeSize(req, res) {
-  if (/^[0-9]+$/.test(req.params.rangeSize)) {
-    logger.info('Voting for changing range size')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_RANGE_SIZE,
-      epoch,
-      parseInt(req.params.rangeSize, 10),
-      padZeros(req.attempt, 54)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.VOTE_CHANGE_RANGE_SIZE,
+    epoch,
+    req.rangeSize,
+    padZeros(req.attempt.toString(16), 54)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeCloseEpoch(req, res) {
-  if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
-    logger.info('Voting for changing close epoch')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_CLOSE_EPOCH,
-      epoch,
-      req.params.closeEpoch === 'true',
-      padZeros(req.attempt, 56)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.VOTE_CHANGE_CLOSE_EPOCH,
+    epoch,
+    req.closeEpoch,
+    padZeros(req.attempt.toString(16), 56)
+  )
+  res.send('Voted\n')
 }
 
 async function voteRemoveValidator(req, res) {
-  if (ethers.utils.isHexString(req.params.validator, 20)) {
-    logger.info('Voting for removing validator')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_REMOVE_VALIDATOR,
-      epoch,
-      req.params.validator,
-      padZeros(req.attempt, 18)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.VOTE_REMOVE_VALIDATOR,
+    epoch,
+    req.validator,
+    padZeros(req.attempt.toString(16), 18)
+  )
+  res.send('Voted\n')
 }
 
 async function transfer(req, res) {
@@ -386,35 +299,23 @@ async function transfer(req, res) {
   } = req.body
   if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
-    const message = buildMessage(Action.TRANSFER, epoch, hash, to, padZeros(value, 24))
-    logger.info(`Message for sign: ${message.toString('hex')}`)
-    await processMessage(message)
+    await processMessage(Action.TRANSFER, epoch, hash, to, padZeros(value, 24))
   }
   res.send()
   logger.info('Transfer end')
 }
 
-function getForeignBalances(address) {
-  return httpClient
-    .get(`/api/v1/account/${address}`)
-    .then((res) => res.data.balances.reduce((prev, cur) => {
-      // eslint-disable-next-line no-param-reassign
-      prev[cur.symbol] = cur.free
-      return prev
-    }, {}))
-    .catch(() => ({}))
-}
-
 async function info(req, res) {
-  logger.debug('Info start')
   try {
     const [
       x, y, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch, epochStartBlock,
       foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, bridgeStatus,
       homeBalance
     ] = await Promise.all([
-      bridge.getX().then((value) => new BN(value).toString(16)),
-      bridge.getY().then((value) => new BN(value).toString(16)),
+      bridge.getX()
+        .then((value) => new BN(value).toString(16)),
+      bridge.getY()
+        .then((value) => new BN(value).toString(16)),
       bridge.epoch(),
       bridge.getRangeSize(),
       bridge.getNextRangeSize(),
@@ -429,7 +330,8 @@ async function info(req, res) {
       bridge.getNextValidators(),
       bridge.status(),
       token.balanceOf(HOME_BRIDGE_ADDRESS)
-        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
+        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18)
+          .toFixed(8, 3)))
     ])
     const foreignAddress = publicKeyToAddress({
       x,
@@ -465,9 +367,10 @@ async function info(req, res) {
       error: e
     })
   }
-  logger.debug('Info end')
 }
 
+
+app.use('/', logRequest)
 app.get('/status', status)
 
 app.post('/get', get)
@@ -480,27 +383,18 @@ app.post('/confirmFundsTransfer', confirmFundsTransfer)
 app.post('/confirmCloseEpoch', confirmCloseEpoch)
 app.post('/transfer', transfer)
 
+votesProxyApp.use('/', logRequest)
+
 votesProxyApp.get('/vote/startVoting', voteStartVoting)
 votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
 votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 
-votesProxyApp.use('/vote', (req, res, next) => {
-  if (/^[0-9]+$/.test(req.query.attempt)) {
-    req.attempt = parseInt(req.query.attempt, 10).toString(16)
-    logger.debug(`Vote attempt 0x${req.attempt}`)
-    next()
-  } else if (!req.query.attempt) {
-    req.attempt = '0'
-    logger.debug('Vote attempt 0x00')
-    next()
-  }
-})
-
-votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
-votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
-votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
-votesProxyApp.get('/vote/changeRangeSize/:rangeSize', voteChangeRangeSize)
-votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
+votesProxyApp.use('/vote', parseNumber(true, 'attempt', 0))
+votesProxyApp.get('/vote/addValidator/:validator', parseAddress('validator'), voteAddValidator)
+votesProxyApp.get('/vote/removeValidator/:validator', parseAddress('validator'), voteRemoveValidator)
+votesProxyApp.get('/vote/changeThreshold/:threshold', parseNumber(false, 'threshold'), voteChangeThreshold)
+votesProxyApp.get('/vote/changeRangeSize/:rangeSize', parseNumber(false, 'rangeSize'), voteChangeRangeSize)
+votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', parseBool('closeEpoch'), voteChangeCloseEpoch)
 votesProxyApp.get('/info', info)
 
 async function main() {

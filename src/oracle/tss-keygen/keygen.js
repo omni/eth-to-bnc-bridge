@@ -3,10 +3,10 @@ const fs = require('fs')
 const express = require('express')
 const axios = require('axios')
 
-const logger = require('./logger')
-const { connectRabbit, assertQueue } = require('./amqp')
-const { publicKeyToAddress } = require('./crypto')
-const { delay } = require('./wait')
+const logger = require('../shared/logger')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
+const { publicKeyToAddress } = require('../shared/crypto')
+const { delay } = require('../shared/wait')
 
 const { RABBITMQ_URL, PROXY_URL } = process.env
 const KEYGEN_ATTEMPT_TIMEOUT = parseInt(process.env.KEYGEN_ATTEMPT_TIMEOUT, 10)
