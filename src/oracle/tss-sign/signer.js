@@ -291,7 +291,7 @@ async function consumer(msg) {
   }
   const account = await getAccount(from)
 
-  if (nonce > account.sequence) {
+  if (nonce < account.sequence) {
     logger.debug('Tx has been already sent')
     logger.info('Acking message (skipped nonce)')
     channel.ack(msg)
