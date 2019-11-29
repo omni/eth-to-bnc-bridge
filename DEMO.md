@@ -382,7 +382,15 @@ container for listening GET requests
         - `ADDRESS` - Ethereum address of a validator.
         - After enough votes are collected, validator is added into 
         the next validators list for the next epoch.
-    - http://localhost:5001/vote/addValidator/ADDRESS
+    - http://localhost:5001/vote/removeValidator/ADDRESS
         - `ADDRESS` - Ethereum address of a validator.
         - After enough votes are collected, validator is removed from
         the next validators list for the next epoch.
+    - http://localhost:5001/vote/changeThreshold/THRESHOLD
+        - `THRESHOLD` - Number. New threshold value.
+        - After enough votes are collected, new threshold is set for next epoch.
+    - http://localhost:5001/vote/changeCloseEpoch/CLOSE_EPOCH
+        - `CLOSE_EPOCH` - Boolean. Next epoch close epoch policy 
+        (If true, next validators set will first disable binance account for previous 
+        epoch, before moving onto a new one).
+        - After enough votes are collected, new close policy is set for the next epoch.
