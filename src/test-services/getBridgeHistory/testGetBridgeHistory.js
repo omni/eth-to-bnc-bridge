@@ -52,93 +52,71 @@ function processEvent(event) {
 
   const type = parseInt(message.slice(2, 4), 16)
   const epoch = parseInt(message.slice(4, 8), 16)
+  const baseMsg = {
+    type,
+    blockNumber: event.blockNumber,
+    epoch
+  }
 
   switch (type) {
     case Action.CONFIRM_KEYGEN:
       return {
-        type: ActionName.CONFIRM_KEYGEN,
-        epoch,
+        ...baseMsg,
         x: message.slice(8, 72),
         y: message.slice(72, 136)
       }
     case Action.CONFIRM_FUNDS_TRANSFER:
-      return {
-        type: ActionName.CONFIRM_FUNDS_TRANSFER,
-        epoch
-      }
     case Action.CONFIRM_CLOSE_EPOCH:
-      return {
-        type: ActionName.CONFIRM_CLOSE_EPOCH,
-        epoch
-      }
     case Action.VOTE_START_VOTING:
-      return {
-        type: ActionName.VOTE_START_VOTING,
-        epoch
-      }
+      return baseMsg
     case Action.VOTE_ADD_VALIDATOR:
-      return {
-        type: ActionName.VOTE_ADD_VALIDATOR,
-        epoch,
-        validator: `0x${message.slice(8, 48)}`,
-        attempt: parseInt(message.slice(48, 66), 16)
-      }
     case Action.VOTE_REMOVE_VALIDATOR:
       return {
-        type: ActionName.VOTE_REMOVE_VALIDATOR,
-        epoch,
+        ...baseMsg,
         validator: `0x${message.slice(8, 48)}`,
         attempt: parseInt(message.slice(48, 66), 16)
       }
     case Action.VOTE_CHANGE_THRESHOLD:
       return {
-        type: ActionName.VOTE_CHANGE_THRESHOLD,
-        epoch,
+        ...baseMsg,
         threshold: parseInt(message.slice(8, 12), 16),
         attempt: parseInt(message.slice(12, 66), 16)
       }
     case Action.VOTE_CHANGE_RANGE_SIZE:
       return {
-        type: ActionName.VOTE_CHANGE_RANGE_SIZE,
-        epoch,
+        ...baseMsg,
         rangeSize: parseInt(message.slice(8, 12), 16),
         attempt: parseInt(message.slice(12, 66), 16)
       }
     case Action.VOTE_CHANGE_CLOSE_EPOCH:
       return {
-        type: ActionName.VOTE_CHANGE_CLOSE_EPOCH,
-        epoch,
+        ...baseMsg,
         closeEpoch: parseInt(message.slice(8, 10), 16) > 0,
         attempt: parseInt(message.slice(10, 66), 16)
       }
     case Action.VOTE_START_KEYGEN:
-      return {
-        type: ActionName.VOTE_START_KEYGEN,
-        epoch,
-        attempt: parseInt(message.slice(8, 66), 16)
-      }
     case Action.VOTE_CANCEL_KEYGEN:
       return {
-        type: ActionName.VOTE_CANCEL_KEYGEN,
-        epoch,
+        ...baseMsg,
         attempt: parseInt(message.slice(8, 66), 16)
       }
     case Action.TRANSFER:
       return {
-        type: ActionName.TRANSFER,
-        epoch,
+        ...baseMsg,
         txHash: message.slice(8, 72),
         to: `0x${message.slice(72, 112)}`,
         value: `0x${message.slice(112, 136)}`
       }
     default:
       return {
+        ...baseMsg,
         type: ActionName.UNKNOWN
       }
   }
 }
 
 const epochValidators = []
+
 async function getEpochValidators(epoch) {
   if (!epochValidators[epoch]) {
     epochValidators[epoch] = await bridge.getValidators(epoch)
@@ -175,7 +153,10 @@ async function main() {
     fromBlock: HOME_START_BLOCK,
     toBlock: 'latest',
     topics: bridge.filters.AppliedMessage().topics
-  })).map((log) => bridge.interface.parseLog(log))
+  })).map((log) => ({
+    ...bridge.interface.parseLog(log),
+    ...log
+  }))
 
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i]
