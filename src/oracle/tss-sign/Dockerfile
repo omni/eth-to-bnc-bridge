@@ -9,7 +9,7 @@ COPY ./tss-sign/package.json /tss/
 
 RUN npm install --no-optional
 
-COPY --from=tss /tss/target/release/gg18_sign_client /tss/
+COPY --from=tss /tss/target/release/examples/gg18_sign_client /tss/
 
 COPY ./tss-sign/sign-entrypoint.sh /tss/
 COPY ./tss-sign/signer.js ./tss-sign/tx.js /tss/src/

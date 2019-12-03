@@ -38,7 +38,7 @@ let sideValidatorNonce
 let sideSender
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ strict: false }))
 app.use(express.urlencoded({ extended: true }))
 
 const votesProxyApp = express()
@@ -70,21 +70,23 @@ async function status(req, res) {
 }
 
 async function get(req, res) {
-  const round = req.body.key.second
-  const uuid = req.body.key.third
+  const tags = req.body.key.split('-')
+  const fromId = tags[0]
+  const round = tags[tags.length - 2]
+  const uuid = tags[tags.length - 1]
+  const to = tags.length === 4 ? tags[1] : ''
   let from
   if (uuid.startsWith('k')) {
-    from = (await bridge.getNextValidators())[parseInt(req.body.key.first, 10) - 1]
+    from = (await bridge.getNextValidators())[parseInt(fromId, 10) - 1]
   } else {
     const validators = await bridge.getValidators()
     from = await sharedDb.getSignupAddress(
       uuid,
       validators,
-      parseInt(req.body.key.first, 10)
+      parseInt(fromId, 10)
     )
   }
-  const to = Number(req.body.key.fourth) // 0 if empty
-  const key = ethers.utils.id(`${round}_${to}`)
+  const key = ethers.utils.id(`${round}_${Number(to)}`)
 
   const data = await sharedDb.getData(from, ethers.utils.id(uuid), key)
 
@@ -102,10 +104,11 @@ async function get(req, res) {
 }
 
 async function set(req, res) {
-  const round = req.body.key.second
-  const uuid = req.body.key.third
-  const to = Number(req.body.key.fourth)
-  const key = ethers.utils.id(`${round}_${to}`)
+  const tags = req.body.key.split('-')
+  const round = tags[tags.length - 2]
+  const uuid = tags[tags.length - 1]
+  const to = tags.length === 4 ? tags[1] : ''
+  const key = ethers.utils.id(`${round}_${Number(to)}`)
 
   logger.trace('Received data: %o', req.body.value)
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
@@ -147,7 +150,7 @@ async function signupKeygen(req, res) {
 }
 
 async function signupSign(req, res) {
-  const msgHash = req.body.third
+  const [, , msgHash] = req.body.split('-')
 
   logger.debug('Checking previous attempts')
   let attempt = 1

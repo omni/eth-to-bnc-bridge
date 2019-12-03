@@ -9,7 +9,7 @@ COPY ./tss-keygen/package.json /tss/
 
 RUN npm install
 
-COPY --from=tss /tss/target/release/gg18_keygen_client /tss/
+COPY --from=tss /tss/target/release/examples/gg18_keygen_client /tss/
 
 COPY ./tss-keygen/keygen-entrypoint.sh /tss/
 COPY ./tss-keygen/keygen.js /tss/src/

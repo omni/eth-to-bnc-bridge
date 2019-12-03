@@ -35,7 +35,7 @@ async function confirmKeygen({ x, y }, epoch) {
 
 function writeParams(parties, threshold) {
   logger.debug('Writing params')
-  fs.writeFileSync('./params', JSON.stringify({
+  fs.writeFileSync('./params.json', JSON.stringify({
     parties: parties.toString(),
     threshold: (threshold - 1).toString()
   }))
