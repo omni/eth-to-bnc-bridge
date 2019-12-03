@@ -4,6 +4,8 @@ const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, WITH_SIGNATURES, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS
 } = process.env
 const HOME_START_BLOCK = parseInt(process.env.HOME_START_BLOCK, 10)
+const START_BLOCK = parseInt(process.env.START_BLOCK, 10)
+const EPOCH = parseInt(process.env.EPOCH, 10)
 
 const bridgeAbi = [
   'event AppliedMessage(bytes message)',
@@ -150,7 +152,7 @@ async function main() {
 
   const events = (await homeProvider.getLogs({
     address: HOME_BRIDGE_ADDRESS,
-    fromBlock: HOME_START_BLOCK,
+    fromBlock: START_BLOCK || HOME_START_BLOCK,
     toBlock: 'latest',
     topics: bridge.filters.AppliedMessage().topics
   })).map((log) => ({
@@ -161,10 +163,12 @@ async function main() {
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i]
     const log = processEvent(event)
-    if (WITH_SIGNATURES) {
-      log.signatures = await fetchSignatures(event)
+    if (!EPOCH || log.epoch === EPOCH) {
+      if (WITH_SIGNATURES) {
+        log.signatures = await fetchSignatures(event)
+      }
+      console.log(JSON.stringify(log))
     }
-    console.log(JSON.stringify(log))
   }
 }
 
