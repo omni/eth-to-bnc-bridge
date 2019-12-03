@@ -30,21 +30,20 @@ const Action = {
   TRANSFER: 11
 }
 
-const ActionName = {
-  CONFIRM_KEYGEN: 'CONFIRM_KEYGEN',
-  CONFIRM_FUNDS_TRANSFER: 'CONFIRM_FUNDS_TRANSFER',
-  CONFIRM_CLOSE_EPOCH: 'CONFIRM_CLOSE_EPOCH',
-  VOTE_START_VOTING: 'VOTE_START_VOTING',
-  VOTE_ADD_VALIDATOR: 'VOTE_ADD_VALIDATOR',
-  VOTE_REMOVE_VALIDATOR: 'VOTE_REMOVE_VALIDATOR',
-  VOTE_CHANGE_THRESHOLD: 'VOTE_CHANGE_THRESHOLD',
-  VOTE_CHANGE_RANGE_SIZE: 'VOTE_CHANGE_RANGE_SIZE',
-  VOTE_CHANGE_CLOSE_EPOCH: 'VOTE_CHANGE_CLOSE_EPOCH',
-  VOTE_START_KEYGEN: 'VOTE_START_KEYGEN',
-  VOTE_CANCEL_KEYGEN: 'VOTE_CANCEL_KEYGEN',
-  TRANSFER: 'TRANSFER',
-  UNKNOWN: 'UNKNOWN'
-}
+const actionNames = [
+  'CONFIRM_KEYGEN',
+  'CONFIRM_FUNDS_TRANSFER',
+  'CONFIRM_CLOSE_EPOCH',
+  'VOTE_START_VOTING',
+  'VOTE_ADD_VALIDATOR',
+  'VOTE_REMOVE_VALIDATOR',
+  'VOTE_CHANGE_THRESHOLD',
+  'VOTE_CHANGE_RANGE_SIZE',
+  'VOTE_CHANGE_CLOSE_EPOCH',
+  'VOTE_START_KEYGEN',
+  'VOTE_CANCEL_KEYGEN',
+  'TRANSFER'
+]
 
 let bridge
 let sharedDb
@@ -55,7 +54,7 @@ function processEvent(event) {
   const type = parseInt(message.slice(2, 4), 16)
   const epoch = parseInt(message.slice(4, 8), 16)
   const baseMsg = {
-    type,
+    type: actionNames[type],
     blockNumber: event.blockNumber,
     epoch
   }
@@ -112,7 +111,7 @@ function processEvent(event) {
     default:
       return {
         ...baseMsg,
-        type: ActionName.UNKNOWN
+        type: 'UNKNOWN'
       }
   }
 }
