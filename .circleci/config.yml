@@ -21,13 +21,6 @@ orbs:
           - setup_remote_docker:
               version: 18.09.3
               docker_layer_caching: true
-      restore_tss_image:
-        description: "Restores tss image from cache"
-        steps:
-          - restore_cache:
-              name: "Restore tss image from cache"
-              key: "tss-v1-{{ .Branch }}"
-          - load_tss
       save_tss:
         description: "Save tss image to workspace"
         steps:
@@ -41,11 +34,6 @@ orbs:
               root: ./workspace
               paths:
                 - tss.tar.gz
-          - save_cache:
-              name: "Save tss image to cache"
-              paths:
-                - ./workspace/tss.tar.gz
-              key: "tss-v1-{{ .Branch }}"
       load_tss:
         description: "Load tss image from workspace"
         steps:
@@ -115,10 +103,9 @@ jobs:
     steps:
       - bridge/fetch_repo
       - bridge/setup_docker
-      - bridge/restore_tss_image
       - run:
           name: "Build tss image"
-          command: docker build --cache-from tss -t tss ./src/tss || docker build -t tss ./src/tss
+          command: docker build -t tss ./src/tss
       - bridge/save_tss
   run_tests:
     executor: bridge/node-dev
