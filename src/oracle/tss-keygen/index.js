@@ -51,7 +51,7 @@ function restart(req, res) {
   res.send('Done')
 }
 
-function keygen(keysFile, epoch) {
+function index(keysFile, epoch) {
   let restartTimeoutId
   let epochDaemonIntervalId
   let epochInterrupt
@@ -108,7 +108,7 @@ async function keygenConsumer(msg) {
   writeParams(parties, threshold)
 
   while (true) {
-    const keygenResult = await keygen(keysFile, epoch)
+    const keygenResult = await index(keysFile, epoch)
 
     if (keygenResult === KEYGEN_OK) {
       const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
