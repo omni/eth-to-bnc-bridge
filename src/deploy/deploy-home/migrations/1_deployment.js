@@ -1,4 +1,4 @@
-const Bridge = artifacts.require('Bridge')
+const Bridge = artifacts.require('EthToBncBridge')
 
 const addresses = Object.entries(process.env)
   .filter(([key]) => key.startsWith('VALIDATOR_ADDRESS'))
