@@ -58,6 +58,9 @@ orbs:
                 docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
                 docker logs validator<< parameters.validator >>_signer_1 > ./artifacts/logs/validator<< parameters.validator >>/signer.log
                 docker logs validator<< parameters.validator >>_keygen_1 > ./artifacts/logs/validator<< parameters.validator >>/keygen.log
+                docker logs validator<< parameters.validator >>_side-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/side-watcher.log
+                docker logs validator<< parameters.validator >>_side-sender_1 > ./artifacts/logs/validator<< parameters.validator >>/side-sender.log
+                docker logs validator<< parameters.validator >>_home-sender_1 > ./artifacts/logs/validator<< parameters.validator >>/home-sender.log
               when: always
       save_artifacts:
         description: "Save and upload tests results, save validator logs to artifacts"
@@ -81,7 +84,6 @@ orbs:
               name: "Save ethereum logs"
               command: |
                 mkdir -p ./artifacts/logs/ethereum
-                docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log
                 docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ethereum/ganache_home.log
                 docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ethereum/ganache_side.log
               when: always
@@ -149,10 +151,18 @@ jobs:
           command: docker ps
           when: always
       - bridge/save_artifacts
+  lint:
+    executor: bridge/node-dev
+    steps:
+      - bridge/fetch_repo
+      - run:
+          name: "Eslint"
+          command: eslint .
 workflows:
   version: 2
   main:
     jobs:
+      - lint
       - init_tss
       - run_tests:
           requires:
