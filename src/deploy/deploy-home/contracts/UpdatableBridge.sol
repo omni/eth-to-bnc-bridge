@@ -1,9 +1,11 @@
 pragma solidity ^0.5.0;
 
-import "./Government.sol";
-import "./MessageDecoder.sol";
+import "./ActionableBridge.sol";
+import "./libraries/MessageDecoder.sol";
 
-contract MessageHandler is Government, MessageDecoder {
+contract UpdatableBridge is ActionableBridge {
+    using MessageDecoder for bytes;
+
     uint constant SIGNATURE_SIZE = 65;
 
     event AppliedMessage(bytes message);
@@ -27,7 +29,7 @@ contract MessageHandler is Government, MessageDecoder {
         if (msgAction == Action.CONFIRM_KEYGEN) {
             // [3,34] - x, [35,66] - y
             require(message.length == 67, "Incorrect message length");
-            (uint x, uint y) = _decodeKeygen(message);
+            (uint x, uint y) = message._decodeKeygen();
             _confirmKeygen(x, y);
         } else if (msgAction == Action.CONFIRM_FUNDS_TRANSFER) {
             require(message.length == 3, "Incorrect message length");
@@ -41,27 +43,27 @@ contract MessageHandler is Government, MessageDecoder {
         } else if (msgAction == Action.VOTE_ADD_VALIDATOR) {
             // [3,22] - address, [23,31] - extra data
             require(message.length == 32, "Incorrect message length");
-            address validator = _decodeAddress(message);
+            address validator = message._decodeAddress();
             _addValidator(validator);
         } else if (msgAction == Action.VOTE_REMOVE_VALIDATOR) {
             // [3,22] - address, [23,31] - extra data
             require(message.length == 32, "Incorrect message length");
-            address validator = _decodeAddress(message);
+            address validator = message._decodeAddress();
             _removeValidator(validator);
         } else if (msgAction == Action.VOTE_CHANGE_THRESHOLD) {
             // [3,4] - threshold, [5,31] - extra data
             require(message.length == 32, "Incorrect message length");
-            uint16 threshold = _decodeUint16(message);
+            uint16 threshold = message._decodeUint16();
             _changeThreshold(threshold);
         } else if (msgAction == Action.VOTE_CHANGE_RANGE_SIZE) {
             // [3,4] - rangeSize, [5,31] - extra data
             require(message.length == 32, "Incorrect message length");
-            uint16 rangeSize = _decodeUint16(message);
+            uint16 rangeSize = message._decodeUint16();
             _changeRangeSize(rangeSize);
         } else if (msgAction == Action.VOTE_CHANGE_CLOSE_EPOCH) {
             // [3] - closeEpoch, [4,31] - extra data
             require(message.length == 32, "Incorrect message length");
-            bool closeEpoch = _decodeBoolean(message);
+            bool closeEpoch = message._decodeBoolean();
             _changeCloseEpoch(closeEpoch);
         } else if (msgAction == Action.VOTE_START_KEYGEN) {
             // [3-31] - extra data
@@ -74,7 +76,7 @@ contract MessageHandler is Government, MessageDecoder {
         } else if (msgAction == Action.TRANSFER) {
             // [3,34] - txHash, [35,54] - address, [55,66] - value
             require(message.length == 67, "Incorrect message length");
-            (address to, uint96 value) = _decodeTransfer(message);
+            (address to, uint96 value) = message._decodeTransfer();
             _transfer(to, value);
         } else {
             revert("Unknown message action");

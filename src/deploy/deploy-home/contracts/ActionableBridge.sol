@@ -2,7 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./BasicBridge.sol";
 
-contract Government is BasicBridge {
+contract ActionableBridge is BasicBridge {
     enum Action {
         CONFIRM_KEYGEN,
         CONFIRM_FUNDS_TRANSFER,

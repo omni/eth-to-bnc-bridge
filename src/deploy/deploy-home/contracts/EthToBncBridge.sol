@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import "./MessageHandler.sol";
+import "./UpdatableBridge.sol";
 
-contract Bridge is MessageHandler {
+contract EthToBncBridge is UpdatableBridge {
     event ExchangeRequest(uint96 value, uint32 nonce);
 
     mapping(bytes32 => bool) usedExchangeRanges;

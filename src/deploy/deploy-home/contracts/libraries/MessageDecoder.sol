@@ -1,7 +1,7 @@
 pragma solidity ^0.5.0;
 
 
-contract MessageDecoder {
+library MessageDecoder {
     // [0] - action type
     // [1,2] - epoch
     // [3..] - payload
