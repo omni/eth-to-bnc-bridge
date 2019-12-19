@@ -4,10 +4,13 @@ async function delay(ms) {
   await new Promise((res) => setTimeout(res, ms))
 }
 
-async function retry(getPromise, n = -1, sleep = 3000) {
+async function retry(getPromise, n = -1, checker = () => true, sleep = 3000) {
   while (n) {
     try {
-      return await getPromise()
+      const result = await getPromise()
+      if (checker(result)) {
+        return result
+      }
     } catch (e) {
       logger.debug(`Promise failed, retrying, ${n - 1} attempts left`)
       await delay(sleep)

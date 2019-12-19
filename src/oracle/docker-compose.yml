@@ -6,6 +6,7 @@ services:
       dockerfile: proxy/Dockerfile
       context: .
     environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
@@ -15,14 +16,10 @@ services:
       - FOREIGN_URL
       - FOREIGN_ASSET
       - LOG_LEVEL
-      - 'GAS_LIMIT_FACTOR=3'
-      - 'MAX_GAS_LIMIT=6000000'
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
-      - sign-proxy-net
-      - keygen-proxy-net
-      - bncwatcher-proxy-net
+      - oracle_network
   keygen:
     image: keygen-client
     build:
@@ -39,9 +36,7 @@ services:
     ports:
       - '${KEYGEN_RESTART_PORT}:8001'
     networks:
-      - keygen-proxy-net
-      - rabbit-keygen-net
-      - redis-keygen-net
+      - oracle_network
   signer:
     image: sign-client
     build:
@@ -62,9 +57,7 @@ services:
     ports:
       - '${SIGN_RESTART_PORT}:8001'
     networks:
-      - sign-proxy-net
-      - rabbit-signer-net
-      - redis-signer-net
+      - oracle_network
   redis:
     image: redis
     build:
@@ -73,10 +66,7 @@ services:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/db:/data'
     networks:
-      - redis-signer-net
-      - redis-keygen-net
-      - redis-ethwatcher-net
-      - redis-bncwatcher-net
+      - oracle_network
   rabbitmq:
     hostname: rabbit
     image: rabbitmq:3.7.15-alpine
@@ -85,37 +75,33 @@ services:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/queue:/var/lib/rabbitmq/mnesia'
     networks:
-      - rabbit-signer-net
-      - rabbit-keygen-net
-      - rabbit-ethwatcher-net
-      - rabbit-bncwatcher-net
+      - oracle_network
   eth-watcher:
     build:
       dockerfile: ethWatcher/Dockerfile
       context: .
     image: eth-watcher
     environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
       - HOME_START_BLOCK
       - VALIDATOR_PRIVATE_KEY
       - HOME_MAX_FETCH_RANGE_SIZE
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
     networks:
-      - rabbit-ethwatcher-net
-      - redis-ethwatcher-net
+      - oracle_network
   bnc-watcher:
     build:
       dockerfile: bncWatcher
       context: .
     image: bnc-watcher
     environment:
-      - FOREIGN_URL
-      - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://proxy:8001'
+      - FOREIGN_URL
+      - FOREIGN_ASSET
       - FOREIGN_FETCH_MAX_TIME_INTERVAL
       - FOREIGN_FETCH_INTERVAL
       - FOREIGN_FETCH_BLOCK_TIME_OFFSET
@@ -123,18 +109,58 @@ services:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
-      - rabbit-bncwatcher-net
-      - redis-bncwatcher-net
-      - bncwatcher-proxy-net
+      - oracle_network
+  side-watcher:
+    build:
+      dockerfile: sideWatcher/Dockerfile
+      context: .
+    image: side-watcher
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'REDIS_HOST=redis'
+      - HOME_RPC_URL
+      - HOME_BRIDGE_ADDRESS
+      - SIDE_RPC_URL
+      - SIDE_START_BLOCK
+      - SIDE_MAX_FETCH_RANGE_SIZE
+      - SIDE_SHARED_DB_ADDRESS
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      - oracle_network
+  home-sender:
+    build:
+      dockerfile: ethSender/Dockerfile
+      context: .
+    image: sender
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'REDIS_HOST=redis'
+      - 'RPC_URL=${HOME_RPC_URL}'
+      - 'TO_ADDRESS=${HOME_BRIDGE_ADDRESS}'
+      - 'GAS_LIMIT_FACTOR=3'
+      - 'MAX_GAS_LIMIT=6000000'
+      - 'QUEUE_NAME=homeSendQueue'
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      - oracle_network
+  side-sender:
+    build:
+      dockerfile: ethSender/Dockerfile
+      context: .
+    image: sender
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'REDIS_HOST=redis'
+      - 'RPC_URL=${SIDE_RPC_URL}'
+      - 'TO_ADDRESS=${SIDE_SHARED_DB_ADDRESS}'
+      - 'GAS_LIMIT_FACTOR=3'
+      - 'MAX_GAS_LIMIT=6000000'
+      - 'QUEUE_NAME=sideSendQueue'
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      - oracle_network
 networks:
-  sign-proxy-net:
-  keygen-proxy-net:
-  rabbit-signer-net:
-  rabbit-keygen-net:
-  rabbit-ethwatcher-net:
-  rabbit-bncwatcher-net:
-  redis-keygen-net:
-  redis-signer-net:
-  redis-ethwatcher-net:
-  redis-bncwatcher-net:
-  bncwatcher-proxy-net:
+  oracle_network:

@@ -6,6 +6,7 @@ services:
       dockerfile: proxy/Dockerfile
       context: .
     environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
@@ -15,8 +16,6 @@ services:
       - FOREIGN_URL
       - FOREIGN_ASSET
       - LOG_LEVEL
-      - 'GAS_LIMIT_FACTOR=3'
-      - 'MAX_GAS_LIMIT=6000000'
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
@@ -89,14 +88,14 @@ services:
       context: .
     image: eth-watcher
     environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'REDIS_HOST=redis'
       - HOME_RPC_URL
       - HOME_BRIDGE_ADDRESS
       - HOME_TOKEN_ADDRESS
       - HOME_START_BLOCK
-      - BLOCKS_RANGE_SIZE
       - VALIDATOR_PRIVATE_KEY
       - HOME_MAX_FETCH_RANGE_SIZE
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - LOG_LEVEL
     networks:
       - test_network
@@ -107,10 +106,11 @@ services:
       context: .
     image: bnc-watcher
     environment:
-      - FOREIGN_URL
-      - FOREIGN_ASSET
       - 'RABBITMQ_URL=amqp://rabbitmq:5672'
       - 'PROXY_URL=http://local_proxy:8001'
+      - 'REDIS_HOST=redis'
+      - FOREIGN_URL
+      - FOREIGN_ASSET
       - FOREIGN_FETCH_MAX_TIME_INTERVAL
       - FOREIGN_FETCH_INTERVAL
       - FOREIGN_FETCH_BLOCK_TIME_OFFSET
@@ -120,6 +120,62 @@ services:
     networks:
       - test_network
       - binance_net
+  side-watcher:
+    build:
+      dockerfile: sideWatcher/Dockerfile
+      context: .
+    image: side-watcher
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'REDIS_HOST=redis'
+      - HOME_RPC_URL
+      - HOME_BRIDGE_ADDRESS
+      - SIDE_RPC_URL
+      - SIDE_START_BLOCK
+      - SIDE_MAX_FETCH_RANGE_SIZE
+      - SIDE_SHARED_DB_ADDRESS
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      - test_network
+      - ethereum_home_rpc_net
+      - ethereum_side_rpc_net
+  home-sender:
+    build:
+      dockerfile: ethSender/Dockerfile
+      context: .
+    image: sender
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'RPC_URL=${HOME_RPC_URL}'
+      - 'TO_ADDRESS=${HOME_BRIDGE_ADDRESS}'
+      - 'GAS_LIMIT_FACTOR=3'
+      - 'MAX_GAS_LIMIT=6000000'
+      - 'QUEUE_NAME=homeSendQueue'
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      test_network:
+        aliases:
+          - local_home-sender
+      ethereum_home_rpc_net:
+  side-sender:
+    build:
+      dockerfile: ethSender/Dockerfile
+      context: .
+    image: sender
+    environment:
+      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
+      - 'RPC_URL=${SIDE_RPC_URL}'
+      - 'TO_ADDRESS=${SIDE_SHARED_DB_ADDRESS}'
+      - 'GAS_LIMIT_FACTOR=3'
+      - 'MAX_GAS_LIMIT=6000000'
+      - 'QUEUE_NAME=sideSendQueue'
+      - VALIDATOR_PRIVATE_KEY
+      - LOG_LEVEL
+    networks:
+      - test_network
+      - ethereum_side_rpc_net
 networks:
   test_network:
   ethereum_side_rpc_net:

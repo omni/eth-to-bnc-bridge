@@ -4,7 +4,8 @@ const axios = require('axios')
 
 const logger = require('../shared/logger')
 const redis = require('../shared/db')
-const { connectRabbit, assertQueue } = require('../shared/amqp')
+const createProvider = require('../shared/ethProvider')
+const { connectRabbit, assertQueue, resetFutureMessages } = require('../shared/amqp')
 const { publicKeyToAddress } = require('../shared/crypto')
 const { delay, retry } = require('../shared/wait')
 
@@ -13,7 +14,7 @@ const {
 } = process.env
 const HOME_MAX_FETCH_RANGE_SIZE = parseInt(process.env.HOME_MAX_FETCH_RANGE_SIZE, 10)
 
-const provider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
+const provider = createProvider(HOME_RPC_URL)
 const bridgeAbi = [
   'event ExchangeRequest(uint96 value, uint32 nonce)',
   'event EpochEnd(uint16 indexed epoch)',
@@ -52,44 +53,6 @@ let activeEpoch
 
 async function getBlockTimestamp(n) {
   return (await provider.getBlock(n, false)).timestamp
-}
-
-async function resetFutureMessages(queue) {
-  logger.debug(`Resetting future messages in queue ${queue.name}`)
-  const { messageCount } = await channel.checkQueue(queue.name)
-  if (messageCount) {
-    logger.info(`Filtering ${messageCount} reloaded messages from queue ${queue.name}`)
-    const backup = await assertQueue(channel, `${queue.name}.backup`)
-    while (true) {
-      const message = await queue.get()
-      if (message === false) {
-        break
-      }
-      const data = JSON.parse(message.content)
-      if (data.blockNumber < blockNumber) {
-        logger.debug('Saving message %o', data)
-        backup.send(data)
-      } else {
-        logger.debug('Dropping message %o', data)
-      }
-      channel.ack(message)
-    }
-
-    logger.debug('Dropped messages came from future')
-
-    while (true) {
-      const message = await backup.get()
-      if (message === false) {
-        break
-      }
-      const data = JSON.parse(message.content)
-      logger.debug('Requeuing message %o', data)
-      queue.send(data)
-      channel.ack(message)
-    }
-
-    logger.debug('Redirected messages back to initial queue')
-  }
 }
 
 async function sendKeygen(event) {
@@ -273,14 +236,15 @@ async function initialize() {
     logger.info(`${validatorAddress} is not a current validator`)
   }
 
-  await resetFutureMessages(keygenQueue)
-  await resetFutureMessages(cancelKeygenQueue)
-  await resetFutureMessages(exchangeQueue)
-  await resetFutureMessages(signQueue)
-  await resetFutureMessages(epochTimeIntervalsQueue)
+  await resetFutureMessages(channel, keygenQueue, blockNumber)
+  await resetFutureMessages(channel, cancelKeygenQueue, blockNumber)
+  await resetFutureMessages(channel, exchangeQueue, blockNumber)
+  await resetFutureMessages(channel, signQueue, blockNumber)
+  await resetFutureMessages(channel, epochTimeIntervalsQueue, blockNumber)
   logger.debug('Sending start commands')
   await axios.get('http://keygen:8001/start')
   await axios.get('http://signer:8001/start')
+  await axios.get('http://side-sender:8001/start')
 }
 
 async function loop() {

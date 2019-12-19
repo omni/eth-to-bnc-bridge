@@ -1,5 +1,4 @@
 const express = require('express')
-const AsyncLock = require('async-lock')
 const BN = require('bignumber.js')
 const ethers = require('ethers')
 
@@ -9,8 +8,10 @@ const {
 } = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
-const { createSender, waitForReceipt } = require('./sendTx')
 const logger = require('../shared/logger')
+const { retry } = require('../shared/wait')
+const createProvider = require('../shared/ethProvider')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
 const { publicKeyToAddress, padZeros } = require('../shared/crypto')
 const {
   parseNumber, parseAddress, parseBool, logRequest
@@ -19,44 +20,27 @@ const { getForeignBalances } = require('../shared/binanceClient')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
-  HOME_TOKEN_ADDRESS, FOREIGN_ASSET
+  HOME_TOKEN_ADDRESS, FOREIGN_ASSET, RABBITMQ_URL
 } = process.env
 
-const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
-const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
+const sideProvider = createProvider(SIDE_RPC_URL)
+const homeProvider = createProvider(HOME_RPC_URL)
 const sideWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, sideProvider)
 
 const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeProvider)
 const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeProvider)
-const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideWallet)
+const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
 
 const validatorAddress = sideWallet.address
 
-const lock = new AsyncLock()
-
-let sideValidatorNonce
-let sideSender
+let channel
+let sideSendQueue
 
 const app = express()
 app.use(express.json({ strict: false }))
 app.use(express.urlencoded({ extended: true }))
 
 const votesProxyApp = express()
-
-function sideSendQuery(query) {
-  return lock.acquire('side', async () => {
-    logger.debug('Sending side query')
-    const senderResponse = await sideSender({
-      data: query,
-      to: SIDE_SHARED_DB_ADDRESS,
-      nonce: sideValidatorNonce
-    })
-    if (senderResponse !== true) {
-      sideValidatorNonce += 1
-    }
-    return senderResponse
-  })
-}
 
 async function status(req, res) {
   const [bridgeEpoch, bridgeStatus] = await Promise.all([
@@ -71,20 +55,17 @@ async function status(req, res) {
 
 async function get(req, res) {
   const tags = req.body.key.split('-')
-  const fromId = tags[0]
+  const fromId = parseInt(tags[0], 10)
   const round = tags[tags.length - 2]
   const uuid = tags[tags.length - 1]
   const to = tags.length === 4 ? tags[1] : ''
   let from
   if (uuid.startsWith('k')) {
-    from = (await bridge.getNextValidators())[parseInt(fromId, 10) - 1]
+    const validators = await bridge.getNextValidators()
+    from = validators[fromId - 1]
   } else {
     const validators = await bridge.getValidators()
-    from = await sharedDb.getSignupAddress(
-      uuid,
-      validators,
-      parseInt(fromId, 10)
-    )
+    from = await sharedDb.getSignupAddress(uuid, validators, fromId)
   }
   const key = ethers.utils.id(`${round}_${Number(to)}`)
 
@@ -103,6 +84,12 @@ async function get(req, res) {
   }
 }
 
+function sendJob(data) {
+  sideSendQueue.send({
+    data
+  })
+}
+
 async function set(req, res) {
   const tags = req.body.key.split('-')
   const round = tags[tags.length - 2]
@@ -115,7 +102,7 @@ async function set(req, res) {
   logger.trace(`Encoded data: ${encoded.toString('hex')}`)
   logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
   const query = sharedDb.interface.functions.setData.encode([ethers.utils.id(uuid), key, encoded])
-  await sideSendQuery(query)
+  sendJob(query)
 
   res.send(Ok(null))
 }
@@ -159,7 +146,7 @@ async function signupSign(req, res) {
   while (true) {
     uuid = `${msgHash}_${attempt}`
     hash = ethers.utils.id(uuid)
-    const data = await sharedDb.isSignuped(hash)
+    const data = await sharedDb.isSignuped(hash, validatorAddress)
     if (!data) {
       break
     }
@@ -169,11 +156,9 @@ async function signupSign(req, res) {
   logger.debug(`Using attempt ${attempt}`)
 
   const query = sharedDb.interface.functions.signup.encode([hash])
-  const { txHash } = await sideSendQuery(query)
-  const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
+  const isSignuped = await sharedDb.isSignuped(hash, validatorAddress)
 
-  // Already have signup
-  if (receipt.status === false) {
+  if (isSignuped) {
     res.send(Ok({
       uuid: hash,
       number: 0
@@ -182,8 +167,13 @@ async function signupSign(req, res) {
     return
   }
 
+  sendJob(query)
   const validators = await bridge.getValidators()
-  const id = await sharedDb.getSignupNumber(hash, validators, validatorAddress)
+  const id = await retry(
+    () => sharedDb.getSignupNumber(hash, validators, validatorAddress),
+    -1,
+    (signupId) => signupId > 0
+  )
 
   res.send(Ok({
     uuid: hash,
@@ -201,7 +191,7 @@ async function processMessage(type, ...params) {
   const signature = await sideWallet.signMessage(message)
   logger.debug('Adding signature to shared db contract')
   const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
-  await sideSendQuery(query)
+  sendJob(query)
 }
 
 async function confirmKeygen(req, res) {
@@ -410,9 +400,8 @@ votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', parseBool('closeEpoch'),
 votesProxyApp.get('/info', info)
 
 async function main() {
-  sideValidatorNonce = await sideWallet.getTransactionCount()
-
-  sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
+  channel = await connectRabbit(RABBITMQ_URL)
+  sideSendQueue = await assertQueue(channel, 'sideSendQueue')
 
   logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
 
