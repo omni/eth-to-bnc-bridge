@@ -9,7 +9,7 @@ const { delay, retry } = require('../shared/wait')
 
 const {
   VALIDATOR_PRIVATE_KEY, HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS,
-  RABBITMQ_URL, SIDE_START_BLOCK
+  RABBITMQ_URL, SIDE_START_BLOCK, HOME_SENDER_URL
 } = process.env
 const SIDE_MAX_FETCH_RANGE_SIZE = parseInt(process.env.SIDE_MAX_FETCH_RANGE_SIZE, 10)
 
@@ -117,7 +117,7 @@ async function initialize() {
 
   await resetFutureMessages(channel, homeSendQueue, blockNumber)
   logger.debug('Sending start commands')
-  await axios.get('http://local_home-sender:8001/start')
+  await axios.get(`${HOME_SENDER_URL}/start`)
 }
 
 async function main() {

@@ -12,7 +12,7 @@ RUN npm install --no-optional
 COPY --from=tss /tss/target/release/examples/gg18_sign_client /tss/
 
 COPY ./tss-sign/sign-entrypoint.sh /tss/
-COPY ./tss-sign/signer.js ./tss-sign/tx.js /tss/src/
+COPY ./tss-sign/index.js ./tss-sign/tx.js /tss/src/
 COPY ./shared/logger.js ./shared/amqp.js ./shared/crypto.js ./shared/wait.js ./shared/binanceClient.js /tss/shared/
 
-ENTRYPOINT ["node", "src/signer.js"]
+ENTRYPOINT ["node", "src/index.js"]

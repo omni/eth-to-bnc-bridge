@@ -10,7 +10,8 @@ const { publicKeyToAddress } = require('../shared/crypto')
 const { delay, retry } = require('../shared/wait')
 
 const {
-  HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY
+  HOME_RPC_URL, HOME_BRIDGE_ADDRESS, RABBITMQ_URL, HOME_START_BLOCK, VALIDATOR_PRIVATE_KEY,
+  KEYGEN_CLIENT_URL, SIGN_CLIENT_URL, SIDE_SENDER_URL
 } = process.env
 const HOME_MAX_FETCH_RANGE_SIZE = parseInt(process.env.HOME_MAX_FETCH_RANGE_SIZE, 10)
 
@@ -242,9 +243,9 @@ async function initialize() {
   await resetFutureMessages(channel, signQueue, blockNumber)
   await resetFutureMessages(channel, epochTimeIntervalsQueue, blockNumber)
   logger.debug('Sending start commands')
-  await axios.get('http://keygen:8001/start')
-  await axios.get('http://signer:8001/start')
-  await axios.get('http://side-sender:8001/start')
+  await axios.get(`${KEYGEN_CLIENT_URL}/start`)
+  await axios.get(`${SIGN_CLIENT_URL}/start`)
+  await axios.get(`${SIDE_SENDER_URL}/start`)
 }
 
 async function loop() {

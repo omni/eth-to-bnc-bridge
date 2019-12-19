@@ -1,7 +1,7 @@
 const axios = require('axios')
 
 function createController(validatorId) {
-  const url = `http://validator${validatorId}_signer_1:8001/`
+  const url = `http://validator${validatorId}_sign-client_1:8001/`
 
   const signerClient = axios.create({
     baseURL: url,

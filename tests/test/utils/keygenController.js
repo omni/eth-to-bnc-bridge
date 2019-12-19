@@ -1,7 +1,7 @@
 const axios = require('axios')
 
 function createController(validatorId) {
-  const url = `http://validator${validatorId}_keygen_1:8001/`
+  const url = `http://validator${validatorId}_keygen-client_1:8001/`
 
   const keygenClient = axios.create({
     baseURL: url,

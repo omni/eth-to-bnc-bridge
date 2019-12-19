@@ -1,4 +1,7 @@
 version: '3.7'
+x-common-environment: &common-environment
+  RABBITMQ_URL: amqp://rabbitmq:5672
+  LOG_LEVEL:
 services:
   proxy:
     image: blockchain-proxy
@@ -6,52 +9,49 @@ services:
       dockerfile: proxy/Dockerfile
       context: .
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - HOME_RPC_URL
-      - HOME_BRIDGE_ADDRESS
-      - HOME_TOKEN_ADDRESS
-      - SIDE_RPC_URL
-      - SIDE_SHARED_DB_ADDRESS
-      - VALIDATOR_PRIVATE_KEY
-      - FOREIGN_URL
-      - FOREIGN_ASSET
-      - LOG_LEVEL
+      <<: *common-environment
+      HOME_RPC_URL:
+      HOME_BRIDGE_ADDRESS:
+      HOME_TOKEN_ADDRESS:
+      SIDE_RPC_URL:
+      SIDE_SHARED_DB_ADDRESS:
+      VALIDATOR_PRIVATE_KEY:
+      FOREIGN_URL:
+      FOREIGN_ASSET:
     ports:
       - '${VOTES_PROXY_PORT}:8002'
     networks:
       - oracle_network
-  keygen:
+  keygen-client:
     image: keygen-client
     build:
       dockerfile: tss-keygen/Dockerfile
       context: .
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
-      - KEYGEN_ATTEMPT_TIMEOUT
-      - KEYGEN_EPOCH_CHECK_INTERVAL
-      - LOG_LEVEL
+      <<: *common-environment
+      PROXY_URL: http://proxy:8001
+      KEYGEN_ATTEMPT_TIMEOUT:
+      KEYGEN_EPOCH_CHECK_INTERVAL:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     ports:
       - '${KEYGEN_RESTART_PORT}:8001'
     networks:
       - oracle_network
-  signer:
+  sign-client:
     image: sign-client
     build:
       dockerfile: tss-sign/Dockerfile
       context: .
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
-      - FOREIGN_CHAIN_ID
-      - FOREIGN_URL
-      - FOREIGN_ASSET
-      - SIGN_ATTEMPT_TIMEOUT
-      - SIGN_NONCE_CHECK_INTERVAL
-      - SEND_TIMEOUT
-      - LOG_LEVEL
+      <<: *common-environment
+      PROXY_URL: http://proxy:8001
+      FOREIGN_CHAIN_ID:
+      FOREIGN_URL:
+      FOREIGN_ASSET:
+      SIGN_ATTEMPT_TIMEOUT:
+      SIGN_NONCE_CHECK_INTERVAL:
+      SEND_TIMEOUT:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     ports:
@@ -76,36 +76,39 @@ services:
       - '${PWD}/${TARGET_NETWORK}/queue:/var/lib/rabbitmq/mnesia'
     networks:
       - oracle_network
-  eth-watcher:
+  home-watcher:
     build:
-      dockerfile: ethWatcher/Dockerfile
+      dockerfile: homeWatcher/Dockerfile
       context: .
-    image: eth-watcher
+    image: home-watcher
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - HOME_RPC_URL
-      - HOME_BRIDGE_ADDRESS
-      - HOME_TOKEN_ADDRESS
-      - HOME_START_BLOCK
-      - VALIDATOR_PRIVATE_KEY
-      - HOME_MAX_FETCH_RANGE_SIZE
-      - LOG_LEVEL
+      <<: *common-environment
+      KEYGEN_CLIENT_URL: http://keygen-client:8001
+      SIGN_CLIENT_URL: http://sign-client:8001
+      SIDE_SENDER_URL: http://side-sender:8001
+      REDIS_HOST: redis
+      HOME_RPC_URL:
+      HOME_BRIDGE_ADDRESS:
+      HOME_TOKEN_ADDRESS:
+      HOME_START_BLOCK:
+      VALIDATOR_PRIVATE_KEY:
+      HOME_MAX_FETCH_RANGE_SIZE:
     networks:
       - oracle_network
   bnc-watcher:
     build:
-      dockerfile: bncWatcher
+      dockerfile: bncWatcher/Dockerfile
       context: .
     image: bnc-watcher
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'PROXY_URL=http://proxy:8001'
-      - FOREIGN_URL
-      - FOREIGN_ASSET
-      - FOREIGN_FETCH_MAX_TIME_INTERVAL
-      - FOREIGN_FETCH_INTERVAL
-      - FOREIGN_FETCH_BLOCK_TIME_OFFSET
-      - LOG_LEVEL
+      <<: *common-environment
+      PROXY_URL: http://proxy:8001
+      REDIS_HOST: redis
+      FOREIGN_URL:
+      FOREIGN_ASSET:
+      FOREIGN_FETCH_MAX_TIME_INTERVAL:
+      FOREIGN_FETCH_INTERVAL:
+      FOREIGN_FETCH_BLOCK_TIME_OFFSET:
     volumes:
       - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
@@ -116,16 +119,16 @@ services:
       context: .
     image: side-watcher
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'REDIS_HOST=redis'
-      - HOME_RPC_URL
-      - HOME_BRIDGE_ADDRESS
-      - SIDE_RPC_URL
-      - SIDE_START_BLOCK
-      - SIDE_MAX_FETCH_RANGE_SIZE
-      - SIDE_SHARED_DB_ADDRESS
-      - VALIDATOR_PRIVATE_KEY
-      - LOG_LEVEL
+      <<: *common-environment
+      HOME_SENDER_URL: http://home-sender:8001
+      REDIS_HOST: redis
+      HOME_RPC_URL:
+      HOME_BRIDGE_ADDRESS:
+      SIDE_RPC_URL:
+      SIDE_START_BLOCK:
+      SIDE_MAX_FETCH_RANGE_SIZE:
+      SIDE_SHARED_DB_ADDRESS:
+      VALIDATOR_PRIVATE_KEY:
     networks:
       - oracle_network
   home-sender:
@@ -134,15 +137,13 @@ services:
       context: .
     image: sender
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'REDIS_HOST=redis'
-      - 'RPC_URL=${HOME_RPC_URL}'
-      - 'TO_ADDRESS=${HOME_BRIDGE_ADDRESS}'
-      - 'GAS_LIMIT_FACTOR=3'
-      - 'MAX_GAS_LIMIT=6000000'
-      - 'QUEUE_NAME=homeSendQueue'
-      - VALIDATOR_PRIVATE_KEY
-      - LOG_LEVEL
+      <<: *common-environment
+      RPC_URL: ${HOME_RPC_URL}
+      TO_ADDRESS: ${HOME_BRIDGE_ADDRESS}
+      GAS_LIMIT_FACTOR: ${HOME_GAS_LIMIT_FACTOR}
+      MAX_GAS_LIMIT: ${HOME_MAX_GAS_LIMIT}
+      QUEUE_NAME: homeSendQueue
+      VALIDATOR_PRIVATE_KEY:
     networks:
       - oracle_network
   side-sender:
@@ -151,15 +152,13 @@ services:
       context: .
     image: sender
     environment:
-      - 'RABBITMQ_URL=amqp://rabbitmq:5672'
-      - 'REDIS_HOST=redis'
-      - 'RPC_URL=${SIDE_RPC_URL}'
-      - 'TO_ADDRESS=${SIDE_SHARED_DB_ADDRESS}'
-      - 'GAS_LIMIT_FACTOR=3'
-      - 'MAX_GAS_LIMIT=6000000'
-      - 'QUEUE_NAME=sideSendQueue'
-      - VALIDATOR_PRIVATE_KEY
-      - LOG_LEVEL
+      <<: *common-environment
+      RPC_URL: ${SIDE_RPC_URL}
+      TO_ADDRESS: ${SIDE_SHARED_DB_ADDRESS}
+      GAS_LIMIT_FACTOR: ${SIDE_GAS_LIMIT_FACTOR}
+      MAX_GAS_LIMIT: ${SIDE_MAX_GAS_LIMIT}
+      QUEUE_NAME: sideSendQueue
+      VALIDATOR_PRIVATE_KEY:
     networks:
       - oracle_network
 networks:
