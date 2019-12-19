@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import './openzeppelin-solidity/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 contract BasicBridge {
     uint32 constant UPPER_BOUND = 0xffffffff;

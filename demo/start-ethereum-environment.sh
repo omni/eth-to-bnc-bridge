@@ -20,7 +20,7 @@ deploy_token() {
   echo "Compiling and deploying erc20"
 
   echo "Building deploy docker image"
-  docker build -t deploy_test "$DEPLOY_DIR/deploy-test" > /dev/null 2>&1
+  docker build -t deploy_test "$DEPLOY_DIR/deploy-test" # > /dev/null 2>&1
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
@@ -42,7 +42,7 @@ deploy_bridge() {
   echo "Compiling and deploying home part"
 
   echo "Building deploy docker image"
-  docker build -t deploy_home "$DEPLOY_DIR/deploy-home" > /dev/null 2>&1
+  docker build -t deploy_home "$DEPLOY_DIR/deploy-home" # > /dev/null 2>&1
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
@@ -64,7 +64,7 @@ deploy_db() {
   echo "Compiling and deploying side part"
 
   echo "Building deploy docker image"
-  docker build -t deploy_side "$DEPLOY_DIR/deploy-side" > /dev/null 2>&1
+  docker build -t deploy_side "$DEPLOY_DIR/deploy-side" # > /dev/null 2>&1
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then

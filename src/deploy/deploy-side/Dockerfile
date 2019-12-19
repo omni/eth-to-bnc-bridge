@@ -5,7 +5,6 @@ WORKDIR /build
 RUN apk add git python build-base
 
 RUN npm install -g truffle
-RUN npm install truffle-hdwallet-provider
 
 RUN truffle obtain --solc 0.5.9
 
@@ -16,6 +15,9 @@ RUN mkdir temp \
  && cp ./contracts/Migrations.sol ../contracts/Migrations.sol \
  && cd .. \
  && rm -rf temp
+
+COPY package.json /build/
+RUN npm install
 
 COPY truffle-config-build.js /build/truffle-config.js
 COPY contracts /build/contracts

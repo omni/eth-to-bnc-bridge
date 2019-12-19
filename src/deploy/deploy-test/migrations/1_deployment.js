@@ -1,4 +1,4 @@
-const TokenContract = artifacts.require('ERC20Mintable')
+const TokenContract = artifacts.require('Token')
 
 const {
   TOKEN_INITIAL_MINT

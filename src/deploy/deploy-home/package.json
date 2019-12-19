@@ -1,0 +1,8 @@
+{
+  "name": "deploy-home",
+  "version": "0.0.1",
+  "dependencies": {
+    "@openzeppelin/contracts": "2.4.0",
+    "truffle-hdwallet-provider": "1.0.17"
+  }
+}
