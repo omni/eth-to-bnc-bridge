@@ -156,8 +156,8 @@ jobs:
     steps:
       - bridge/fetch_repo
       - run:
-          name: "Eslint"
-          command: eslint .
+          name: "Lint"
+          command: npm run lint
 workflows:
   version: 2
   main:

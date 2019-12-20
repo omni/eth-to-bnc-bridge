@@ -8,6 +8,14 @@
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-truffle": "0.3.1"
   },
+  "scripts": {
+    "e2e": "./tests/init.sh && ./tests/run.sh",
+    "lint": "npm run lint:js && npm run lint:sol",
+    "lint:js": "eslint .",
+    "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",
+    "lint:sol:home": "cd ./src/deploy/deploy-home && solhint --max-warnings 0 \"./contracts/**/*.sol\"",
+    "lint:sol:side": "cd ./src/deploy/deploy-side && solhint --max-warnings 0 \"./contracts/**/*.sol\""
+  },
   "engines": {
     "node": ">=10.6.0"
   }

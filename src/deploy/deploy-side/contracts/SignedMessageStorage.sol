@@ -64,7 +64,12 @@ contract SignedMessageStorage {
         return result;
     }
 
-    function isResponsibleToSend(bytes32 msgHash, address[] memory validators, uint16 threshold, address validatorAddress) public view returns (bool) {
+    function isResponsibleToSend(
+        bytes32 msgHash,
+        address[] memory validators,
+        uint16 threshold,
+        address validatorAddress
+    ) public view returns (bool) {
         uint senderPartyId = uint(msgHash) % threshold;
         SignedMessage storage message = signedMessages[msgHash];
         uint mySigOrder = message.sigOrder[validatorAddress];
