@@ -30,11 +30,8 @@ if [[ "$TARGET_NETWORK" == "development" ]]; then
   docker network rm binance-testnet_binance_rpc_net > /dev/null 2>&1 || true
 fi
 
-docker network rm validator1_test_network > /dev/null 2>&1 || true
-docker network rm validator2_test_network > /dev/null 2>&1 || true
-docker network rm validator3_test_network > /dev/null 2>&1 || true
-
 for (( I = 1; I < 4; ++I )); do
+    docker network rm validator"$I"_test_network > /dev/null 2>&1 || true
     DIRNAME="validator$I"
     rm -rf "$DIRNAME/$TARGET_NETWORK"
     mkdir -p "$DIRNAME/$TARGET_NETWORK/db"

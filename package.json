@@ -9,7 +9,7 @@
     "eslint-plugin-truffle": "0.3.1"
   },
   "scripts": {
-    "e2e": "./tests/init.sh && ./tests/run.sh",
+    "tests:e2e": "./tests/run.sh",
     "lint": "npm run lint:js && npm run lint:sol",
     "lint:js": "eslint .",
     "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",

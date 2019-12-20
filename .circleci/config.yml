@@ -69,7 +69,7 @@ orbs:
               name: "Save tests results"
               command: |
                 mkdir -p ./artifacts/test_results/mocha
-                docker cp "tests:/tests/results.xml" "./artifacts/test_results/mocha/results.xml"
+                cp "./tests/results.xml" "./artifacts/test_results/mocha/results.xml"
               when: always
           - store_test_results:
               path: ./artifacts/test_results/mocha
@@ -117,35 +117,7 @@ jobs:
       - attach_workspace:
           at: ./workspace
       - bridge/load_tss
-      - run:
-          name: "Init tests environment"
-          command: |
-            BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
-            ./demo/start-binance-environment.sh
-            N=1 ./demo/validator-demo.sh -d
-            N=2 ./demo/validator-demo.sh -d
-            N=3 ./demo/validator-demo.sh -d
-      - run:
-          name: "Wait until validator nodes are ready"
-          command: |
-            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-          no_output_timeout: 3m
-      - run:
-          name: "Build and prepare tests container"
-          command: |
-            docker build -t tests ./tests
-            docker create --env-file ./tests/.env --name tests tests
-            docker network connect binance_net tests
-            docker network connect ethereum_side_rpc_net tests
-            docker network connect ethereum_home_rpc_net tests
-            docker network connect validator1_test_network tests
-            docker network connect validator2_test_network tests
-            docker network connect validator3_test_network tests
-      - run:
-          name: "Run tests"
-          command: docker start -a tests
+      - run: npm run tests:e2e
       - run:
           name: "Check alive docker containers"
           command: docker ps
@@ -155,9 +127,7 @@ jobs:
     executor: bridge/node-dev
     steps:
       - bridge/fetch_repo
-      - run:
-          name: "Lint"
-          command: npm run lint
+      - run: npm run lint
 workflows:
   version: 2
   main:
