@@ -5,6 +5,10 @@
     "@openzeppelin/contracts": "2.4.0",
     "truffle-hdwallet-provider": "1.0.17"
   },
+  "devDependencies": {
+    "chai": "4.2.0",
+    "chai-as-promised": "7.1.1"
+  },
   "engines": {
     "node": ">=10.6.0"
   }
