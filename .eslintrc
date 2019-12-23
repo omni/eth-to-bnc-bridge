@@ -9,7 +9,9 @@
   "rules": {
     "semi": [1, "never"],
     "comma-dangle": [1, "never"],
+    "import/no-extraneous-dependencies": [2, {"devDependencies": true}],
     "node/no-missing-require": 0,
+    "node/no-unpublished-require": 0,
     "import/no-unresolved": 0,
     "no-return-await": 0,
     "no-await-in-loop": 0,

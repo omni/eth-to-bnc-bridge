@@ -12,4 +12,8 @@ cleanup() {
 ganache-cli --gasLimit 0xfffffffffff -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 55 > /dev/null &
 ganache_pid=$!
 
+echo "Running tests for $1"
+
+cd "$1"
+
 truffle test --network test
