@@ -56,13 +56,13 @@ The public Binance Chain testnet will keep a BEP2 token.
       ./src/test-services/getAddresses/run.sh <PRIVATE_KEY>
       ```
 2. Run test environment
-    * (2.1) Modify `src/deploy/deploy-test/.env.development` and specify the amount of tokens to mint in the parameter `TOKEN_INITIAL_MINT`.
+    * (2.1) Modify `src/contracts/home/deploy/.env.development` and specify the amount of tokens to mint in the parameter `TOKEN_INITIAL_MINT`.
     * (2.2) Run Ethereum testnets and deploy contracts
       ```
       TARGET_NETWORK=development ./demo/start-ethereum-environment.sh
       ```
       This command will also mint tokens, the owner of tokens is the address that corresponds to the 
-      private key specified in `HOME_PRIVATE_KEY` of `src/deploy/deploy-test/.env.development` (`0xA374DC09057D6B3253d04fACb15736B43fBc7943`).
+      private key specified in `HOME_PRIVATE_KEY` of `src/contracts/home/deploy/.env.development` (`0xA374DC09057D6B3253d04fACb15736B43fBc7943`).
     * (2.4) Run Binance testnet and api services
       ```
       ./demo/start-binance-environment.sh
@@ -241,19 +241,19 @@ Make sure, to first run demo in development mode, before trying to run it in the
       ```
 2. Run test environment
     * (2.1) Prepare three private keys for validators. Get the Ethereum account addresses for these keys.
-    * (2.2) Modify `src/deploy/deploy-home/.env.staging` and specify the token contract address in 
+    * (2.2) Modify `src/contracts/home/deploy/.env.staging` and specify the token contract address in 
     the Kovan network via `HOME_TOKEN_ADDRESS` (use empty address `0x` if you want to create new 
     ERC20 contract while deployment). \
     Set `VALIDATOR_ADDRESS_*` to Ethereum addresses obtained in the previous step. 
-    * (2.3) Modify `src/deploy/.keys.staging` and specify private keys for prefunded accounts in both networks.
-    These accounts are used for contract deployment. Use `src/deploy/.keys.staging.example` as an example.
+    * (2.3) Modify `src/contracts/.keys.staging` and specify private keys for prefunded accounts in both networks.
+    These accounts are used for contract deployment. Use `src/contracts/.keys.staging.example` as an example.
     * (2.4) Deploy contracts
       ```
       TARGET_NETWORK=staging ./demo/start-ethereum-environment.sh
       ```
       This command will deploy ERC20 contract and also mint tokens if you left `HOME_TOKEN_ADDRESS` empty,
       the owner of tokens is the address that corresponds to the private key specified in 
-      `HOME_PRIVATE_KEY` of `src/deploy/.keys.staging`.\
+      `HOME_PRIVATE_KEY` of `src/contracts/.keys.staging`.\
       Deployed contract addresses will be automatically updated in all required validators 
       and test services configs.
     * (2.5) Prefund validator accounts in home network (Kovan):

@@ -5,8 +5,8 @@ data/
 demo/validator*/development
 demo/validator*/staging
 demo/validator*/.keys.staging
-src/deploy/deploy*/build/
-src/deploy/.keys.staging
+src/contracts/*/build/
+src/contracts/.keys.staging
 src/test-services/.keys.staging
 src/test.js
 tests/results.xml
