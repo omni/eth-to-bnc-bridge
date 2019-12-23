@@ -18,9 +18,7 @@ orbs:
         steps:
           - run:
               name: "Install truffle"
-              command: |
-                sudo npm install -g truffle@v5.0.39
-                npm install --only=dev
+              command: sudo npm install -g truffle@v5.0.39
           - run:
               name: "Install ganache-cli"
               command: sudo npm install -g ganache-cli@v6.4.4
@@ -29,7 +27,9 @@ orbs:
         steps:
           - run:
               name: "Install eslint"
-              command: sudo npm install -g eslint@v6.6.0
+              command: |
+                sudo npm install -g eslint@v6.6.0
+                npm install --only=dev
           - run:
               name: "Install solhint"
               command: sudo npm install -g solhint@2.3.0
