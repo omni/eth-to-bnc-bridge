@@ -5,18 +5,6 @@ orbs:
       node:
         docker:
           - image: circleci/node:10.15
-      node-truffle:
-        docker:
-          - image: circleci/node:10.15
-            command: |
-              npm install -g truffle@v5.0.39
-              npm install -g ganache-cli@v6.4.4
-      node-lint:
-        docker:
-          - image: circleci/node:10.15
-            command: |
-              npm install -g eslint@v6.6.0
-              npm install -g solhint@2.3.0
     commands:
       fetch_repo:
         description: "Checkout and init submodules"
@@ -25,6 +13,24 @@ orbs:
           - run:
               name: "Initialize submodules"
               command: git submodule update --init
+      install_truffle_ganache:
+        description: "Install truffle and ganache-cli"
+        steps:
+          - run:
+              name: "Install truffle"
+              command: npm install -g truffle@v5.0.39
+          - run:
+              name: "Install ganache-cli"
+              command: npm install -g ganache-cli@v6.4.4
+      install_linters:
+        description: "Install code linters"
+        steps:
+          - run:
+              name: "Install eslint"
+              command: npm install -g eslint@v6.6.0
+          - run:
+              name: "Install solhint"
+              command: npm install -g solhint@2.3.0
       setup_docker:
         description: "Set up remote docker engine"
         steps:
@@ -134,14 +140,16 @@ jobs:
           when: always
       - bridge/save_artifacts
   lint:
-    executor: bridge/node-lint
+    executor: bridge/node
     steps:
       - bridge/fetch_repo
+      - bridge/install_linters
       - run: npm run lint
   tests_home:
-    executor: bridge/node-truffle
+    executor: bridge/node
     steps:
       - bridge/fetch_repo
+      - bridge/install_truffle_ganache
       - run:
           name: "Install test dependencies"
           command: |
@@ -149,9 +157,10 @@ jobs:
             npm install
       - run: npm run tests:home
   tests_side:
-    executor: bridge/node-truffle
+    executor: bridge/node
     steps:
       - bridge/fetch_repo
+      - bridge/install_truffle_ganache
       - run:
           name: "Install test dependencies"
           command: |
