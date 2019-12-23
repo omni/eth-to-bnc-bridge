@@ -1,0 +1,11 @@
+{
+  "extends": [
+    "../../.eslintrc"
+  ],
+  "env": {
+    "mocha": true
+  },
+  "rules": {
+    "no-loop-func": 0
+  }
+}
