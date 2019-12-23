@@ -18,19 +18,19 @@ orbs:
         steps:
           - run:
               name: "Install truffle"
-              command: npm install -g truffle@v5.0.39
+              command: sudo npm install -g truffle@v5.0.39
           - run:
               name: "Install ganache-cli"
-              command: npm install -g ganache-cli@v6.4.4
+              command: sudo npm install -g ganache-cli@v6.4.4
       install_linters:
         description: "Install code linters"
         steps:
           - run:
               name: "Install eslint"
-              command: npm install -g eslint@v6.6.0
+              command: sudo npm install -g eslint@v6.6.0
           - run:
               name: "Install solhint"
-              command: npm install -g solhint@2.3.0
+              command: sudo npm install -g solhint@2.3.0
       setup_docker:
         description: "Set up remote docker engine"
         steps:
