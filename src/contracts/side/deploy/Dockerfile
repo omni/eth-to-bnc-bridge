@@ -16,15 +16,15 @@ RUN mkdir temp \
  && cd .. \
  && rm -rf temp
 
-COPY package.json /build/
+COPY ./package.json /build/
 RUN npm install
 
-COPY truffle-config-build.js /build/truffle-config.js
+COPY ./truffle-config.js /build
 COPY contracts /build/contracts
 
 RUN truffle compile
 
-COPY truffle-config.js /build/truffle-config.js
+COPY ./deploy/truffle-config.js /build/truffle-config.js
 COPY migrations /build/migrations
 
 ENTRYPOINT ["truffle", "deploy"]

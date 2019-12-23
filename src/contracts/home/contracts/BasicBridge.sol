@@ -20,6 +20,8 @@ contract BasicBridge {
         uint32 nonce;
         uint16 threshold;
         uint16 rangeSize;
+        uint96 minTxLimit;
+        uint96 maxTxLimit;
         bool closeEpoch;
         uint x;
         uint y;
@@ -39,9 +41,6 @@ contract BasicBridge {
 
     uint16 public epoch;
     uint16 public nextEpoch;
-
-    uint96 minTxLimit;
-    uint96 maxTxLimit;
 
     IERC20 public tokenContract;
 
@@ -108,6 +107,30 @@ contract BasicBridge {
 
     function getNextRangeSize() view public returns (uint16) {
         return getRangeSize(nextEpoch);
+    }
+
+    function getMinPerTx() view public returns (uint96) {
+        return getMinPerTx(epoch);
+    }
+
+    function getNextMinPerTx() view public returns (uint96) {
+        return getMinPerTx(nextEpoch);
+    }
+
+    function getMinPerTx(uint16 _epoch) view public returns (uint96) {
+        return states[_epoch].minTxLimit;
+    }
+
+    function getMaxPerTx() view public returns (uint96) {
+        return getMaxPerTx(epoch);
+    }
+
+    function getNextMaxPerTx() view public returns (uint96) {
+        return getMaxPerTx(nextEpoch);
+    }
+
+    function getMaxPerTx(uint16 _epoch) view public returns (uint96) {
+        return states[_epoch].maxTxLimit;
     }
 
     function getRangeSize(uint16 _epoch) view public returns (uint16) {

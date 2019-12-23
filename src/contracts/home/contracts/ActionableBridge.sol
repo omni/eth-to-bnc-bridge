@@ -55,6 +55,8 @@ contract ActionableBridge is BasicBridge {
         states[nextEpoch].validators = getValidators();
         states[nextEpoch].rangeSize = getRangeSize();
         states[nextEpoch].closeEpoch = getCloseEpoch();
+        states[nextEpoch].minTxLimit = getMinPerTx();
+        states[nextEpoch].maxTxLimit = getMaxPerTx();
 
         if (getCloseEpoch()) {
             status = Status.CLOSING_EPOCH;

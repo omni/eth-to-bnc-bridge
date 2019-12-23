@@ -18,6 +18,8 @@ contract EthToBncBridge is UpdatableBridge {
     ) public {
         require(validators.length > 0);
         require(threshold <= validators.length);
+        require(limits[0] >= 10 ** 10);
+        require(limits[0] <= limits[1]);
 
         tokenContract = IERC20(_tokenContract);
 
@@ -34,17 +36,16 @@ contract EthToBncBridge is UpdatableBridge {
             nonce : UPPER_BOUND,
             x : 0,
             y : 0,
-            closeEpoch : closeEpoch
+            closeEpoch : closeEpoch,
+            minTxLimit: limits[0],
+            maxTxLimit: limits[1]
         });
-
-        minTxLimit = limits[0];
-        maxTxLimit = limits[1];
 
         emit NewEpoch(0, 1);
     }
 
     function exchange(uint96 value) public ready {
-        require(value >= minTxLimit && value >= 10 ** 10 && value <= maxTxLimit);
+        require(value >= getMinPerTx() && value <= getMaxPerTx());
 
         uint32 txRange = (uint32(block.number) - getStartBlock()) / uint32(getRangeSize());
         if (!usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))]) {
