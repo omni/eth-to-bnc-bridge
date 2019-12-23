@@ -75,11 +75,11 @@ orbs:
                 docker logs validator<< parameters.validator >>_rabbitmq_1 > ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
                 docker logs validator<< parameters.validator >>_redis_1 > ./artifacts/logs/validator<< parameters.validator >>/redis.log
                 docker logs validator<< parameters.validator >>_proxy_1 > ./artifacts/logs/validator<< parameters.validator >>/proxy.log
-                docker logs validator<< parameters.validator >>_eth-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/eth-watcher.log
-                docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
-                docker logs validator<< parameters.validator >>_signer_1 > ./artifacts/logs/validator<< parameters.validator >>/signer.log
-                docker logs validator<< parameters.validator >>_keygen_1 > ./artifacts/logs/validator<< parameters.validator >>/keygen.log
+                docker logs validator<< parameters.validator >>_home-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/home-watcher.log
                 docker logs validator<< parameters.validator >>_side-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/side-watcher.log
+                docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
+                docker logs validator<< parameters.validator >>_sign-client_1 > ./artifacts/logs/validator<< parameters.validator >>/sign-client.log
+                docker logs validator<< parameters.validator >>_keygen-client_1 > ./artifacts/logs/validator<< parameters.validator >>/keygen-client.log
                 docker logs validator<< parameters.validator >>_side-sender_1 > ./artifacts/logs/validator<< parameters.validator >>/side-sender.log
                 docker logs validator<< parameters.validator >>_home-sender_1 > ./artifacts/logs/validator<< parameters.validator >>/home-sender.log
               when: always
