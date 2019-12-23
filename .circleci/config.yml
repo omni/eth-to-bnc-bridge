@@ -28,8 +28,10 @@ orbs:
           - run:
               name: "Install eslint"
               command: |
-                sudo npm install -g eslint@v6.6.0
-                npm install --only=dev
+                npm install eslint@6.8.0
+                npm install eslint-config-airbnb@18.0.1
+                npm install eslint-plugin-node@10.0.0
+                npm install eslint-plugin-truffle@0.3.1
           - run:
               name: "Install solhint"
               command: sudo npm install -g solhint@2.3.0

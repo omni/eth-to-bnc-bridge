@@ -30,7 +30,7 @@ for (( I = 1; I < 4; ++I )); do
             --network validator"$I"_test_network \
             --entrypoint ash \
             appropriate/curl:latest \
-            -c "timeout 30s ash -c 'until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done'"
+            -c "timeout -t 30 ash -c 'until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done'"
     fi
 done
 

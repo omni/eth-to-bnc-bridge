@@ -2,8 +2,8 @@
   "name": "bridge",
   "version": "0.0.1",
   "devDependencies": {
+    "eslint": "6.8.0",
     "eslint-config-airbnb": "18.0.1",
-    "eslint-plugin-import": "2.18.2",
     "eslint-plugin-node": "10.0.0",
     "eslint-plugin-truffle": "0.3.1"
   },
@@ -12,7 +12,7 @@
     "tests:home": "cd src/contracts && ./run-tests.sh home",
     "tests:side": "cd src/contracts && ./run-tests.sh side",
     "lint": "npm run lint:js && npm run lint:sol",
-    "lint:js": "eslint .",
+    "lint:js": "npx eslint .",
     "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",
     "lint:sol:home": "cd src/contracts && solhint --max-warnings 0 \"./home/contracts/**/*.sol\"",
     "lint:sol:side": "cd src/contracts && solhint --max-warnings 0 \"./side/contracts/**/*.sol\""
