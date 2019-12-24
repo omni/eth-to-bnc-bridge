@@ -50,7 +50,8 @@ for (( I = 1; I < 4; ++I )); do
 done
 
 echo "Starting tests"
-docker start -a tests || true
+res=0
+docker start -a tests || res=$?
 
 echo "Saving test results"
 docker cp "tests:/tests/results.xml" "./tests/results.xml" > /dev/null 2>&1 || true
@@ -61,3 +62,5 @@ if [[ -z "$CI" ]]; then
     docker kill $(docker ps | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
     docker kill $(docker ps | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
 fi
+
+exit "$res"

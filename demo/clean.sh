@@ -13,6 +13,8 @@ docker kill $(docker ps | grep validator[1-3]_ | awk '{print $1}') > /dev/null 2
 docker rm $(docker ps -a | grep validator[1-3]_ | awk '{print $1}') > /dev/null 2>&1 || true
 docker kill ganache_home ganache_side > /dev/null 2>&1 || true
 docker rm ganache_home ganache_side > /dev/null 2>&1 || true
+docker kill deploy_token deploy_bridge deploy_db > /dev/null 2>&1 || true
+docker rm deploy_token deploy_bridge deploy_db > /dev/null 2>&1 || true
 docker kill $(docker ps | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
 docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
 docker kill $(docker ps | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true

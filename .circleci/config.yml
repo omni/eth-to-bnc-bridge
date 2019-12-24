@@ -116,6 +116,14 @@ orbs:
                 docker logs binance-testnet_api-server_1 > ./artifacts/logs/binance/api-server.log
                 docker logs binance-testnet_http-api_1 > ./artifacts/logs/binance/http-api.log
               when: always
+          - run:
+              name: "Save deploy logs"
+              command: |
+                mkdir -p ./artifacts/logs/deploy
+                docker logs deploy_token > ./artifacts/logs/deploy/deploy_token.log
+                docker logs deploy_bridge > ./artifacts/logs/deploy/deploy_bridge.log
+                docker logs deploy_db > ./artifacts/logs/deploy/deploy_db.log
+              when: always
           - store_artifacts:
               path: ./artifacts
               destination: artifacts

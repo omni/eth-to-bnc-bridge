@@ -22,23 +22,25 @@ deploy_token() {
   echo "Compiling and deploying erc20"
 
   echo "Building deploy docker image"
-  docker build -t deploy_test -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
+  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    TOKEN_ADDRESS=$(docker run --network "$HOME_NETWORK" --rm -v "$HOME_CONTRACTS_DIR/build:/build/build" \
+    TOKEN_ADDRESS=$(docker run --network "$HOME_NETWORK" -v "$HOME_CONTRACTS_DIR/build:/build/build" \
     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.development" \
     -e "DEPLOY_TOKEN=true" \
-    deploy_test \
+    --name deploy_token \
+    deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    TOKEN_ADDRESS=$(docker run --rm -v "$HOME_CONTRACTS_DIR/deploy/build:/build/build" \
+    TOKEN_ADDRESS=$(docker run -v "$HOME_CONTRACTS_DIR/deploy/build:/build/build" \
     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.staging" \
     --env-file "$CONTRACTS_DIR/.keys.staging" \
     -e "DEPLOY_TOKEN=true" \
-    deploy_test \
+    --name deploy_token \
+    deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
@@ -49,20 +51,22 @@ deploy_bridge() {
   echo "Compiling and deploying home part"
 
   echo "Building deploy docker image"
-  docker build -t deploy_test -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
+  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    BRIDGE_ADDRESS=$(docker run --network "$HOME_NETWORK" --rm -v "$HOME_CONTRACTS_DIR/build:/build/build" \
-     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.development" \
+    BRIDGE_ADDRESS=$(docker run --network "$HOME_NETWORK" -v "$HOME_CONTRACTS_DIR/build:/build/build" \
+    --env-file "$HOME_CONTRACTS_DIR/deploy/.env.development" \
+    --name deploy_bridge \
     deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    BRIDGE_ADDRESS=$(docker run --rm -v "$HOME_CONTRACTS_DIR/build:/build/build" \
+    BRIDGE_ADDRESS=$(docker run -v "$HOME_CONTRACTS_DIR/build:/build/build" \
     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.staging" \
     --env-file "$CONTRACTS_DIR/.keys.staging" \
+    --name deploy_bridge \
     deploy_home \
     --network home 2>&1 \
     | grep "contract address" \
@@ -78,16 +82,18 @@ deploy_db() {
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
-    SHARED_DB_ADDRESS=$(docker run --network "$SIDE_NETWORK" --rm -v "$SIDE_CONTRACTS_DIR/build:/build/build" \
+    SHARED_DB_ADDRESS=$(docker run --network "$SIDE_NETWORK" -v "$SIDE_CONTRACTS_DIR/build:/build/build" \
     --env-file "$SIDE_CONTRACTS_DIR/deploy/.env.development" \
+    --name deploy_db \
     deploy_side \
     --network side 2>&1 \
     | grep "contract address" \
     | awk '{print $4}')
   else
-    SHARED_DB_ADDRESS=$(docker run --rm -v "$SIDE_CONTRACTS_DIR/build:/build/build" \
+    SHARED_DB_ADDRESS=$(docker run -v "$SIDE_CONTRACTS_DIR/build:/build/build" \
     --env-file "$SIDE_CONTRACTS_DIR/deploy/.env.staging" \
     --env-file "$CONTRACTS_DIR/.keys.staging" \
+    --name deploy_db \
     deploy_side \
     --network side 2>&1 \
     | grep "contract address" \
