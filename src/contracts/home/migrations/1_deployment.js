@@ -12,7 +12,7 @@ const {
 
 module.exports = DEPLOY_TOKEN
   ? async (deployer, network, accounts) => {
-    if (network === 'test') {
+    if (network === 'test' || network === 'coverage') {
       return
     }
     await deployer.deploy(TokenContract)
@@ -21,7 +21,7 @@ module.exports = DEPLOY_TOKEN
     await instance.mint(accounts[0], TOKEN_INITIAL_MINT)
   }
   : (deployer, network) => {
-    if (network === 'test') {
+    if (network === 'test' || network === 'coverage') {
       return
     }
     deployer.deploy(
