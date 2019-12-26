@@ -156,16 +156,6 @@ async function signupSign(req, res) {
   logger.debug(`Using attempt ${attempt}`)
 
   const query = sharedDb.interface.functions.signup.encode([hash])
-  const isSignuped = await sharedDb.isSignuped(hash, validatorAddress)
-
-  if (isSignuped) {
-    res.send(Ok({
-      uuid: hash,
-      number: 0
-    }))
-    logger.debug('Already have signup')
-    return
-  }
 
   sendJob(query)
   const validators = await bridge.getValidators()
