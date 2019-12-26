@@ -2,6 +2,8 @@
 
 trap cleanup EXIT
 
+cd $(dirname "$0")
+
 cleanup() {
   # Kill the ganache instance that we started (if we started one and if it's still running).
   if [ -n "$ganache_pid" ] && ps -p $ganache_pid > /dev/null; then
@@ -9,11 +11,34 @@ cleanup() {
   fi
 }
 
-ganache-cli --gasLimit 0xfffffffffff -m "shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat" -i 55 > /dev/null &
+PROJECT_ROOT_DIR=$(dirname "`dirname "$(pwd)"`")
+cd "$1"
+
+echo "$PROJECT_ROOT_DIR"
+
+mnemonic="shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat"
+if [[ -z "$COVERAGE" ]]; then
+    echo "Starting ganache-cli"
+    "$PROJECT_ROOT_DIR/node_modules/.bin/ganache-cli" \
+    --gasLimit 8000000 \
+    -m "$mnemonic" \
+    -i 55 \
+    > /dev/null &
+else
+    echo "Starting testrpc-sc"
+    "$PROJECT_ROOT_DIR/node_modules/.bin/testrpc-sc" \
+    --gasLimit 0xfffffffffff \
+    --allowUnlimitedContractSize \
+    -m "$mnemonic" \
+    -i 55 \
+    > /dev/null &
+fi
 ganache_pid=$!
 
 echo "Running tests for $1"
 
-cd "$1"
-
-truffle test --network test
+if [[ -z "$COVERAGE" ]]; then
+    "$PROJECT_ROOT_DIR/node_modules/.bin/truffle" test --network test
+else
+    "$PROJECT_ROOT_DIR/node_modules/.bin/solidity-coverage"
+fi
