@@ -6,6 +6,8 @@ demo/validator*/development
 demo/validator*/staging
 demo/validator*/.keys.staging
 src/contracts/*/build/
+src/contracts/*/coverage/
+src/contracts/*/coverage.json
 src/contracts/.keys.staging
 src/test-services/.keys.staging
 src/test.js
