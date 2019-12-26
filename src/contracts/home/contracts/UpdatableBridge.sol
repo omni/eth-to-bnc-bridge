@@ -6,7 +6,7 @@ import "./libraries/MessageDecoder.sol";
 contract UpdatableBridge is ActionableBridge {
     using MessageDecoder for bytes;
 
-    uint constant SIGNATURE_SIZE = 65;
+    uint internal constant SIGNATURE_SIZE = 65;
 
     event AppliedMessage(bytes message);
 
@@ -21,7 +21,7 @@ contract UpdatableBridge is ActionableBridge {
         if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.VOTE_CANCEL_KEYGEN) {
             require(msgEpoch == nextEpoch, "Incorrect message epoch");
         } else if (msgAction == Action.TRANSFER) {
-            require(msgEpoch <= epoch, "Incorrect message epoch");
+            require(msgEpoch > 0 && msgEpoch <= epoch, "Incorrect message epoch");
         } else {
             require(msgEpoch == epoch, "Incorrect message epoch");
         }
@@ -73,19 +73,17 @@ contract UpdatableBridge is ActionableBridge {
             // [3-31] - extra data
             require(message.length == 32, "Incorrect message length");
             _cancelKeygen();
-        } else if (msgAction == Action.TRANSFER) {
+        } else { // Action.TRANSFER, invalid actions will not reach this line, since casting uint8 to Action will revert execution
             // [3,34] - txHash, [35,54] - address, [55,66] - value
             require(message.length == 67, "Incorrect message length");
             (address to, uint96 value) = message._decodeTransfer();
             _transfer(to, value);
-        } else {
-            revert("Unknown message action");
         }
 
         emit AppliedMessage(message);
     }
 
-    function checkSignedMessage(bytes memory message, bytes memory signatures) view public returns (bytes32, uint16) {
+    function checkSignedMessage(bytes memory message, bytes memory signatures) public view returns (bytes32, uint16) {
         require(signatures.length % SIGNATURE_SIZE == 0, "Incorrect signatures length");
 
         bytes32 msgHash;

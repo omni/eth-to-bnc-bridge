@@ -1,3 +1,8 @@
 {
-  "extends": "solhint:default"
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["off", "^0.5.0"],
+    "mark-callable-contracts": "off",
+    "no-inline-assembly": "off"
+  }
 }

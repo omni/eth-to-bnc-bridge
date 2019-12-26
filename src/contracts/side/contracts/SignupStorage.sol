@@ -1,7 +1,7 @@
 pragma solidity ^0.5.0;
 
 contract SignupStorage {
-    uint counter = 1;
+    uint public counter = 1;
 
     mapping(bytes32 => mapping(address => uint)) public signups;
 
@@ -20,7 +20,7 @@ contract SignupStorage {
         bytes32 hash,
         address[] memory validators,
         address validator
-    ) view public returns (uint16) {
+    ) public view returns (uint16) {
         if (signups[hash][validator] == 0)
             return 0;
         uint16 id = 1;
@@ -37,7 +37,7 @@ contract SignupStorage {
         bytes32 hash,
         address[] memory validators,
         uint16 signupNumber
-    ) view public returns (address) {
+    ) public view returns (address) {
         for (uint i = 0; i < validators.length; i++) {
             if (getSignupNumber(hash, validators, validators[i]) == signupNumber) {
                 return validators[i];

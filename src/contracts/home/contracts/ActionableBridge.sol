@@ -27,16 +27,13 @@ contract ActionableBridge is BasicBridge {
             states[nextEpoch].startBlock = uint32(block.number);
             epoch = nextEpoch;
             emit EpochStart(epoch, x, y);
-        }
-        else {
+        } else {
             status = Status.FUNDS_TRANSFER;
             emit NewFundsTransfer(epoch, nextEpoch);
         }
     }
 
     function _confirmFundsTransfer() internal fundsTransfer {
-        require(epoch > 0, "First epoch does not need funds transfer");
-
         status = Status.READY;
         states[nextEpoch].startBlock = uint32(block.number);
         epoch = nextEpoch;
@@ -77,11 +74,14 @@ contract ActionableBridge is BasicBridge {
 
     function _removeValidator(address validator) internal voting {
         require(getNextPartyId(validator) != 0, "Already not a validator");
+        require(getNextParties() > getNextThreshold(), "Threshold is too high");
 
         uint16 lastPartyId = getNextParties() - 1;
+        address[] memory nextValidators = getNextValidators();
+
         for (uint i = 0; i < lastPartyId; i++) {
-            if (states[nextEpoch].validators[i] == validator) {
-                states[nextEpoch].validators[i] = getNextValidators()[lastPartyId];
+            if (nextValidators[i] == validator) {
+                states[nextEpoch].validators[i] = nextValidators[lastPartyId];
                 break;
             }
         }
@@ -91,6 +91,7 @@ contract ActionableBridge is BasicBridge {
 
     function _changeThreshold(uint16 threshold) internal voting {
         require(threshold > 0, "Invalid threshold value");
+        require(threshold <= getNextParties(), "Should be less than or equal to parties number");
 
         states[nextEpoch].threshold = threshold;
     }
@@ -106,14 +107,13 @@ contract ActionableBridge is BasicBridge {
     }
 
     function _startKeygen() internal voting {
-        require(getNextThreshold() <= getNextParties(), "Invalid threshold number");
-
         status = Status.KEYGEN;
 
         emit NewEpoch(epoch, nextEpoch);
     }
 
     function _cancelKeygen() internal keygen {
+        require(epoch > 0, "Cannot cancel keygen for first epoch");
         status = Status.VOTING;
 
         emit NewEpochCancelled(nextEpoch);

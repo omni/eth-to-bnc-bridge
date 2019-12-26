@@ -1,12 +1,12 @@
 pragma solidity ^0.5.0;
 
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./UpdatableBridge.sol";
 
 contract EthToBncBridge is UpdatableBridge {
     event ExchangeRequest(uint96 value, uint32 nonce);
 
-    mapping(bytes32 => bool) usedExchangeRanges;
+    mapping(bytes32 => bool) public usedExchangeRanges;
 
     constructor(
         uint16 threshold,
@@ -16,8 +16,8 @@ contract EthToBncBridge is UpdatableBridge {
         uint16 rangeSize,
         bool closeEpoch
     ) public {
-        require(validators.length > 0);
         require(threshold <= validators.length);
+        require(threshold > 0);
         require(limits[0] >= 10 ** 10);
         require(limits[0] <= limits[1]);
 
@@ -37,8 +37,8 @@ contract EthToBncBridge is UpdatableBridge {
             x : 0,
             y : 0,
             closeEpoch : closeEpoch,
-            minTxLimit: limits[0],
-            maxTxLimit: limits[1]
+            minTxLimit : limits[0],
+            maxTxLimit : limits[1]
         });
 
         emit NewEpoch(0, 1);

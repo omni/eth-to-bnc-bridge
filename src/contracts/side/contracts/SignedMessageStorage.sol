@@ -4,7 +4,7 @@ contract SignedMessageStorage {
     event NewMessage(bytes32 msgHash);
     event NewSignature(address indexed signer, bytes32 msgHash);
 
-    uint counter = 1;
+    uint public counter = 1;
 
     struct SignedMessage {
         bytes message;

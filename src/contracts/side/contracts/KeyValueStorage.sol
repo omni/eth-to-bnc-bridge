@@ -7,7 +7,7 @@ contract KeyValueStorage {
         db[encodeKey(msg.sender, id, key)] = data;
     }
 
-    function getData(address from, bytes32 id, bytes32 key) view public returns (bytes memory data) {
+    function getData(address from, bytes32 id, bytes32 key) public view returns (bytes memory data) {
         return db[encodeKey(from, id, key)];
     }
 

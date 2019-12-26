@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract BasicBridge {
-    uint32 constant UPPER_BOUND = 0xffffffff;
+    uint32 constant internal UPPER_BOUND = 0xffffffff;
 
     event EpochEnd(uint16 indexed epoch);
     event EpochClose(uint16 indexed epoch);
@@ -69,120 +69,111 @@ contract BasicBridge {
         _;
     }
 
-    function getParties() view public returns (uint16) {
+    function getParties() public view returns (uint16) {
         return getParties(epoch);
     }
 
-    function getNextParties() view public returns (uint16) {
+    function getNextParties() public view returns (uint16) {
         return getParties(nextEpoch);
     }
 
-    function getParties(uint16 _epoch) view public returns (uint16) {
+    function getParties(uint16 _epoch) public view returns (uint16) {
         return uint16(states[_epoch].validators.length);
     }
 
-    function getThreshold() view public returns (uint16) {
+    function getThreshold() public view returns (uint16) {
         return getThreshold(epoch);
     }
 
-    function getNextThreshold() view public returns (uint16) {
+    function getNextThreshold() public view returns (uint16) {
         return getThreshold(nextEpoch);
     }
 
-    function getThreshold(uint16 _epoch) view public returns (uint16) {
+    function getThreshold(uint16 _epoch) public view returns (uint16) {
         return states[_epoch].threshold;
     }
 
-    function getStartBlock() view public returns (uint32) {
+    function getStartBlock() public view returns (uint32) {
         return getStartBlock(epoch);
     }
 
-    function getStartBlock(uint16 _epoch) view public returns (uint32) {
+    function getStartBlock(uint16 _epoch) public view returns (uint32) {
         return states[_epoch].startBlock;
     }
 
-    function getRangeSize() view public returns (uint16) {
+    function getRangeSize() public view returns (uint16) {
         return getRangeSize(epoch);
     }
 
-    function getNextRangeSize() view public returns (uint16) {
+    function getNextRangeSize() public view returns (uint16) {
         return getRangeSize(nextEpoch);
     }
 
-    function getMinPerTx() view public returns (uint96) {
+    function getMinPerTx() public view returns (uint96) {
         return getMinPerTx(epoch);
     }
 
-    function getNextMinPerTx() view public returns (uint96) {
+    function getNextMinPerTx() public view returns (uint96) {
         return getMinPerTx(nextEpoch);
     }
 
-    function getMinPerTx(uint16 _epoch) view public returns (uint96) {
+    function getMinPerTx(uint16 _epoch) public view returns (uint96) {
         return states[_epoch].minTxLimit;
     }
 
-    function getMaxPerTx() view public returns (uint96) {
+    function getMaxPerTx() public view returns (uint96) {
         return getMaxPerTx(epoch);
     }
 
-    function getNextMaxPerTx() view public returns (uint96) {
+    function getNextMaxPerTx() public view returns (uint96) {
         return getMaxPerTx(nextEpoch);
     }
 
-    function getMaxPerTx(uint16 _epoch) view public returns (uint96) {
+    function getMaxPerTx(uint16 _epoch) public view returns (uint96) {
         return states[_epoch].maxTxLimit;
     }
 
-    function getRangeSize(uint16 _epoch) view public returns (uint16) {
+    function getRangeSize(uint16 _epoch) public view returns (uint16) {
         return states[_epoch].rangeSize;
     }
 
-    function getNonce() view public returns (uint32) {
+    function getNonce() public view returns (uint32) {
         return getNonce(epoch);
     }
 
-    function getNonce(uint16 _epoch) view public returns (uint32) {
+    function getNonce(uint16 _epoch) public view returns (uint32) {
         return states[_epoch].nonce;
     }
 
-    function getX() view public returns (uint) {
+    function getX() public view returns (uint) {
         return getX(epoch);
     }
 
-    function getX(uint16 _epoch) view public returns (uint) {
+    function getX(uint16 _epoch) public view returns (uint) {
         return states[_epoch].x;
     }
 
-    function getY() view public returns (uint) {
+    function getY() public view returns (uint) {
         return getY(epoch);
     }
 
-    function getY(uint16 _epoch) view public returns (uint) {
+    function getY(uint16 _epoch) public view returns (uint) {
         return states[_epoch].y;
     }
 
-    function getCloseEpoch() view public returns (bool) {
+    function getCloseEpoch() public view returns (bool) {
         return getCloseEpoch(epoch);
     }
 
-    function getNextCloseEpoch() view public returns (bool) {
+    function getNextCloseEpoch() public view returns (bool) {
         return getCloseEpoch(nextEpoch);
     }
 
-    function getCloseEpoch(uint16 _epoch) view public returns (bool) {
+    function getCloseEpoch(uint16 _epoch) public view returns (bool) {
         return states[_epoch].closeEpoch;
     }
 
-    function getPartyId() view public returns (uint16) {
-        address[] memory validators = getValidators();
-        for (uint i = 0; i < getParties(); i++) {
-            if (validators[i] == msg.sender)
-                return uint16(i + 1);
-        }
-        return 0;
-    }
-
-    function getNextPartyId(address a) view public returns (uint16) {
+    function getNextPartyId(address a) public view returns (uint16) {
         address[] memory validators = getNextValidators();
         for (uint i = 0; i < getNextParties(); i++) {
             if (validators[i] == a)
@@ -191,15 +182,15 @@ contract BasicBridge {
         return 0;
     }
 
-    function getValidators() view public returns (address[] memory) {
+    function getValidators() public view returns (address[] memory) {
         return getValidators(epoch);
     }
 
-    function getNextValidators() view public returns (address[] memory) {
+    function getNextValidators() public view returns (address[] memory) {
         return getValidators(nextEpoch);
     }
 
-    function getValidators(uint16 _epoch) view public returns (address[] memory) {
+    function getValidators(uint16 _epoch) public view returns (address[] memory) {
         return states[_epoch].validators;
     }
 }
