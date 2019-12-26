@@ -21,7 +21,8 @@ const Action = {
   VOTE_CHANGE_CLOSE_EPOCH: 8,
   VOTE_START_KEYGEN: 9,
   VOTE_CANCEL_KEYGEN: 10,
-  TRANSFER: 11
+  TRANSFER: 11,
+  UNKNOWN_MESSAGE: 255
 }
 
 async function getDeployResult(contract) {
@@ -81,7 +82,7 @@ function expectEventInLogs(logs, eventName, eventArgs = {}) {
 }
 
 function padZeros(arg, len) {
-  let s = arg.toString()
+  let s = typeof arg === 'number' ? arg.toString(16) : arg.toString()
   while (s.length < len) {
     // eslint-disable-next-line no-param-reassign
     s = `0${s}`
@@ -102,6 +103,18 @@ function stripHex(s) {
   return isHex(s) ? s.substr(2) : s
 }
 
+async function skipBlocks(n = 1) {
+  for (let i = 0; i < n; i += 1) {
+    await web3.eth.sendTransaction({
+      from: '0xA374DC09057D6B3253d04fACb15736B43fBc7943',
+      gasPrice: '20000000000',
+      gas: '21000',
+      to: '0x99Eb3D86663c6Db090eFFdBC20510Ca9f836DCE3',
+      value: '1'
+    })
+  }
+}
+
 module.exports = {
   Status,
   Action,
@@ -110,5 +123,5 @@ module.exports = {
   buildMessage,
   stripHex,
   sign,
-  isHex
+  skipBlocks
 }
