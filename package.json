@@ -4,19 +4,27 @@
   "devDependencies": {
     "eslint": "6.8.0",
     "eslint-config-airbnb": "18.0.1",
-    "eslint-plugin-import": "^2.19.1",
+    "eslint-plugin-import": "2.19.1",
     "eslint-plugin-node": "10.0.0",
-    "eslint-plugin-truffle": "0.3.1"
+    "eslint-plugin-truffle": "0.3.1",
+    "solhint": "2.3.0",
+    "solidity-coverage": "0.6.7",
+    "truffle": "5.1.5",
+    "ganache-cli": "6.7.0"
   },
   "scripts": {
     "tests:e2e": "./tests/run.sh",
+    "tests": "npm run tests:home && npm run tests:side",
     "tests:home": "cd src/contracts && ./run-tests.sh home",
     "tests:side": "cd src/contracts && ./run-tests.sh side",
+    "tests:coverage": "npm run tests:home && npm run tests:side",
+    "tests:home:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh home",
+    "tests:side:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh home",
     "lint": "npm run lint:js && npm run lint:sol",
     "lint:js": "npx eslint .",
     "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",
-    "lint:sol:home": "cd src/contracts && solhint --max-warnings 0 \"./home/contracts/**/*.sol\"",
-    "lint:sol:side": "cd src/contracts && solhint --max-warnings 0 \"./side/contracts/**/*.sol\""
+    "lint:sol:home": "cd src/contracts && solhint --max-warnings 0 --ignore-path .solhintignore \"./home/contracts/**/*.sol\"",
+    "lint:sol:side": "cd src/contracts && solhint --max-warnings 0 --ignore-path .solhintignore \"./side/contracts/**/*.sol\""
   },
   "engines": {
     "node": ">=10.6.0"
