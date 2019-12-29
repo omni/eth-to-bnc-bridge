@@ -1,5 +1,5 @@
 module.exports = {
   norpc: true,
   testCommand: 'truffle test --network coverage',
-  copyPackages: ['@openzeppelin/contracts', 'truffle-hdwallet-provider']
+  copyPackages: ['@openzeppelin/contracts']
 }
