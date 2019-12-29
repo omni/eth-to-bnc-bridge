@@ -19,7 +19,7 @@
     "tests:side": "cd src/contracts && ./run-tests.sh side",
     "tests:coverage": "npm run tests:home && npm run tests:side",
     "tests:home:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh home",
-    "tests:side:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh home",
+    "tests:side:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh side",
     "lint": "npm run lint:js && npm run lint:sol",
     "lint:js": "npx eslint .",
     "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",
