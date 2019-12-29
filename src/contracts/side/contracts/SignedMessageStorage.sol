@@ -15,7 +15,6 @@ contract SignedMessageStorage {
     mapping(bytes32 => SignedMessage) public signedMessages;
 
     function addSignature(bytes memory message, bytes memory rsv) public {
-        require(message.length > 0, "Incorrect message length");
         require(rsv.length == 65, "Incorrect signature length");
 
         bytes32 msgHash;
