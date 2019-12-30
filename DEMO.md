@@ -136,6 +136,13 @@ The public Binance Chain testnet will keep a BEP2 token.
           // next epoch number, for which votes and keygen operations are applied
           "nextEpoch": 3,
       
+          // current and next epoch watcher range sizes, each range corresponds to at most one transaction in binance side
+          "rangeSize": 25,
+          "nextRangeSize": 25,
+      
+          // start block of current epoch in home chain
+          "epochStartBlock": 100,
+      
           // threshold number for current epoch, 
           // at least threshold votes are required for any changes in next epoch
           "threshold": 2, 
@@ -143,9 +150,16 @@ The public Binance Chain testnet will keep a BEP2 token.
           // threshold number for next epoch
           "nextThreshold": 2,
       
+          // true if bridge validators are required to close binance account for incoming transactions
+          "closeEpoch": true,
+          "nextCloseEpoch": false,
+      
           // current bridge addresses in home and foreign networks
           "homeBridgeAddress": "0x44c158FE850821ae69DaF37AADF5c539e9d0025B",
           "foreignBridgeAddress": "tbnb19z22khee969yj05dckg9usvmwndkucpyl543xk",
+      
+          // current pending nonce of bridge account in binance chain
+          "foreignNonce": 0,
       
           // current set of validators
           "validators": [
@@ -165,18 +179,8 @@ The public Binance Chain testnet will keep a BEP2 token.
           "foreignBalanceTokens": 100,
           "foreignBalanceNative": 0.0994,
       
-          // current bridge status, can be one of: ready, voting, keygen, funds_transfer
-          "bridgeStatus": "ready",
-      
-          // current votes count for starting voting, starting/cancelling keygen
-          // -1 means that enough confirmations are already collected
-          "votesForVoting": 0,
-          "votesForKeygen": 0,
-          "votesForCancelKeygen": 0,
-      
-          // collected confirmations for changing epoch to nextEpoch
-          // -1 means that enough confirmations are already collected
-          "confirmationsForFundsTransfer": 0
+          // current bridge status, can be one of: ready, closing_epoch, voting, keygen, funds_transfer
+          "bridgeStatus": "ready"
         }
       ``` 
     * (7.1) Start voting process for next epoch, via sending `$THRESHOLD` requests to `/vote/startVoting` url. Bridge 
@@ -333,7 +337,6 @@ Make sure, to first run demo in development mode, before trying to run it in the
    docker kill binance-testnet_api-server_1
    docker kill ethereum-testnet_ganache_home_1
    docker kill ethereum-testnet_ganache_side_1
-   docker kill ethereum-testnet_side-oracle_1
    ```
 3. Remove testnets and validators data:
    ```
