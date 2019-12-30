@@ -2,7 +2,7 @@
   "name": "side-contracts",
   "version": "0.0.1",
   "dependencies": {
-    "truffle-hdwallet-provider": "1.0.17"
+    "@truffle/hdwallet-provider": "1.0.28"
   },
   "devDependencies": {
     "chai": "4.2.0",

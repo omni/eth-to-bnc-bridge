@@ -1,4 +1,4 @@
-const PrivateKeyProvider = require('truffle-hdwallet-provider')
+const PrivateKeyProvider = require('@truffle/hdwallet-provider')
 
 const { HOME_RPC_URL, HOME_PRIVATE_KEY } = process.env
 

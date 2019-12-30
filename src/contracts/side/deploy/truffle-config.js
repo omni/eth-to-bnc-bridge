@@ -1,4 +1,4 @@
-const PrivateKeyProvider = require('truffle-hdwallet-provider')
+const PrivateKeyProvider = require('@truffle/hdwallet-provider')
 
 const { SIDE_RPC_URL, SIDE_PRIVATE_KEY } = process.env
 
@@ -15,7 +15,7 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 3
+          runs: 200
         }
       }
     }
