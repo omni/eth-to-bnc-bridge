@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 trap cleanup EXIT
 
 cd $(dirname "$0")
@@ -13,8 +15,6 @@ cleanup() {
 
 PROJECT_ROOT_DIR=$(dirname "`dirname "$(pwd)"`")
 cd "$1"
-
-echo "$PROJECT_ROOT_DIR"
 
 mnemonic="shrug dwarf easily blade trigger lucky reopen cage lake scatter desk boat"
 if [[ -z "$COVERAGE" ]]; then

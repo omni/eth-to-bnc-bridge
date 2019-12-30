@@ -18,33 +18,33 @@ orbs:
         steps:
           - run:
               name: "Install truffle"
-              command: sudo npm install -g truffle@v5.0.39
+              command: npm install truffle
       install_ganache:
         description: "Install ganache-cli"
         steps:
           - run:
               name: "Install ganache-cli"
-              command: sudo npm install -g ganache-cli@v6.4.4
+              command: npm install ganache-cli
       install_linters:
         description: "Install code linters"
         steps:
           - run:
               name: "Install eslint"
               command: |
-                npm install eslint@6.8.0
-                npm install eslint-config-airbnb@18.0.1
-                npm install eslint-plugin-node@10.0.0
-                npm install eslint-plugin-truffle@0.3.1
-                npm install eslint-plugin-import@2.19.1
+                npm install eslint
+                npm install eslint-config-airbnb
+                npm install eslint-plugin-node
+                npm install eslint-plugin-truffle
+                npm install eslint-plugin-import
           - run:
               name: "Install solhint"
-              command: sudo npm install -g solhint@2.3.0
+              command: npm install solhint
       install_solidity_coverage:
         description: "Install solidity-coverage"
         steps:
           - run:
               name: "Install solidity-coverage"
-              command: npm install solidity-coverage@0.6.7
+              command: npm install solidity-coverage
       setup_docker:
         description: "Set up remote docker engine"
         steps:
