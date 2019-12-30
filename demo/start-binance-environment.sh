@@ -14,19 +14,19 @@ else
     echo "Creating new binance test network"
 
     echo "Removing old environment"
-    docker kill $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker volume rm binance_marketdata > /dev/null 2>&1 || true
+    docker kill $(docker ps -a | grep binance-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker volume rm binance_marketdata &>/dev/null || true
 
-    docker network create binance_net > /dev/null 2>&1 || true
-    docker volume create binance_marketdata > /dev/null 2>&1 || true
-    docker volume create binance_data > /dev/null 2>&1 || true
+    docker network create binance_net &>/dev/null || true
+    docker volume create binance_marketdata &>/dev/null || true
+    docker volume create binance_data &>/dev/null || true
 
     need_to_deploy=true
 fi
 
 echo "Building required binaries"
-docker build -t testnet-binaries ../src/binance-testnet > /dev/null 2>&1 || true
+docker build -t testnet-binaries ../src/binance-testnet &>/dev/null || true
 
 echo "Running environment"
 docker-compose -f ../src/binance-testnet/docker-compose.yml up --build -d

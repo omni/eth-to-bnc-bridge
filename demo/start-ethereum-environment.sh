@@ -22,7 +22,7 @@ deploy_token() {
   echo "Compiling and deploying erc20"
 
   echo "Building deploy docker image"
-  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
+  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" &>/dev/null
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
@@ -51,7 +51,7 @@ deploy_bridge() {
   echo "Compiling and deploying home part"
 
   echo "Building deploy docker image"
-  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" > /dev/null 2>&1
+  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" &>/dev/null
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
@@ -78,7 +78,7 @@ deploy_db() {
   echo "Compiling and deploying side part"
 
   echo "Building deploy docker image"
-  docker build -t deploy_side -f "$SIDE_CONTRACTS_DIR/deploy/Dockerfile" "$SIDE_CONTRACTS_DIR" > /dev/null 2>&1
+  docker build -t deploy_side -f "$SIDE_CONTRACTS_DIR/deploy/Dockerfile" "$SIDE_CONTRACTS_DIR" &>/dev/null
 
   echo "Deploying"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
@@ -139,15 +139,15 @@ if [[ "$TARGET_NETWORK" == "development" ]]; then
     echo "Creating new ethereum test network"
 
     echo "Removing old environment"
-    docker kill $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker rm $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker volume rm ganache_side_data > /dev/null 2>&1 || true
-    docker volume rm ganache_home_data > /dev/null 2>&1 || true
+    docker kill $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker rm $(docker ps -a | grep ethereum-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker volume rm ganache_side_data &>/dev/null || true
+    docker volume rm ganache_home_data &>/dev/null || true
 
-    docker network create ethereum_side_rpc_net > /dev/null 2>&1 || true
-    docker network create ethereum_home_rpc_net > /dev/null 2>&1 || true
-    docker volume create ganache_side_data > /dev/null 2>&1 || true
-    docker volume create ganache_home_data > /dev/null 2>&1 || true
+    docker network create ethereum_side_rpc_net &>/dev/null || true
+    docker network create ethereum_home_rpc_net &>/dev/null || true
+    docker volume create ganache_side_data &>/dev/null || true
+    docker volume create ganache_home_data &>/dev/null || true
 
     need_to_deploy=true
   fi

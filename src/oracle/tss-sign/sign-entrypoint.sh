@@ -4,7 +4,7 @@ set -e
 
 echo "Connecting to $1"
 
-until curl "$1" > /dev/null 2>&1; do
+until curl "$1" &>/dev/null; do
     sleep 1;
 done
 
