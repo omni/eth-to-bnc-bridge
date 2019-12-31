@@ -64,9 +64,15 @@ contract('EthToBncBridge', async (accounts) => {
       })
     })
 
-    it('should not accept only 0 threshold', async () => {
+    it('should not accept 0 threshold', async () => {
       await deployBridge({
         threshold: 0
+      }).should.be.rejected
+    })
+
+    it('should not accept 0 range size', async () => {
+      await deployBridge({
+        rangeSize: 0
       }).should.be.rejected
     })
 
@@ -661,7 +667,11 @@ contract('EthToBncBridge', async (accounts) => {
       })
 
       it('should start keygen for 2nd epoch', async () => {
-        await applyMessage(startKeygenMessage11).should.be.fulfilled
+        const { logs } = await applyMessage(startKeygenMessage11).should.be.fulfilled
+        expectEventInLogs(logs, 'NewEpoch', {
+          oldEpoch: '1',
+          newEpoch: '2'
+        })
         expect(await bridge.status()).to.bignumber.equal(Status.KEYGEN)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
@@ -669,7 +679,11 @@ contract('EthToBncBridge', async (accounts) => {
 
       it('should confirm keygen for 2nd epoch', async () => {
         await applyMessage(startKeygenMessage11)
-        await applyMessage(confirmKeygenMessage2).should.be.fulfilled
+        const { logs } = await applyMessage(confirmKeygenMessage2).should.be.fulfilled
+        expectEventInLogs(logs, 'NewFundsTransfer', {
+          oldEpoch: '1',
+          newEpoch: '2'
+        })
       })
 
       it('should not accept message with wrong length', async () => {
@@ -704,7 +718,11 @@ contract('EthToBncBridge', async (accounts) => {
 
       it('should confirm funds transfer', async () => {
         await applyMessage(confirmKeygenMessage2)
-        await applyMessage(confirmFundsTransferMessage1).should.be.fulfilled
+        const { logs } = await applyMessage(confirmFundsTransferMessage1).should.be.fulfilled
+        expectEventInLogs(logs, 'EpochStart', {
+          x: '0x3333333333333333333333333333333333333333333333333333333333333333',
+          y: '0x4444444444444444444444444444444444444444444444444444444444444444'
+        })
         expect(await bridge.status()).to.bignumber.equal(Status.READY)
         expect(await bridge.epoch()).to.bignumber.equal('2')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
@@ -747,7 +765,10 @@ contract('EthToBncBridge', async (accounts) => {
       }).skipBeforeEach = true
 
       it('should cancel keygen for 2nd epoch', async () => {
-        await applyMessage(cancelKeygenMessage21).should.be.fulfilled
+        const { logs } = await applyMessage(cancelKeygenMessage21).should.be.fulfilled
+        expectEventInLogs(logs, 'NewEpochCancelled', {
+          epoch: '2'
+        })
         expect(await bridge.status()).to.bignumber.equal(Status.VOTING)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')

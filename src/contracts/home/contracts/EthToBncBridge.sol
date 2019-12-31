@@ -20,6 +20,7 @@ contract EthToBncBridge is UpdatableBridge {
         require(threshold > 0);
         require(limits[0] >= 10 ** 10);
         require(limits[0] <= limits[1]);
+        require(rangeSize > 0);
 
         tokenContract = IERC20(_tokenContract);
 
