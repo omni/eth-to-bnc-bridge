@@ -9,7 +9,7 @@ RUN npm install -g truffle
 RUN truffle obtain --solc 0.5.9
 
 COPY ./package.json /build/
-RUN npm install
+RUN npm install --only=prod
 
 COPY ./truffle-config.js /build
 COPY contracts /build/contracts
