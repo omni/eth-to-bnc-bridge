@@ -45,6 +45,15 @@ orbs:
           - run:
               name: "Install solidity-coverage"
               command: npm install solidity-coverage
+      install_coveralls:
+        description: "Install coveralls plugin and lcov merger"
+        steps:
+          - run:
+              name: "Install coveralls plugin"
+              command: npm install coveralls
+          - run:
+              name: "Install lcov merger"
+              command: npm install lcov-result-merger
       setup_docker:
         description: "Set up remote docker engine"
         steps:
@@ -203,6 +212,11 @@ jobs:
             cd ./src/contracts/home
             npm install
       - run: npm run tests:home:coverage
+      - persist_to_workspace:
+          name: "Save lcov.info"
+          root: ./src/contracts
+          paths:
+            - home/coverage/lcov.info
   tests_side_coverage:
     executor: bridge/node
     steps:
@@ -215,6 +229,24 @@ jobs:
             cd ./src/contracts/side
             npm install
       - run: npm run tests:side:coverage
+      - persist_to_workspace:
+          name: "Save lcov.info"
+          root: ./src/contracts
+          paths:
+            - side/coverage/lcov.info
+  upload_to_coveralls:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_coveralls
+      - attach_workspace:
+          at: ./workspace
+      - run:
+          name: "Merge lcov files"
+          command: ./node_modules/.bin/lcov-result-merger './workspace/*/coverage/lcov.info' ./lcov.info
+      - run:
+          name: "Upload coveralls"
+          command: cat ./lcov.info | ./node_modules/.bin/coveralls
 workflows:
   version: 2
   main:
@@ -228,3 +260,7 @@ workflows:
       - tests_side
       - tests_home_coverage
       - tests_side_coverage
+      - upload_to_coveralls:
+          requires:
+            - tests_home_coverage
+            - tests_side_coverage
