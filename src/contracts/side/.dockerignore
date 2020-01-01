@@ -1,0 +1,8 @@
+.dockerignore
+Dockerfile
+.solcover.js
+coverage.json
+package-lock.json
+node_modules/
+build/
+coverage/
