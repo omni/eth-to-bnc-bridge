@@ -6,8 +6,10 @@ if [[ -z "$CI" ]]; then
     echo "Cleaning previous demo environment"
     ./demo/clean.sh
 
-    echo "Building tss clients"
-    docker build -t tss ./src/tss
+    if [[ -z "$(docker images -q tss 2> /dev/null)" ]]; then
+        echo "Building tss clients"
+        docker build -t tss ./src/tss &>/dev/null
+    fi
 fi
 
 echo "Starting ethereum test networks"
@@ -16,9 +18,9 @@ echo "Starting binance test network"
 ./demo/start-binance-environment.sh
 
 echo "Starting validator daemons"
-for (( I = 1; I < 4; ++I )); do
-    N="$I" ./demo/validator-demo.sh -d
-done
+N=1 ./demo/validator-demo.sh -d --build
+N=2 ./demo/validator-demo.sh -d
+N=3 ./demo/validator-demo.sh -d
 
 
 echo "Waiting until validators are ready"
@@ -39,7 +41,7 @@ docker build -t tests ./tests
 
 echo "Creating tests container"
 docker rm tests &>/dev/null || true
-docker create --name tests --env-file ./tests/.env tests
+docker create --name tests --env-file ./tests/.env tests &>/dev/null
 
 echo "Connecting tests container to test networks"
 docker network connect binance_net tests

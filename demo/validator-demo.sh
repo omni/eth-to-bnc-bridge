@@ -6,7 +6,7 @@ set -o allexport
 # either development or staging
 TARGET_NETWORK=${TARGET_NETWORK:=development}
 
-DCU_FLAGS="--build --force-recreate"
+DCU_FLAGS="--force-recreate"
 NAME="validator$N"
 
 cd $(dirname "$0")

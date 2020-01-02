@@ -19,12 +19,7 @@ HOME_NETWORK="ethereum_home_rpc_net"
 SIDE_NETWORK="ethereum_side_rpc_net"
 
 deploy_token() {
-  echo "Compiling and deploying erc20"
-
-  echo "Building deploy docker image"
-  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" &>/dev/null
-
-  echo "Deploying"
+  echo "Deploying erc20"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
     TOKEN_ADDRESS=$(docker run --network "$HOME_NETWORK" -v "$HOME_CONTRACTS_DIR/build:/build/build" \
     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.development" \
@@ -48,12 +43,7 @@ deploy_token() {
 }
 
 deploy_bridge() {
-  echo "Compiling and deploying home part"
-
-  echo "Building deploy docker image"
-  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" &>/dev/null
-
-  echo "Deploying"
+  echo "Deploying bridge"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
     BRIDGE_ADDRESS=$(docker run --network "$HOME_NETWORK" -v "$HOME_CONTRACTS_DIR/build:/build/build" \
     --env-file "$HOME_CONTRACTS_DIR/deploy/.env.development" \
@@ -75,12 +65,7 @@ deploy_bridge() {
 }
 
 deploy_db() {
-  echo "Compiling and deploying side part"
-
-  echo "Building deploy docker image"
-  docker build -t deploy_side -f "$SIDE_CONTRACTS_DIR/deploy/Dockerfile" "$SIDE_CONTRACTS_DIR" &>/dev/null
-
-  echo "Deploying"
+  echo "Deploying db"
   if [[ "$TARGET_NETWORK" == "development" ]]; then
     SHARED_DB_ADDRESS=$(docker run --network "$SIDE_NETWORK" -v "$SIDE_CONTRACTS_DIR/build:/build/build" \
     --env-file "$SIDE_CONTRACTS_DIR/deploy/.env.development" \
@@ -103,6 +88,11 @@ deploy_db() {
 
 deploy_all() {
   TOKEN_ADDRESS=$(source "$HOME_CONTRACTS_DIR/deploy/.env.$TARGET_NETWORK"; echo "$HOME_TOKEN_ADDRESS")
+
+  echo "Building home deploy docker image"
+  docker build -t deploy_home -f "$HOME_CONTRACTS_DIR/deploy/Dockerfile" "$HOME_CONTRACTS_DIR" &>/dev/null
+  echo "Building side deploy docker image"
+  docker build -t deploy_side -f "$SIDE_CONTRACTS_DIR/deploy/Dockerfile" "$SIDE_CONTRACTS_DIR" &>/dev/null
 
   if [[ "$TARGET_NETWORK" == "development" ]] || [[ "$TOKEN_ADDRESS" == "0x" ]]; then
     deploy_token
