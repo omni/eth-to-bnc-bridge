@@ -11,7 +11,7 @@ contract BasicBridge {
     event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch);
     event NewEpochCancelled(uint16 indexed epoch);
     event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch);
-    event EpochStart(uint16 indexed epoch, uint x, uint y);
+    event EpochStart(uint16 indexed epoch, bytes20 foreignAddress);
 
     struct State {
         address[] validators;
@@ -23,8 +23,7 @@ contract BasicBridge {
         uint96 minTxLimit;
         uint96 maxTxLimit;
         bool closeEpoch;
-        uint x;
-        uint y;
+        bytes20 foreignAddress;
     }
 
     enum Status {
@@ -145,20 +144,12 @@ contract BasicBridge {
         return states[_epoch].nonce;
     }
 
-    function getX() public view returns (uint) {
-        return getX(epoch);
+    function getForeignAddress() public view returns (bytes20) {
+        return getForeignAddress(epoch);
     }
 
-    function getX(uint16 _epoch) public view returns (uint) {
-        return states[_epoch].x;
-    }
-
-    function getY() public view returns (uint) {
-        return getY(epoch);
-    }
-
-    function getY(uint16 _epoch) public view returns (uint) {
-        return states[_epoch].y;
+    function getForeignAddress(uint16 _epoch) public view returns (bytes20) {
+        return states[_epoch].foreignAddress;
     }
 
     function getCloseEpoch() public view returns (bool) {

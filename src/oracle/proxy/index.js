@@ -9,10 +9,10 @@ const {
 const encode = require('./encode')
 const decode = require('./decode')
 const logger = require('../shared/logger')
-const { retry } = require('../shared/wait')
+const { retry, delay } = require('../shared/wait')
 const createProvider = require('../shared/ethProvider')
 const { connectRabbit, assertQueue } = require('../shared/amqp')
-const { publicKeyToAddress, padZeros } = require('../shared/crypto')
+const { hexAddressToBncAddress, padZeros, publicKeyToHexAddress } = require('../shared/crypto')
 const {
   parseNumber, parseAddress, parseBool, logRequest
 } = require('./expressUtils')
@@ -58,29 +58,26 @@ async function get(req, res) {
   const fromId = parseInt(tags[0], 10)
   const round = tags[tags.length - 2]
   const uuid = tags[tags.length - 1]
+  const hash = ethers.utils.id(uuid)
   const to = tags.length === 4 ? tags[1] : ''
-  let from
-  if (uuid.startsWith('k')) {
-    const validators = await bridge.getNextValidators()
-    from = validators[fromId - 1]
-  } else {
-    const validators = await bridge.getValidators()
-    from = await sharedDb.getSignupAddress(uuid, validators, fromId)
-  }
+  const [mode, epoch] = uuid.split('_')
+  const validators = await bridge['getValidators(uint16)'](parseInt(epoch, 10))
+  const from = mode === 'k' ? validators[fromId - 1] : await sharedDb.getSignupAddress(hash, validators, fromId)
   const key = ethers.utils.id(`${round}_${Number(to)}`)
 
-  const data = await sharedDb.getData(from, ethers.utils.id(uuid), key)
+  const data = await sharedDb.getData(from, hash, key)
 
   if (data.length > 2) {
     logger.trace(`Received encoded data: ${data}`)
-    const decoded = decode(uuid[0] === 'k', round, data)
+    const decoded = decode(mode === 'k', round, data)
     logger.trace('Decoded data: %o', decoded)
     res.send(Ok({
       key: req.body.key,
       value: decoded
     }))
   } else {
-    setTimeout(() => res.send(Err(null)), 1000)
+    await delay(1000)
+    res.send(Err(null))
   }
 }
 
@@ -94,6 +91,7 @@ async function set(req, res) {
   const tags = req.body.key.split('-')
   const round = tags[tags.length - 2]
   const uuid = tags[tags.length - 1]
+  const hash = ethers.utils.id(uuid)
   const to = tags.length === 4 ? tags[1] : ''
   const key = ethers.utils.id(`${round}_${Number(to)}`)
 
@@ -101,7 +99,7 @@ async function set(req, res) {
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
   logger.trace(`Encoded data: ${encoded.toString('hex')}`)
   logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
-  const query = sharedDb.interface.functions.setData.encode([ethers.utils.id(uuid), key, encoded])
+  const query = sharedDb.interface.functions.setData.encode([hash, key, encoded])
   sendJob(query)
 
   res.send(Ok(null))
@@ -115,8 +113,9 @@ async function signupKeygen(req, res) {
   let attempt = 1
   let uuid
   while (true) {
-    uuid = `k${epoch}_${attempt}`
-    const data = await sharedDb.getData(validatorAddress, ethers.utils.id(uuid), ethers.utils.id('round1_0'))
+    uuid = `k_${epoch}_${attempt}`
+    const hash = ethers.utils.id(uuid)
+    const data = await sharedDb.getData(validatorAddress, hash, ethers.utils.id('round1_0'))
     if (data.length === 2) {
       break
     }
@@ -143,8 +142,9 @@ async function signupSign(req, res) {
   let attempt = 1
   let uuid
   let hash
+  const epoch = await bridge.nextEpoch()
   while (true) {
-    uuid = `${msgHash}_${attempt}`
+    uuid = `s_${epoch}_${msgHash}_${attempt}`
     hash = ethers.utils.id(uuid)
     const data = await sharedDb.isSignuped(hash, validatorAddress)
     if (!data) {
@@ -166,7 +166,7 @@ async function signupSign(req, res) {
   )
 
   res.send(Ok({
-    uuid: hash,
+    uuid,
     number: id
   }))
 }
@@ -186,7 +186,8 @@ async function processMessage(type, ...params) {
 
 async function confirmKeygen(req, res) {
   const { x, y, epoch } = req.body
-  await processMessage(Action.CONFIRM_KEYGEN, epoch, padZeros(x, 64), padZeros(y, 64))
+  const hexAddress = publicKeyToHexAddress({ x, y })
+  await processMessage(Action.CONFIRM_KEYGEN, epoch, hexAddress)
   res.send()
 }
 
@@ -299,14 +300,11 @@ async function transfer(req, res) {
 async function info(req, res) {
   try {
     const [
-      x, y, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch, epochStartBlock,
-      foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, bridgeStatus,
-      homeBalance
+      foreignHexAddress, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch,
+      epochStartBlock, foreignNonce, nextEpoch, threshold, nextThreshold, validators,
+      nextValidators, bridgeStatus, homeBalance
     ] = await Promise.all([
-      bridge.getX()
-        .then((value) => new BN(value).toString(16)),
-      bridge.getY()
-        .then((value) => new BN(value).toString(16)),
+      bridge.getForeignAddress(),
       bridge.epoch(),
       bridge.getRangeSize(),
       bridge.getNextRangeSize(),
@@ -321,13 +319,9 @@ async function info(req, res) {
       bridge.getNextValidators(),
       bridge.status(),
       token.balanceOf(HOME_BRIDGE_ADDRESS)
-        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18)
-          .toFixed(8, 3)))
+        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
-    const foreignAddress = publicKeyToAddress({
-      x,
-      y
-    })
+    const foreignAddress = hexAddressToBncAddress(foreignHexAddress)
     const balances = await getForeignBalances(foreignAddress)
     const msg = {
       epoch,

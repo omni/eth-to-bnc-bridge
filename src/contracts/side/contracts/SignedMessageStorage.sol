@@ -17,16 +17,7 @@ contract SignedMessageStorage {
     function addSignature(bytes memory message, bytes memory rsv) public {
         require(rsv.length == 65, "Incorrect signature length");
 
-        bytes32 msgHash;
-        if (message.length == 3) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
-        } else if (message.length == 32) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
-        } else if (message.length == 67) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
-        } else {
-            revert("Incorrect message length");
-        }
+        bytes32 msgHash = hashMessage(message);
 
         bytes32 r;
         bytes32 s;
@@ -83,5 +74,21 @@ contract SignedMessageStorage {
             }
         }
         return id == senderPartyId;
+    }
+
+    function hashMessage(bytes memory message) internal pure returns(bytes32) {
+        if (message.length == 3) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
+        }
+        if (message.length == 23) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n23", message));
+        }
+        if (message.length == 32) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        }
+        if (message.length == 67) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
+        }
+        revert("Incorrect message length");
     }
 }

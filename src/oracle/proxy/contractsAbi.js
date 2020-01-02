@@ -2,8 +2,7 @@ const tokenAbi = [
   'function balanceOf(address account) view returns (uint256)'
 ]
 const bridgeAbi = [
-  'function getX() view returns (uint256)',
-  'function getY() view returns (uint256)',
+  'function getForeignAddress() view returns (bytes20)',
   'function epoch() view returns (uint16)',
   'function getRangeSize() view returns (uint16)',
   'function getNextRangeSize() view returns (uint16)',

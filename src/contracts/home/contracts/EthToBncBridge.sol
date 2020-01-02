@@ -35,8 +35,7 @@ contract EthToBncBridge is UpdatableBridge {
             startBlock : 0,
             endBlock : UPPER_BOUND,
             nonce : UPPER_BOUND,
-            x : 0,
-            y : 0,
+            foreignAddress: bytes20(0),
             closeEpoch : closeEpoch,
             minTxLimit : limits[0],
             maxTxLimit : limits[1]

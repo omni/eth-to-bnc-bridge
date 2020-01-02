@@ -21,16 +21,16 @@ contract UpdatableBridge is ActionableBridge {
         if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.VOTE_CANCEL_KEYGEN) {
             require(msgEpoch == nextEpoch, "Incorrect message epoch");
         } else if (msgAction == Action.TRANSFER) {
-            require(msgEpoch > 0 && msgEpoch <= epoch, "Incorrect message epoch");
+            require(msgEpoch <= epoch, "Incorrect message epoch");
         } else {
             require(msgEpoch == epoch, "Incorrect message epoch");
         }
 
         if (msgAction == Action.CONFIRM_KEYGEN) {
-            // [3,34] - x, [35,66] - y
-            require(message.length == 67, "Incorrect message length");
-            (uint x, uint y) = message._decodeKeygen();
-            _confirmKeygen(x, y);
+            // [3,22] - foreign address bytes
+            require(message.length == 23, "Incorrect message length");
+            address foreignAddress = message._decodeAddress();
+            _confirmKeygen(bytes20(foreignAddress));
         } else if (msgAction == Action.CONFIRM_FUNDS_TRANSFER) {
             require(message.length == 3, "Incorrect message length");
             _confirmFundsTransfer();
@@ -86,23 +86,14 @@ contract UpdatableBridge is ActionableBridge {
     function checkSignedMessage(bytes memory message, bytes memory signatures) public view returns (bytes32, uint16) {
         require(signatures.length % SIGNATURE_SIZE == 0, "Incorrect signatures length");
 
-        bytes32 msgHash;
-        if (message.length == 3) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
-        } else if (message.length == 32) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
-        } else if (message.length == 67) {
-            msgHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
-        } else {
-            revert("Incorrect message length");
-        }
+        bytes32 msgHash = hashMessage(message);
         require(!handledMessages[msgHash], "Tx was already handled");
 
         uint16 msgEpoch;
         assembly {
             msgEpoch := mload(add(message, 3))
         }
-        require(msgEpoch <= nextEpoch, "Invalid epoch number");
+        require(msgEpoch > 0 && msgEpoch <= nextEpoch, "Invalid epoch number");
 
         uint signaturesNum = signatures.length / SIGNATURE_SIZE;
         require(signaturesNum >= getThreshold(msgEpoch), "Not enough signatures");
@@ -133,5 +124,21 @@ contract UpdatableBridge is ActionableBridge {
             require(j != possibleValidators.length, "Not a validator signature");
         }
         return (msgHash, msgEpoch);
+    }
+
+    function hashMessage(bytes memory message) internal pure returns(bytes32) {
+        if (message.length == 3) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
+        }
+        if (message.length == 23) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n23", message));
+        }
+        if (message.length == 32) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+        }
+        if (message.length == 67) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
+        }
+        revert("Incorrect message length");
     }
 }

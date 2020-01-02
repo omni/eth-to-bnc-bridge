@@ -18,15 +18,14 @@ contract ActionableBridge is BasicBridge {
         TRANSFER
     }
 
-    function _confirmKeygen(uint x, uint y) internal keygen {
-        states[nextEpoch].x = x;
-        states[nextEpoch].y = y;
+    function _confirmKeygen(bytes20 foreignAddress) internal keygen {
+        states[nextEpoch].foreignAddress = foreignAddress;
         states[nextEpoch].nonce = UPPER_BOUND;
         if (nextEpoch == 1) {
             status = Status.READY;
             states[nextEpoch].startBlock = uint32(block.number);
             epoch = nextEpoch;
-            emit EpochStart(epoch, x, y);
+            emit EpochStart(epoch, foreignAddress);
         } else {
             status = Status.FUNDS_TRANSFER;
             emit NewFundsTransfer(epoch, nextEpoch);
@@ -37,7 +36,7 @@ contract ActionableBridge is BasicBridge {
         status = Status.READY;
         states[nextEpoch].startBlock = uint32(block.number);
         epoch = nextEpoch;
-        emit EpochStart(epoch, getX(), getY());
+        emit EpochStart(epoch, getForeignAddress());
     }
 
     function _confirmCloseEpoch() internal closingEpoch {
@@ -85,8 +84,7 @@ contract ActionableBridge is BasicBridge {
                 break;
             }
         }
-        delete states[nextEpoch].validators[lastPartyId];
-        states[nextEpoch].validators.length--;
+        states[nextEpoch].validators.pop();
     }
 
     function _changeThreshold(uint16 threshold) internal voting {

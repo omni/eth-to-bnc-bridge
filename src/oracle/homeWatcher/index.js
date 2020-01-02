@@ -6,7 +6,7 @@ const logger = require('../shared/logger')
 const redis = require('../shared/db')
 const createProvider = require('../shared/ethProvider')
 const { connectRabbit, assertQueue, resetFutureMessages } = require('../shared/amqp')
-const { publicKeyToAddress } = require('../shared/crypto')
+const { publicKeyToAddress, hexAddressToBncAddress } = require('../shared/crypto')
 const { delay, retry } = require('../shared/wait')
 
 const {
@@ -22,11 +22,10 @@ const bridgeAbi = [
   'event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
   'event NewEpochCancelled(uint16 indexed epoch)',
   'event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch)',
-  'event EpochStart(uint16 indexed epoch, uint256 x, uint256 y)',
+  'event EpochStart(uint16 indexed epoch, bytes20 foreignAddress)',
   'event EpochClose(uint16 indexed epoch)',
   'event ForceSign()',
-  'function getX(uint16 epoch) view returns (uint256)',
-  'function getY(uint16 epoch) view returns (uint256)',
+  'function getForeignAddress(uint16 epoch) view returns (bytes20)',
   'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getParties(uint16 epoch) view returns (uint16)',
   'function getRangeSize(uint16 epoch) view returns (uint16)',
@@ -83,17 +82,13 @@ function sendKeygenCancellation(event) {
 async function sendSignFundsTransfer(event) {
   const { newEpoch, oldEpoch } = event.values
   const [
-    x, y, threshold, parties
+    foreignHexAddress, threshold, parties
   ] = await Promise.all([
-    bridge.getX(newEpoch).then((value) => new BN(value).toString(16)),
-    bridge.getY(newEpoch).then((value) => new BN(value).toString(16)),
+    bridge.getForeignAddress(newEpoch),
     bridge.getThreshold(oldEpoch),
     bridge.getParties(oldEpoch)
   ])
-  const recipient = publicKeyToAddress({
-    x,
-    y
-  })
+  const recipient = hexAddressToBncAddress(foreignHexAddress)
   signQueue.send({
     epoch: oldEpoch,
     blockNumber,

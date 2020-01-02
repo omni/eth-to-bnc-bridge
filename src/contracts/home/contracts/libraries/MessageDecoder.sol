@@ -23,13 +23,6 @@ library MessageDecoder {
         }
     }
 
-    function _decodeKeygen(bytes memory message) internal pure returns (uint a, uint b) {
-        assembly {
-            a := mload(add(message, 35))
-            b := mload(add(message, 67))
-        }
-    }
-
     function _decodeTransfer(bytes memory message) internal pure returns (address a, uint96 b) {
         assembly {
             a := mload(add(message, 55))

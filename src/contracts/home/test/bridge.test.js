@@ -102,16 +102,13 @@ contract('EthToBncBridge', async (accounts) => {
   })
 
   describe('signatures checks', async () => {
-    const keygenMessage = buildMessage(
-      Action.CONFIRM_KEYGEN,
-      1,
-      '1111111111111111111111111111111111111111111111111111111111111111',
-      '2222222222222222222222222222222222222222222222222222222222222222'
-    )
-    const votingMessage = buildMessage(Action.VOTE_START_VOTING, 1)
+    const keygenMessage = buildMessage(Action.CONFIRM_KEYGEN, 1, '0000000000000000000000000000000000000000')
+    const votingMessage0 = buildMessage(Action.VOTE_START_VOTING, 0)
+    const votingMessage1 = buildMessage(Action.VOTE_START_VOTING, 1)
     const validatorMessage = buildMessage(Action.VOTE_ADD_VALIDATOR, 1, stripHex(accounts[0]), '000000000000000000')
-    const messages = [keygenMessage, votingMessage, validatorMessage]
-    const invalidMessage = `${votingMessage}00`
+    const transferMessage = buildMessage(Action.TRANSFER, 1, '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
+    const messages = [keygenMessage, votingMessage1, validatorMessage, transferMessage]
+    const invalidMessage = `${votingMessage1}00`
 
     before(async () => {
       bridge = await deployBridge()
@@ -157,6 +154,13 @@ contract('EthToBncBridge', async (accounts) => {
       await bridge.checkSignedMessage(keygenMessage, `0x${signature1}`).should.be.rejected
     })
 
+    it('should not accept message with 0 epoch', async () => {
+      const signature1 = stripHex(await sign(validators[0], votingMessage0))
+      const signature2 = stripHex(await sign(validators[1], votingMessage0))
+
+      await bridge.checkSignedMessage(votingMessage0, `0x${signature1}${signature2}`).should.be.rejected
+    })
+
     it('should not accept repeated correct signatures', async () => {
       const signature1 = stripHex(await sign(validators[0], keygenMessage))
       const signature2 = stripHex(await sign(validators[1], keygenMessage))
@@ -176,26 +180,9 @@ contract('EthToBncBridge', async (accounts) => {
   })
 
   describe('actions', async () => {
-    const confirmKeygenMessage0 = buildMessage(
-      Action.CONFIRM_KEYGEN,
-      0,
-      '0000000000000000000000000000000000000000000000000000000000000000',
-      '0000000000000000000000000000000000000000000000000000000000000000'
-    )
-    const confirmKeygenMessage11 = buildMessage(
-      Action.CONFIRM_KEYGEN,
-      1,
-      '1111111111111111111111111111111111111111111111111111111111111111',
-      '2222222222222222222222222222222222222222222222222222222222222222'
-    )
-    const confirmKeygenMessage12 = buildMessage(
-      Action.CONFIRM_KEYGEN,
-      1,
-      '2222222222222222222222222222222222222222222222222222222222222222',
-      '1111111111111111111111111111111111111111111111111111111111111111'
-    )
+    const confirmKeygenMessage11 = buildMessage(Action.CONFIRM_KEYGEN, 1, '1111111111111111111111111111111111111111')
+    const confirmKeygenMessage12 = buildMessage(Action.CONFIRM_KEYGEN, 1, '2222222222222222222222222222222222222222')
     const confirmKeygenMessage1err = buildMessage(Action.CONFIRM_KEYGEN, 1)
-    const startVotingMessage0 = buildMessage(Action.VOTE_START_VOTING, 0)
     const startVotingMessage1 = buildMessage(Action.VOTE_START_VOTING, 1)
     const startVotingMessage1err = buildMessage(Action.VOTE_START_VOTING, 1, '0000000000000000000000000000000000000000000000000000000000')
     const confirmCloseEpochMessage1 = buildMessage(Action.CONFIRM_CLOSE_EPOCH, 1)
@@ -231,20 +218,8 @@ contract('EthToBncBridge', async (accounts) => {
     const cancelKeygenMessage21 = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000000')
     const cancelKeygenMessage22 = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000001')
     const cancelKeygenMessage2err = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2)
-    const confirmKeygenMessage2 = buildMessage(
-      Action.CONFIRM_KEYGEN,
-      2,
-      '3333333333333333333333333333333333333333333333333333333333333333',
-      '4444444444444444444444444444444444444444444444444444444444444444'
-    )
+    const confirmKeygenMessage2 = buildMessage(Action.CONFIRM_KEYGEN, 2, '3333333333333333333333333333333333333333')
     const startVotingMessage2 = buildMessage(Action.VOTE_START_VOTING, 2)
-    const transferMessage05100 = buildMessage(
-      Action.TRANSFER,
-      0,
-      '0000000000000000000000000000000000000000000000000000000000000000',
-      stripHex(accounts[5]),
-      '000000000000000000000064'
-    )
     const transferMessage15100 = buildMessage(
       Action.TRANSFER,
       1,
@@ -258,6 +233,13 @@ contract('EthToBncBridge', async (accounts) => {
       '2222222222222222222222222222222222222222222222222222222222222222',
       stripHex(accounts[5]),
       '0000000000000000000000c8'
+    )
+    const transferMessage25100 = buildMessage(
+      Action.TRANSFER,
+      2,
+      '3333333333333333333333333333333333333333333333333333333333333333',
+      stripHex(accounts[5]),
+      '000000000000000000000064'
     )
     const transferMessage1err = buildMessage(Action.TRANSFER, 1)
     const unknownMessage = buildMessage(
@@ -278,14 +260,10 @@ contract('EthToBncBridge', async (accounts) => {
       startKeygenMessage1err, confirmFundsTransferMessage1, confirmFundsTransferMessage1err,
       cancelKeygenMessage1, cancelKeygenMessage21, cancelKeygenMessage22, cancelKeygenMessage2err,
       confirmKeygenMessage2, startVotingMessage2, transferMessage15100, transferMessage15200,
-      transferMessage1err, unknownMessage
+      transferMessage25100, transferMessage1err, unknownMessage
     ]
 
-    const validSignatures = {
-      [confirmKeygenMessage0]: '0x',
-      [startVotingMessage0]: '0x',
-      [transferMessage05100]: '0x'
-    }
+    const validSignatures = {}
 
     async function applyMessage(message, customBridge = bridge) {
       return await customBridge.applyMessage(message, validSignatures[message])
@@ -313,8 +291,7 @@ contract('EthToBncBridge', async (accounts) => {
       it('should complete keygen', async () => {
         const { logs } = await applyMessage(confirmKeygenMessage11).should.be.fulfilled
         expectEventInLogs(logs, 'EpochStart', {
-          x: '0x1111111111111111111111111111111111111111111111111111111111111111',
-          y: '0x2222222222222222222222222222222222222222222222222222222222222222'
+          foreignAddress: '0x1111111111111111111111111111111111111111'
         })
         expectEventInLogs(logs, 'AppliedMessage', {
           message: confirmKeygenMessage11
@@ -350,10 +327,6 @@ contract('EthToBncBridge', async (accounts) => {
       it('should not be able to apply different keygen confirm message for 1st epoch', async () => {
         await applyMessage(confirmKeygenMessage11)
         await applyMessage(confirmKeygenMessage12).should.be.rejected
-      })
-
-      it('should not be able to apply keygen confirm message for 0th epoch', async () => {
-        await applyMessage(confirmKeygenMessage0).should.be.rejected
       })
 
       it('should not accept message with wrong length', async () => {
@@ -415,11 +388,6 @@ contract('EthToBncBridge', async (accounts) => {
         bridge = await deployBridge()
         await applyMessage(confirmKeygenMessage11)
         await applyMessage(startVotingMessage1err).should.be.rejected
-      })
-
-      it('should fail to start voting in keygen state', async () => {
-        bridge = await deployBridge()
-        await applyMessage(startVotingMessage0).should.be.rejected
       })
     })
 
@@ -686,6 +654,11 @@ contract('EthToBncBridge', async (accounts) => {
         })
       })
 
+      it('should not accept keygen confirmation for for past epoch', async () => {
+        await applyMessage(startKeygenMessage11)
+        await applyMessage(confirmKeygenMessage12).should.be.rejected
+      })
+
       it('should not accept message with wrong length', async () => {
         await applyMessage(startKeygenMessage1err).should.be.rejected
       })
@@ -720,8 +693,7 @@ contract('EthToBncBridge', async (accounts) => {
         await applyMessage(confirmKeygenMessage2)
         const { logs } = await applyMessage(confirmFundsTransferMessage1).should.be.fulfilled
         expectEventInLogs(logs, 'EpochStart', {
-          x: '0x3333333333333333333333333333333333333333333333333333333333333333',
-          y: '0x4444444444444444444444444444444444444444444444444444444444444444'
+          foreignAddress: '0x3333333333333333333333333333333333333333'
         })
         expect(await bridge.status()).to.bignumber.equal(Status.READY)
         expect(await bridge.epoch()).to.bignumber.equal('2')
@@ -806,6 +778,7 @@ contract('EthToBncBridge', async (accounts) => {
       beforeEach(async () => {
         token = await deployToken()
         bridge = await deployBridge({
+          closeEpoch: false,
           token: token.address
         })
         await applyMessage(confirmKeygenMessage11)
@@ -834,14 +807,14 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await token.allowance(bridge.address, accounts[5])).to.bignumber.equal('200')
       })
 
-      it('should not accept transfer message for 0th epoch', async () => {
+      it('should not accept transfer message for next epoch', async () => {
+        await applyMessage(startVotingMessage1)
         await token.transfer(bridge.address, 100, { from: accounts[1] })
-        await applyMessage(transferMessage05100).should.be.rejected
+        await applyMessage(transferMessage25100).should.be.rejected
       })
 
       it('should accept transfer message for previous epoch', async () => {
         await applyMessage(startVotingMessage1)
-        await applyMessage(confirmCloseEpochMessage1)
         await applyMessage(startKeygenMessage11)
         await applyMessage(confirmKeygenMessage2)
         await applyMessage(confirmFundsTransferMessage1)
