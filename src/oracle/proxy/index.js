@@ -99,6 +99,7 @@ async function set(req, res) {
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
   logger.trace(`Encoded data: ${encoded.toString('hex')}`)
   logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
+  logger.debug(`${hash} ${key}`)
   const query = sharedDb.interface.functions.setData.encode([hash, key, encoded])
   sendJob(query)
 
@@ -142,7 +143,7 @@ async function signupSign(req, res) {
   let attempt = 1
   let uuid
   let hash
-  const epoch = await bridge.nextEpoch()
+  const epoch = await bridge.epoch()
   while (true) {
     uuid = `s_${epoch}_${msgHash}_${attempt}`
     hash = ethers.utils.id(uuid)
@@ -186,7 +187,10 @@ async function processMessage(type, ...params) {
 
 async function confirmKeygen(req, res) {
   const { x, y, epoch } = req.body
-  const hexAddress = publicKeyToHexAddress({ x, y })
+  const hexAddress = publicKeyToHexAddress({
+    x,
+    y
+  })
   await processMessage(Action.CONFIRM_KEYGEN, epoch, hexAddress)
   res.send()
 }

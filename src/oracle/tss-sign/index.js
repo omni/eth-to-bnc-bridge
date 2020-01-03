@@ -94,12 +94,12 @@ async function waitForAccountNonce(address, nonce) {
   while (!cancelled) {
     const { sequence } = await getAccount(address)
     if (sequence >= nonce) {
+      logger.info('Account nonce is OK')
       break
     }
     await delay(1000)
     logger.debug('Waiting for needed account nonce')
   }
-  logger.info('Account nonce is OK')
   return !cancelled
 }
 
