@@ -11,4 +11,4 @@ RUN npm install
 COPY config.json .mocharc.yml reportersConfig.json ./
 COPY test ./test
 
-ENTRYPOINT ["mocha"]
+ENTRYPOINT ["node_modules/.bin/mocha"]
