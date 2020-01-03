@@ -5,7 +5,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /tss
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl build-essential openssl pkg-config libssl-dev libgmp3-dev  && \
+    apt-get install -y --no-install-recommends ca-certificates curl build-essential openssl pkg-config libssl-dev libgmp3-dev  && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
