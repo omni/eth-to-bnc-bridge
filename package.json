@@ -20,11 +20,12 @@
     "tests:coverage": "npm run tests:home && npm run tests:side",
     "tests:home:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh home",
     "tests:side:coverage": "cd src/contracts && COVERAGE=true ./run-tests.sh side",
-    "lint": "npm run lint:js && npm run lint:sol",
+    "lint": "npm run lint:js && npm run lint:sol && npm run lint:dockerfile",
     "lint:js": "npx eslint .",
     "lint:sol": "npm run lint:sol:home && npm run lint:sol:side",
     "lint:sol:home": "npx solhint -w 0 -c src/contracts/.solhint.json --ignore-path src/contracts/.solhintignore \"src/contracts/home/contracts/**/*.sol\"",
-    "lint:sol:side": "npx solhint -w 0 -c src/contracts/.solhint.json --ignore-path src/contracts/.solhintignore \"src/contracts/side/contracts/**/*.sol\""
+    "lint:sol:side": "npx solhint -w 0 -c src/contracts/.solhint.json --ignore-path src/contracts/.solhintignore \"src/contracts/side/contracts/**/*.sol\"",
+    "lint:dockerfile": "hadolint $(find . -name Dockerfile)"
   },
   "engines": {
     "node": ">=10.6.0"

@@ -39,6 +39,11 @@ orbs:
           - run:
               name: "Install solhint"
               command: npm install solhint
+          - run:
+              name: "Install hadolint"
+              command: |
+                wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.17.3/hadolint-Linux-x86_64
+                chmod +x /bin/hadolint
       install_solidity_coverage:
         description: "Install solidity-coverage"
         steps:

@@ -2,14 +2,13 @@ FROM node:10.16.0-alpine
 
 WORKDIR /watcher
 
-RUN apk update && \
-    apk add libressl-dev
+RUN apk --no-cache add libressl-dev
 
-COPY ./sideWatcher/package.json /watcher/
+COPY ./sideWatcher/package.json ./
 
 RUN npm install
 
-COPY ./sideWatcher/index.js /watcher/src/
-COPY ./shared/logger.js ./shared/db.js ./shared/amqp.js ./shared/wait.js ./shared/ethProvider.js /watcher/shared/
+COPY ./sideWatcher/index.js ./src/
+COPY ./shared/logger.js ./shared/db.js ./shared/amqp.js ./shared/wait.js ./shared/ethProvider.js ./shared/
 
 ENTRYPOINT ["node", "src/index.js"]

@@ -2,8 +2,11 @@ FROM ubuntu:19.10
 
 ARG BNC_VERSION=0.6.2
 
+# hadolint ignore=DL3015
 RUN apt-get update && \
-    apt-get install -y git git-lfs
+    apt-get install -y git git-lfs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /binaries
 

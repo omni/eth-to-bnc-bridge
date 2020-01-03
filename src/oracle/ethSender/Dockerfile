@@ -2,14 +2,13 @@ FROM node:10.16.0-alpine
 
 WORKDIR /sender
 
-RUN apk update && \
-    apk add libressl-dev
+RUN apk --no-cache add libressl-dev
 
-COPY ./ethSender/package.json /sender/
+COPY ./ethSender/package.json ./
 
 RUN npm install
 
-COPY ./ethSender/index.js /sender/src/
-COPY ./shared/logger.js ./shared/amqp.js ./shared/wait.js ./shared/ethProvider.js /sender/shared/
+COPY ./ethSender/index.js ./src/
+COPY ./shared/logger.js ./shared/amqp.js ./shared/wait.js ./shared/ethProvider.js ./shared/
 
 ENTRYPOINT ["node", "src/index.js"]
