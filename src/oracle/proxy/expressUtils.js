@@ -47,10 +47,10 @@ function parseBool(field) {
 function logRequest(req, res, next) {
   logger.debug(`${req.method} request to ${req.originalUrl}`)
   if (req.query && Object.keys(req.query).length > 0) {
-    logger.trace('Requst query: %o', req.query)
+    logger.trace('Request query: %o', req.query)
   }
   if (req.body && Object.keys(req.body).length > 0) {
-    logger.trace('Requst body: %o', req.body)
+    logger.trace('Request body: %o', req.body)
   }
   next()
 }
