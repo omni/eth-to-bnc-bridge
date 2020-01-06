@@ -137,7 +137,14 @@ contract BridgeEpochs {
         return epochStates[_epoch].validators;
     }
 
-    function _initNextEpoch(address[] memory _validators, uint16 _threshold, uint16 _rangeSize, bool _closeEpoch, uint96 _minTxLimit, uint96 _maxTxLimit) internal {
+    function _initNextEpoch(
+        address[] memory _validators,
+        uint16 _threshold,
+        uint16 _rangeSize,
+        bool _closeEpoch,
+        uint96 _minTxLimit,
+        uint96 _maxTxLimit
+    ) internal {
         epochStates[nextEpoch] = EpochState({
             validators : _validators,
             threshold : _threshold,

@@ -16,11 +16,9 @@ contract EthToBncBridge is BridgeMessageProcessor {
         uint16 rangeSize,
         bool closeEpoch
     ) public {
-        require(threshold <= validators.length);
-        require(threshold > 0);
-        require(limits[0] >= 10 ** 10);
-        require(limits[0] <= limits[1]);
-        require(rangeSize > 0);
+        require(threshold > 0 && threshold <= validators.length, "Incorrect threshold");
+        require(limits[0] >= 10 ** 10 && limits[0] <= limits[1], "Incorrect limits");
+        require(rangeSize > 0, "Range size must be positive");
 
         tokenContract = IERC20(_tokenContract);
 
@@ -34,7 +32,7 @@ contract EthToBncBridge is BridgeMessageProcessor {
     }
 
     function exchange(uint96 value) public ready {
-        require(value >= getMinPerTx() && value <= getMaxPerTx());
+        require(value >= getMinPerTx() && value <= getMaxPerTx(), "Value lies outside of allowed limits");
 
         uint32 txRange = (uint32(block.number) - getStartBlock()) / uint32(getRangeSize());
         if (!usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))]) {

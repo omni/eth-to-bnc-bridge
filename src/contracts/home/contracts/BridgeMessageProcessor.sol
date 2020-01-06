@@ -75,12 +75,12 @@ contract BridgeMessageProcessor is BridgeTransitions {
             // [3-31] - extra data
             require(message.length == 32, "Incorrect message length");
             _cancelKeygen();
-        } else { // Action.TRANSFER, invalid actions will not reach this line, since casting uint8 to Action will revert execution
+        } else { // Action.TRANSFER
             // [3,34] - txHash, [35,54] - address, [55,66] - value
             require(message.length == 67, "Incorrect message length");
             (address to, uint96 value) = message._decodeTransfer();
             _transfer(to, value);
-        }
+        } // invalid actions will not reach this line, since casting uint8 to Action will revert execution
 
         emit AppliedMessage(message);
     }

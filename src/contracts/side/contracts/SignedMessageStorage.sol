@@ -33,7 +33,7 @@ contract SignedMessageStorage {
             v := byte(0, mload(add(rsv, 96)))
         }
 
-        require(ecrecover(msgHash, v, r, s) == msg.sender);
+        require(ecrecover(msgHash, v, r, s) == msg.sender, "Incorrect signature or sender");
 
         if (signedMessages[msgHash].message.length == 0) {
             signedMessages[msgHash].message = message;
