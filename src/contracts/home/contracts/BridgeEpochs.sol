@@ -2,21 +2,12 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract BasicBridge {
+contract BridgeEpochs {
     uint32 constant internal UPPER_BOUND = 0xffffffff;
 
-    event EpochEnd(uint16 indexed epoch);
-    event EpochClose(uint16 indexed epoch);
-    event ForceSign();
-    event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch);
-    event NewEpochCancelled(uint16 indexed epoch);
-    event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch);
-    event EpochStart(uint16 indexed epoch, bytes20 foreignAddress);
-
-    struct State {
+    struct EpochState {
         address[] validators;
         uint32 startBlock;
-        uint32 endBlock;
         uint32 nonce;
         uint16 threshold;
         uint16 rangeSize;
@@ -26,47 +17,10 @@ contract BasicBridge {
         bytes20 foreignAddress;
     }
 
-    enum Status {
-        READY, // bridge is in ready to perform operations
-        CLOSING_EPOCH, // generating transaction for blocking binance side of the bridge
-        VOTING, // voting for changing in next epoch, but still ready
-        KEYGEN, //keygen, can be cancelled
-        FUNDS_TRANSFER // funds transfer, cannot be cancelled
-    }
-
-    mapping(uint16 => State) public states;
-
-    Status public status;
+    mapping(uint16 => EpochState) public epochStates;
 
     uint16 public epoch;
     uint16 public nextEpoch;
-
-    IERC20 public tokenContract;
-
-    modifier ready {
-        require(status == Status.READY, "Not in ready state");
-        _;
-    }
-
-    modifier closingEpoch {
-        require(status == Status.CLOSING_EPOCH, "Not in closing epoch state");
-        _;
-    }
-
-    modifier voting {
-        require(status == Status.VOTING, "Not in voting state");
-        _;
-    }
-
-    modifier keygen {
-        require(status == Status.KEYGEN, "Not in keygen state");
-        _;
-    }
-
-    modifier fundsTransfer {
-        require(status == Status.FUNDS_TRANSFER, "Not in funds transfer state");
-        _;
-    }
 
     function getParties() public view returns (uint16) {
         return getParties(epoch);
@@ -77,7 +31,7 @@ contract BasicBridge {
     }
 
     function getParties(uint16 _epoch) public view returns (uint16) {
-        return uint16(states[_epoch].validators.length);
+        return uint16(epochStates[_epoch].validators.length);
     }
 
     function getThreshold() public view returns (uint16) {
@@ -89,7 +43,7 @@ contract BasicBridge {
     }
 
     function getThreshold(uint16 _epoch) public view returns (uint16) {
-        return states[_epoch].threshold;
+        return epochStates[_epoch].threshold;
     }
 
     function getStartBlock() public view returns (uint32) {
@@ -97,7 +51,7 @@ contract BasicBridge {
     }
 
     function getStartBlock(uint16 _epoch) public view returns (uint32) {
-        return states[_epoch].startBlock;
+        return epochStates[_epoch].startBlock;
     }
 
     function getRangeSize() public view returns (uint16) {
@@ -117,7 +71,7 @@ contract BasicBridge {
     }
 
     function getMinPerTx(uint16 _epoch) public view returns (uint96) {
-        return states[_epoch].minTxLimit;
+        return epochStates[_epoch].minTxLimit;
     }
 
     function getMaxPerTx() public view returns (uint96) {
@@ -129,11 +83,11 @@ contract BasicBridge {
     }
 
     function getMaxPerTx(uint16 _epoch) public view returns (uint96) {
-        return states[_epoch].maxTxLimit;
+        return epochStates[_epoch].maxTxLimit;
     }
 
     function getRangeSize(uint16 _epoch) public view returns (uint16) {
-        return states[_epoch].rangeSize;
+        return epochStates[_epoch].rangeSize;
     }
 
     function getNonce() public view returns (uint32) {
@@ -141,7 +95,7 @@ contract BasicBridge {
     }
 
     function getNonce(uint16 _epoch) public view returns (uint32) {
-        return states[_epoch].nonce;
+        return epochStates[_epoch].nonce;
     }
 
     function getForeignAddress() public view returns (bytes20) {
@@ -149,7 +103,7 @@ contract BasicBridge {
     }
 
     function getForeignAddress(uint16 _epoch) public view returns (bytes20) {
-        return states[_epoch].foreignAddress;
+        return epochStates[_epoch].foreignAddress;
     }
 
     function getCloseEpoch() public view returns (bool) {
@@ -161,13 +115,13 @@ contract BasicBridge {
     }
 
     function getCloseEpoch(uint16 _epoch) public view returns (bool) {
-        return states[_epoch].closeEpoch;
+        return epochStates[_epoch].closeEpoch;
     }
 
-    function getNextPartyId(address a) public view returns (uint16) {
+    function getNextPartyId(address _partyAddress) public view returns (uint16) {
         address[] memory validators = getNextValidators();
         for (uint i = 0; i < getNextParties(); i++) {
-            if (validators[i] == a)
+            if (validators[i] == _partyAddress)
                 return uint16(i + 1);
         }
         return 0;
@@ -182,6 +136,20 @@ contract BasicBridge {
     }
 
     function getValidators(uint16 _epoch) public view returns (address[] memory) {
-        return states[_epoch].validators;
+        return epochStates[_epoch].validators;
+    }
+
+    function _initNextEpoch(address[] memory _validators, uint16 _threshold, uint16 _rangeSize, bool _closeEpoch, uint96 _minTxLimit, uint96 _maxTxLimit) internal {
+        epochStates[nextEpoch] = EpochState({
+            validators : _validators,
+            threshold : _threshold,
+            rangeSize : _rangeSize,
+            startBlock : 0,
+            nonce : UPPER_BOUND,
+            foreignAddress : bytes20(0),
+            closeEpoch : _closeEpoch,
+            minTxLimit : _minTxLimit,
+            maxTxLimit : _maxTxLimit
+        });
     }
 }

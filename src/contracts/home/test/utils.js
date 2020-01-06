@@ -1,7 +1,7 @@
 const { expect } = require('chai')
 const { BN } = require('./setup')
 
-const Status = {
+const State = {
   READY: '0',
   CLOSING_EPOCH: '1',
   VOTING: '2',
@@ -116,7 +116,7 @@ async function skipBlocks(n = 1) {
 }
 
 module.exports = {
-  Status,
+  State,
   Action,
   getDeployResult,
   expectEventInLogs,

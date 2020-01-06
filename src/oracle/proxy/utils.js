@@ -23,8 +23,8 @@ function Err(data) {
   return { Err: data }
 }
 
-function decodeStatus(status) {
-  switch (status) {
+function decodeState(state) {
+  switch (state) {
     case 0:
       return 'ready'
     case 1:
@@ -59,7 +59,7 @@ function encodeParam(param) {
 module.exports = {
   Ok,
   Err,
-  decodeStatus,
+  decodeState,
   encodeParam,
   Action
 }

@@ -4,7 +4,7 @@ const ethers = require('ethers')
 
 const { tokenAbi, bridgeAbi, sharedDbAbi } = require('./contractsAbi')
 const {
-  Ok, Err, decodeStatus, encodeParam, Action
+  Ok, Err, decodeState, encodeParam, Action
 } = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
@@ -45,7 +45,7 @@ const votesProxyApp = express()
 async function status(req, res) {
   const [bridgeEpoch, bridgeStatus] = await Promise.all([
     bridge.epoch(),
-    bridge.status()
+    bridge.state()
   ])
   res.send({
     bridgeEpoch,
@@ -321,7 +321,7 @@ async function info(req, res) {
       bridge.getNextThreshold(),
       bridge.getValidators(),
       bridge.getNextValidators(),
-      bridge.status(),
+      bridge.state(),
       token.balanceOf(HOME_BRIDGE_ADDRESS)
         .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
     ])
@@ -345,7 +345,7 @@ async function info(req, res) {
       homeBalance,
       foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
       foreignBalanceNative: parseFloat(balances.BNB) || 0,
-      bridgeStatus: decodeStatus(bridgeStatus)
+      bridgeStatus: decodeState(bridgeStatus)
     }
     logger.trace('%o', msg)
     res.send(msg)

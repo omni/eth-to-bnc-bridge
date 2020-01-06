@@ -1,6 +1,10 @@
 pragma solidity ^0.5.0;
 
+import "./libraries/MessageHash.sol";
+
 contract SignedMessageStorage {
+    using MessageHash for bytes;
+
     event NewMessage(bytes32 msgHash);
     event NewSignature(address indexed signer, bytes32 msgHash);
 
@@ -17,7 +21,7 @@ contract SignedMessageStorage {
     function addSignature(bytes memory message, bytes memory rsv) public {
         require(rsv.length == 65, "Incorrect signature length");
 
-        bytes32 msgHash = hashMessage(message);
+        bytes32 msgHash = message._hash();
 
         bytes32 r;
         bytes32 s;
@@ -74,21 +78,5 @@ contract SignedMessageStorage {
             }
         }
         return id == senderPartyId;
-    }
-
-    function hashMessage(bytes memory message) internal pure returns(bytes32) {
-        if (message.length == 3) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
-        }
-        if (message.length == 23) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n23", message));
-        }
-        if (message.length == 32) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
-        }
-        if (message.length == 67) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
-        }
-        revert("Incorrect message length");
     }
 }

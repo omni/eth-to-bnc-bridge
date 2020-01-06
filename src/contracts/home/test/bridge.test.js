@@ -1,7 +1,7 @@
 const { expect } = require('chai')
 
 const {
-  Status, Action, getDeployResult, expectEventInLogs, buildMessage, sign, stripHex, skipBlocks
+  State, Action, getDeployResult, expectEventInLogs, buildMessage, sign, stripHex, skipBlocks
 } = require('./utils')
 
 const EthToBncBridge = artifacts.require('EthToBncBridge')
@@ -53,7 +53,7 @@ contract('EthToBncBridge', async (accounts) => {
       expect(await bridge.getNextRangeSize()).to.bignumber.equal('15')
       expect(await bridge.getNextCloseEpoch()).to.equal(true)
       expect(await bridge.getStartBlock()).to.bignumber.equal('0')
-      expect(await bridge.status()).to.bignumber.equal(Status.KEYGEN)
+      expect(await bridge.state()).to.bignumber.equal(State.KEYGEN)
       expect(await bridge.tokenContract()).to.equal(token.address)
 
       const { logs } = await getDeployResult(bridge)
@@ -307,7 +307,7 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await bridge.getRangeSize()).to.bignumber.equal('15')
         expect(await bridge.getStartBlock()).to.bignumber.above('0')
         expect(await bridge.getCloseEpoch()).to.equal(true)
-        expect(await bridge.status()).to.bignumber.equal(Status.READY)
+        expect(await bridge.state()).to.bignumber.equal(State.READY)
       })
 
       it('should not accept already applied message', async () => {
@@ -358,7 +358,7 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await bridge.getNextRangeSize()).to.bignumber.equal('15')
         expect(await bridge.getCloseEpoch()).to.equal(true)
         expect(await bridge.getNextCloseEpoch()).to.equal(true)
-        expect(await bridge.status()).to.bignumber.equal(Status.CLOSING_EPOCH)
+        expect(await bridge.state()).to.bignumber.equal(State.CLOSING_EPOCH)
       })
 
       it('should start voting with close epoch disabled', async () => {
@@ -374,7 +374,7 @@ contract('EthToBncBridge', async (accounts) => {
         })
         expect(await bridge.getCloseEpoch()).to.equal(false)
         expect(await bridge.getNextCloseEpoch()).to.equal(false)
-        expect(await bridge.status()).to.bignumber.equal(Status.VOTING)
+        expect(await bridge.state()).to.bignumber.equal(State.VOTING)
       })
 
       it('should not be able to start voting for 2nd epoch', async () => {
@@ -400,7 +400,7 @@ contract('EthToBncBridge', async (accounts) => {
         expectEventInLogs(logs, 'EpochEnd', {
           epoch: '1'
         })
-        expect(await bridge.status()).to.bignumber.equal(Status.VOTING)
+        expect(await bridge.state()).to.bignumber.equal(State.VOTING)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })
@@ -640,7 +640,7 @@ contract('EthToBncBridge', async (accounts) => {
           oldEpoch: '1',
           newEpoch: '2'
         })
-        expect(await bridge.status()).to.bignumber.equal(Status.KEYGEN)
+        expect(await bridge.state()).to.bignumber.equal(State.KEYGEN)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })
@@ -684,7 +684,7 @@ contract('EthToBncBridge', async (accounts) => {
 
       it('should start funds transfer', async () => {
         await applyMessage(confirmKeygenMessage2).should.be.fulfilled
-        expect(await bridge.status()).to.bignumber.equal(Status.FUNDS_TRANSFER)
+        expect(await bridge.state()).to.bignumber.equal(State.FUNDS_TRANSFER)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })
@@ -695,7 +695,7 @@ contract('EthToBncBridge', async (accounts) => {
         expectEventInLogs(logs, 'EpochStart', {
           foreignAddress: '0x3333333333333333333333333333333333333333'
         })
-        expect(await bridge.status()).to.bignumber.equal(Status.READY)
+        expect(await bridge.state()).to.bignumber.equal(State.READY)
         expect(await bridge.epoch()).to.bignumber.equal('2')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
         expect(await bridge.getValidators()).to.deep.equal(validators)
@@ -741,7 +741,7 @@ contract('EthToBncBridge', async (accounts) => {
         expectEventInLogs(logs, 'NewEpochCancelled', {
           epoch: '2'
         })
-        expect(await bridge.status()).to.bignumber.equal(Status.VOTING)
+        expect(await bridge.state()).to.bignumber.equal(State.VOTING)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })
@@ -749,7 +749,7 @@ contract('EthToBncBridge', async (accounts) => {
       it('should restart keygen for 2nd epoch', async () => {
         await applyMessage(cancelKeygenMessage21)
         await applyMessage(startKeygenMessage12).should.be.fulfilled
-        expect(await bridge.status()).to.bignumber.equal(Status.KEYGEN)
+        expect(await bridge.state()).to.bignumber.equal(State.KEYGEN)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })
@@ -758,7 +758,7 @@ contract('EthToBncBridge', async (accounts) => {
         await applyMessage(cancelKeygenMessage21)
         await applyMessage(startKeygenMessage12)
         await applyMessage(cancelKeygenMessage22).should.be.fulfilled
-        expect(await bridge.status()).to.bignumber.equal(Status.VOTING)
+        expect(await bridge.state()).to.bignumber.equal(State.VOTING)
         expect(await bridge.epoch()).to.bignumber.equal('1')
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
       })

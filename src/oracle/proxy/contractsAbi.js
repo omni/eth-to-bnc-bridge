@@ -17,7 +17,7 @@ const bridgeAbi = [
   'function getNextValidators() view returns (address[])',
   'function getCloseEpoch() view returns (bool)',
   'function getNextCloseEpoch() view returns (bool)',
-  'function status() view returns (uint8)',
+  'function state() view returns (uint8)',
   'function votesCount(bytes32) view returns (uint16)',
   'function getNextPartyId(address a) view returns (uint16)',
   'function applyMessage(bytes message, bytes signatures)'

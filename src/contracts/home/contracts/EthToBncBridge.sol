@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./UpdatableBridge.sol";
+import "./BridgeMessageProcessor.sol";
 
-contract EthToBncBridge is UpdatableBridge {
+contract EthToBncBridge is BridgeMessageProcessor {
     event ExchangeRequest(uint96 value, uint32 nonce);
 
     mapping(bytes32 => bool) public usedExchangeRanges;
@@ -25,21 +25,10 @@ contract EthToBncBridge is UpdatableBridge {
         tokenContract = IERC20(_tokenContract);
 
         epoch = 0;
-        status = Status.KEYGEN;
+        state = State.KEYGEN;
         nextEpoch = 1;
 
-        states[nextEpoch] = State({
-            validators : validators,
-            threshold : threshold,
-            rangeSize : rangeSize,
-            startBlock : 0,
-            endBlock : UPPER_BOUND,
-            nonce : UPPER_BOUND,
-            foreignAddress: bytes20(0),
-            closeEpoch : closeEpoch,
-            minTxLimit : limits[0],
-            maxTxLimit : limits[1]
-        });
+        _initNextEpoch(validators, threshold, rangeSize, closeEpoch, limits[0], limits[1]);
 
         emit NewEpoch(0, 1);
     }
@@ -50,7 +39,7 @@ contract EthToBncBridge is UpdatableBridge {
         uint32 txRange = (uint32(block.number) - getStartBlock()) / uint32(getRangeSize());
         if (!usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))]) {
             usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))] = true;
-            states[epoch].nonce++;
+            epochStates[epoch].nonce++;
         }
 
         tokenContract.transferFrom(msg.sender, address(this), value);

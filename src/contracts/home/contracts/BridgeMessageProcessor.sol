@@ -1,10 +1,12 @@
 pragma solidity ^0.5.0;
 
-import "./ActionableBridge.sol";
-import "./libraries/MessageDecoder.sol";
+import "./BridgeTransitions.sol";
+import "./libraries/MessageDecode.sol";
+import "./libraries/MessageHash.sol";
 
-contract UpdatableBridge is ActionableBridge {
-    using MessageDecoder for bytes;
+contract BridgeMessageProcessor is BridgeTransitions {
+    using MessageDecode for bytes;
+    using MessageHash for bytes;
 
     uint internal constant SIGNATURE_SIZE = 65;
 
@@ -86,7 +88,7 @@ contract UpdatableBridge is ActionableBridge {
     function checkSignedMessage(bytes memory message, bytes memory signatures) public view returns (bytes32, uint16) {
         require(signatures.length % SIGNATURE_SIZE == 0, "Incorrect signatures length");
 
-        bytes32 msgHash = hashMessage(message);
+        bytes32 msgHash = message._hash();
         require(!handledMessages[msgHash], "Tx was already handled");
 
         uint16 msgEpoch;
@@ -124,21 +126,5 @@ contract UpdatableBridge is ActionableBridge {
             require(j != possibleValidators.length, "Not a validator signature");
         }
         return (msgHash, msgEpoch);
-    }
-
-    function hashMessage(bytes memory message) internal pure returns(bytes32) {
-        if (message.length == 3) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n3", message));
-        }
-        if (message.length == 23) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n23", message));
-        }
-        if (message.length == 32) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
-        }
-        if (message.length == 67) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
-        }
-        revert("Incorrect message length");
     }
 }

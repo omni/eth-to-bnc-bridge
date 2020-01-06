@@ -1,8 +1,17 @@
 pragma solidity ^0.5.0;
 
-import "./BasicBridge.sol";
+import "./BridgeEpochs.sol";
+import "./BridgeStates.sol";
 
-contract ActionableBridge is BasicBridge {
+contract BridgeTransitions is BridgeEpochs, BridgeStates {
+    event EpochEnd(uint16 indexed epoch);
+    event EpochClose(uint16 indexed epoch);
+    event ForceSign();
+    event NewEpoch(uint16 indexed oldEpoch, uint16 indexed newEpoch);
+    event NewEpochCancelled(uint16 indexed epoch);
+    event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch);
+    event EpochStart(uint16 indexed epoch, bytes20 foreignAddress);
+
     enum Action {
         CONFIRM_KEYGEN,
         CONFIRM_FUNDS_TRANSFER,
@@ -18,48 +27,43 @@ contract ActionableBridge is BasicBridge {
         TRANSFER
     }
 
+    IERC20 public tokenContract;
+
     function _confirmKeygen(bytes20 foreignAddress) internal keygen {
-        states[nextEpoch].foreignAddress = foreignAddress;
-        states[nextEpoch].nonce = UPPER_BOUND;
+        epochStates[nextEpoch].foreignAddress = foreignAddress;
         if (nextEpoch == 1) {
-            status = Status.READY;
-            states[nextEpoch].startBlock = uint32(block.number);
+            state = State.READY;
+            epochStates[nextEpoch].startBlock = uint32(block.number);
             epoch = nextEpoch;
             emit EpochStart(epoch, foreignAddress);
         } else {
-            status = Status.FUNDS_TRANSFER;
+            state = State.FUNDS_TRANSFER;
             emit NewFundsTransfer(epoch, nextEpoch);
         }
     }
 
     function _confirmFundsTransfer() internal fundsTransfer {
-        status = Status.READY;
-        states[nextEpoch].startBlock = uint32(block.number);
+        state = State.READY;
+        epochStates[nextEpoch].startBlock = uint32(block.number);
         epoch = nextEpoch;
         emit EpochStart(epoch, getForeignAddress());
     }
 
     function _confirmCloseEpoch() internal closingEpoch {
-        status = Status.VOTING;
+        state = State.VOTING;
         emit EpochEnd(epoch);
     }
 
     function _startVoting() internal ready {
-        states[epoch].endBlock = uint32(block.number);
         nextEpoch++;
-        states[nextEpoch].threshold = getThreshold();
-        states[nextEpoch].validators = getValidators();
-        states[nextEpoch].rangeSize = getRangeSize();
-        states[nextEpoch].closeEpoch = getCloseEpoch();
-        states[nextEpoch].minTxLimit = getMinPerTx();
-        states[nextEpoch].maxTxLimit = getMaxPerTx();
+        _initNextEpoch(getValidators(), getThreshold(), getRangeSize(), getCloseEpoch(), getMinPerTx(), getMaxPerTx());
 
         if (getCloseEpoch()) {
-            status = Status.CLOSING_EPOCH;
+            state = State.CLOSING_EPOCH;
             emit ForceSign();
             emit EpochClose(epoch);
         } else {
-            status = Status.VOTING;
+            state = State.VOTING;
             emit ForceSign();
             emit EpochEnd(epoch);
         }
@@ -68,7 +72,7 @@ contract ActionableBridge is BasicBridge {
     function _addValidator(address validator) internal voting {
         require(getNextPartyId(validator) == 0, "Already a validator");
 
-        states[nextEpoch].validators.push(validator);
+        epochStates[nextEpoch].validators.push(validator);
     }
 
     function _removeValidator(address validator) internal voting {
@@ -80,39 +84,39 @@ contract ActionableBridge is BasicBridge {
 
         for (uint i = 0; i < lastPartyId; i++) {
             if (nextValidators[i] == validator) {
-                states[nextEpoch].validators[i] = nextValidators[lastPartyId];
+                epochStates[nextEpoch].validators[i] = nextValidators[lastPartyId];
                 break;
             }
         }
-        states[nextEpoch].validators.pop();
+        epochStates[nextEpoch].validators.pop();
     }
 
     function _changeThreshold(uint16 threshold) internal voting {
         require(threshold > 0, "Invalid threshold value");
         require(threshold <= getNextParties(), "Should be less than or equal to parties number");
 
-        states[nextEpoch].threshold = threshold;
+        epochStates[nextEpoch].threshold = threshold;
     }
 
     function _changeRangeSize(uint16 rangeSize) internal voting {
         require(rangeSize > 0, "Invalid range size");
 
-        states[nextEpoch].rangeSize = rangeSize;
+        epochStates[nextEpoch].rangeSize = rangeSize;
     }
 
     function _changeCloseEpoch(bool closeEpoch) internal voting {
-        states[nextEpoch].closeEpoch = closeEpoch;
+        epochStates[nextEpoch].closeEpoch = closeEpoch;
     }
 
     function _startKeygen() internal voting {
-        status = Status.KEYGEN;
+        state = State.KEYGEN;
 
         emit NewEpoch(epoch, nextEpoch);
     }
 
     function _cancelKeygen() internal keygen {
         require(epoch > 0, "Cannot cancel keygen for first epoch");
-        status = Status.VOTING;
+        state = State.VOTING;
 
         emit NewEpochCancelled(nextEpoch);
     }
