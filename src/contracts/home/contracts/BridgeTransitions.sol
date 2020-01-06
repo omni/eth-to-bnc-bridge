@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./BridgeEpochs.sol";
 import "./BridgeStates.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract BridgeTransitions is BridgeEpochs, BridgeStates {
     event EpochEnd(uint16 indexed epoch);
