@@ -10,6 +10,9 @@ const Token = artifacts.require('Token')
 const TOKEN_INITIAL_MINT = '31415000000000000000000000'
 const MIN_TX_LIMIT = '10000000000'
 const MAX_TX_LIMIT = '1000000000000'
+const EXECUTION_MIN_LIMIT = '10000000001'
+const EXECUTION_MAX_LIMIT = '1000000000001'
+
 
 contract('EthToBncBridge', async (accounts) => {
   const validators = [accounts[2], accounts[3], accounts[4]]
@@ -32,10 +35,11 @@ contract('EthToBncBridge', async (accounts) => {
     return await EthToBncBridge.new(
       options.threshold === undefined ? 2 : options.threshold,
       options.validators || validators,
+      options.closeEpoch === undefined || options.closeEpoch,
       options.token || token.address,
-      options.limits || [MIN_TX_LIMIT, MAX_TX_LIMIT],
-      options.rangeSize === undefined ? 15 : options.rangeSize,
-      options.closeEpoch === undefined || options.closeEpoch
+      options.homeLimits || [MIN_TX_LIMIT, MAX_TX_LIMIT],
+      options.foreignLimits || [EXECUTION_MIN_LIMIT, EXECUTION_MAX_LIMIT],
+      options.rangeSize === undefined ? 15 : options.rangeSize
     )
   }
 
@@ -48,11 +52,15 @@ contract('EthToBncBridge', async (accounts) => {
       expect(await bridge.getNextParties()).to.bignumber.equal('3')
       expect(await bridge.getNextValidators()).to.deep.equal(validators)
       expect(await bridge.getNextThreshold()).to.bignumber.equal('2')
-      expect(await bridge.getNextMinPerTx()).to.bignumber.equal(MIN_TX_LIMIT)
-      expect(await bridge.getNextMaxPerTx()).to.bignumber.equal(MAX_TX_LIMIT)
-      expect(await bridge.getNextRangeSize()).to.bignumber.equal('15')
       expect(await bridge.getNextCloseEpoch()).to.equal(true)
       expect(await bridge.getStartBlock()).to.bignumber.equal('0')
+      expect(await bridge.minPerTxLimit()).to.bignumber.equal(MIN_TX_LIMIT)
+      expect(await bridge.maxPerTxLimit()).to.bignumber.equal(MAX_TX_LIMIT)
+      expect(await bridge.executionMinLimit()).to.bignumber.equal(EXECUTION_MIN_LIMIT)
+      expect(await bridge.executionMaxLimit()).to.bignumber.equal(EXECUTION_MAX_LIMIT)
+      expect(await bridge.rangeSize()).to.bignumber.equal('15')
+      expect(await bridge.rangeSizeVersion()).to.bignumber.equal('0')
+      expect(await bridge.rangeSizeStartBlock()).to.bignumber.above('0')
       expect(await bridge.state()).to.bignumber.equal(State.KEYGEN)
       expect(await bridge.tokenContract()).to.equal(token.address)
 
@@ -85,27 +93,42 @@ contract('EthToBncBridge', async (accounts) => {
       }).should.be.rejected
     })
 
-    it('should accept only valid limits', async () => {
+    it('should accept only valid home limits', async () => {
       await deployBridge({
-        limits: ['100', MAX_TX_LIMIT]
+        homeLimits: ['100', MAX_TX_LIMIT]
       }).should.be.rejected
       await deployBridge({
-        limits: [MIN_TX_LIMIT, '100']
+        homeLimits: [MIN_TX_LIMIT, '100']
       }).should.be.rejected
       await deployBridge({
-        limits: ['100', '100']
+        homeLimits: ['100', '100']
       }).should.be.rejected
       await deployBridge({
-        limits: [MIN_TX_LIMIT, MIN_TX_LIMIT]
+        homeLimits: [MIN_TX_LIMIT, MIN_TX_LIMIT]
+      }).should.be.fulfilled
+    })
+
+    it('should accept only valid execution limits', async () => {
+      await deployBridge({
+        foreignLimits: ['100', MAX_TX_LIMIT]
+      }).should.be.rejected
+      await deployBridge({
+        foreignLimits: [MIN_TX_LIMIT, '100']
+      }).should.be.rejected
+      await deployBridge({
+        foreignLimits: ['100', '100']
+      }).should.be.rejected
+      await deployBridge({
+        foreignLimits: [MIN_TX_LIMIT, MIN_TX_LIMIT]
       }).should.be.fulfilled
     })
   })
 
   describe('signatures checks', async () => {
     const keygenMessage = buildMessage(Action.CONFIRM_KEYGEN, 1, '0000000000000000000000000000000000000000')
-    const votingMessage0 = buildMessage(Action.VOTE_START_VOTING, 0)
-    const votingMessage1 = buildMessage(Action.VOTE_START_VOTING, 1)
-    const validatorMessage = buildMessage(Action.VOTE_ADD_VALIDATOR, 1, stripHex(accounts[0]), '000000000000000000')
+    const votingMessage0 = buildMessage(Action.START_VOTING, 0)
+    const votingMessage1 = buildMessage(Action.START_VOTING, 1)
+    const validatorMessage = buildMessage(Action.ADD_VALIDATOR, 1, stripHex(accounts[0]), '000000000000000000')
     const transferMessage = buildMessage(Action.TRANSFER, 1, '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
     const messages = [keygenMessage, votingMessage1, validatorMessage, transferMessage]
     const invalidMessage = `${votingMessage1}00`
@@ -183,65 +206,94 @@ contract('EthToBncBridge', async (accounts) => {
     const confirmKeygenMessage11 = buildMessage(Action.CONFIRM_KEYGEN, 1, '1111111111111111111111111111111111111111')
     const confirmKeygenMessage12 = buildMessage(Action.CONFIRM_KEYGEN, 1, '2222222222222222222222222222222222222222')
     const confirmKeygenMessage1err = buildMessage(Action.CONFIRM_KEYGEN, 1)
-    const startVotingMessage1 = buildMessage(Action.VOTE_START_VOTING, 1)
-    const startVotingMessage1err = buildMessage(Action.VOTE_START_VOTING, 1, '0000000000000000000000000000000000000000000000000000000000')
+    const startVotingMessage1 = buildMessage(Action.START_VOTING, 1)
+    const startVotingMessage1err = buildMessage(Action.START_VOTING, 1, '0000000000000000000000000000000000000000000000000000000000')
     const confirmCloseEpochMessage1 = buildMessage(Action.CONFIRM_CLOSE_EPOCH, 1)
     const confirmCloseEpochMessage1err = buildMessage(Action.CONFIRM_CLOSE_EPOCH, 1, '0000000000000000000000000000000000000000000000000000000000')
-    const removeValidatorMessage111 = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1, stripHex(validators[0]), '000000000000000000')
-    const removeValidatorMessage112 = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1, stripHex(validators[0]), '0123456789abcdef01')
-    const removeValidatorMessage12 = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1, stripHex(validators[1]), '000000000000000000')
-    const removeValidatorMessage13 = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1, stripHex(validators[2]), '000000000000000000')
-    const removeValidatorMessage14 = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1, stripHex(accounts[5]), '000000000000000000')
-    const removeValidatorMessage1err = buildMessage(Action.VOTE_REMOVE_VALIDATOR, 1)
-    const addValidatorMessage111 = buildMessage(Action.VOTE_ADD_VALIDATOR, 1, stripHex(validators[0]), '000000000000000000')
-    const addValidatorMessage112 = buildMessage(Action.VOTE_ADD_VALIDATOR, 1, stripHex(validators[0]), '000000000000000001')
-    const addValidatorMessage14 = buildMessage(Action.VOTE_ADD_VALIDATOR, 1, stripHex(accounts[5]), '000000000000000001')
-    const addValidatorMessage1err = buildMessage(Action.VOTE_ADD_VALIDATOR, 1)
-    const changeThresholdMessage10 = buildMessage(Action.VOTE_CHANGE_THRESHOLD, 1, '0000', '000000000000000000000000000000000000000000000000000000')
-    const changeThresholdMessage11 = buildMessage(Action.VOTE_CHANGE_THRESHOLD, 1, '0001', '000000000000000000000000000000000000000000000000000000')
-    const changeThresholdMessage13 = buildMessage(Action.VOTE_CHANGE_THRESHOLD, 1, '0003', '000000000000000000000000000000000000000000000000000000')
-    const changeThresholdMessage14 = buildMessage(Action.VOTE_CHANGE_THRESHOLD, 1, '0004', '000000000000000000000000000000000000000000000000000000')
-    const changeThresholdMessage1err = buildMessage(Action.VOTE_CHANGE_THRESHOLD, 1)
-    const changeRangeSizeMessage10 = buildMessage(Action.VOTE_CHANGE_RANGE_SIZE, 1, '0000', '000000000000000000000000000000000000000000000000000000')
-    const changeRangeSizeMessage11 = buildMessage(Action.VOTE_CHANGE_RANGE_SIZE, 1, '0001', '000000000000000000000000000000000000000000000000000000')
-    const changeRangeSizeMessage1max = buildMessage(Action.VOTE_CHANGE_RANGE_SIZE, 1, 'ffff', '000000000000000000000000000000000000000000000000000000')
-    const changeRangeSizeMessage1err = buildMessage(Action.VOTE_CHANGE_RANGE_SIZE, 1)
-    const changeCloseEpochMessage10 = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, 1, '00', '00000000000000000000000000000000000000000000000000000000')
-    const changeCloseEpochMessage11 = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, 1, '01', '00000000000000000000000000000000000000000000000000000000')
-    const changeCloseEpochMessage1err = buildMessage(Action.VOTE_CHANGE_CLOSE_EPOCH, 1)
-    const startKeygenMessage11 = buildMessage(Action.VOTE_START_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000000')
-    const startKeygenMessage12 = buildMessage(Action.VOTE_START_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000001')
-    const startKeygenMessage1err = buildMessage(Action.VOTE_START_KEYGEN, 1)
+    const removeValidatorMessage111 = buildMessage(Action.REMOVE_VALIDATOR, 1, stripHex(validators[0]), '000000000000000000')
+    const removeValidatorMessage112 = buildMessage(Action.REMOVE_VALIDATOR, 1, stripHex(validators[0]), '0123456789abcdef01')
+    const removeValidatorMessage12 = buildMessage(Action.REMOVE_VALIDATOR, 1, stripHex(validators[1]), '000000000000000000')
+    const removeValidatorMessage13 = buildMessage(Action.REMOVE_VALIDATOR, 1, stripHex(validators[2]), '000000000000000000')
+    const removeValidatorMessage14 = buildMessage(Action.REMOVE_VALIDATOR, 1, stripHex(accounts[5]), '000000000000000000')
+    const removeValidatorMessage1err = buildMessage(Action.REMOVE_VALIDATOR, 1)
+    const addValidatorMessage111 = buildMessage(Action.ADD_VALIDATOR, 1, stripHex(validators[0]), '000000000000000000')
+    const addValidatorMessage112 = buildMessage(Action.ADD_VALIDATOR, 1, stripHex(validators[0]), '000000000000000001')
+    const addValidatorMessage14 = buildMessage(Action.ADD_VALIDATOR, 1, stripHex(accounts[5]), '000000000000000001')
+    const addValidatorMessage1err = buildMessage(Action.ADD_VALIDATOR, 1)
+    const changeThresholdMessage10 = buildMessage(Action.CHANGE_THRESHOLD, 1, '0000', '000000000000000000000000000000000000000000000000000000')
+    const changeThresholdMessage11 = buildMessage(Action.CHANGE_THRESHOLD, 1, '0001', '000000000000000000000000000000000000000000000000000000')
+    const changeThresholdMessage13 = buildMessage(Action.CHANGE_THRESHOLD, 1, '0003', '000000000000000000000000000000000000000000000000000000')
+    const changeThresholdMessage14 = buildMessage(Action.CHANGE_THRESHOLD, 1, '0004', '000000000000000000000000000000000000000000000000000000')
+    const changeThresholdMessage1err = buildMessage(Action.CHANGE_THRESHOLD, 1)
+    const changeCloseEpochMessage10 = buildMessage(Action.CHANGE_CLOSE_EPOCH, 1, '00', '00000000000000000000000000000000000000000000000000000000')
+    const changeCloseEpochMessage11 = buildMessage(Action.CHANGE_CLOSE_EPOCH, 1, '01', '00000000000000000000000000000000000000000000000000000000')
+    const changeCloseEpochMessage1err = buildMessage(Action.CHANGE_CLOSE_EPOCH, 1)
+    const startKeygenMessage11 = buildMessage(Action.START_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000000')
+    const startKeygenMessage12 = buildMessage(Action.START_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000001')
+    const startKeygenMessage1err = buildMessage(Action.START_KEYGEN, 1)
     const confirmFundsTransferMessage1 = buildMessage(Action.CONFIRM_FUNDS_TRANSFER, 1)
     const confirmFundsTransferMessage1err = buildMessage(Action.CONFIRM_FUNDS_TRANSFER, 1, '0000000000000000000000000000000000000000000000000000000000')
-    const cancelKeygenMessage1 = buildMessage(Action.VOTE_CANCEL_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000000')
-    const cancelKeygenMessage21 = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000000')
-    const cancelKeygenMessage22 = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000001')
-    const cancelKeygenMessage2err = buildMessage(Action.VOTE_CANCEL_KEYGEN, 2)
+    const cancelKeygenMessage1 = buildMessage(Action.CANCEL_KEYGEN, 1, '0000000000000000000000000000000000000000000000000000000000')
+    const cancelKeygenMessage21 = buildMessage(Action.CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000000')
+    const cancelKeygenMessage22 = buildMessage(Action.CANCEL_KEYGEN, 2, '0000000000000000000000000000000000000000000000000000000001')
+    const cancelKeygenMessage2err = buildMessage(Action.CANCEL_KEYGEN, 2)
     const confirmKeygenMessage2 = buildMessage(Action.CONFIRM_KEYGEN, 2, '3333333333333333333333333333333333333333')
-    const startVotingMessage2 = buildMessage(Action.VOTE_START_VOTING, 2)
-    const transferMessage15100 = buildMessage(
+    const startVotingMessage2 = buildMessage(Action.START_VOTING, 2)
+    const transferMessage15min = buildMessage(
+      Action.TRANSFER,
+      1,
+      '1111111111111111111111111111111111111111111111111111111111111111',
+      stripHex(accounts[5]),
+      '0000000000000002540be401'
+    )
+    const transferMessage15max = buildMessage(
+      Action.TRANSFER,
+      1,
+      '2222222222222222222222222222222222222222222222222222222222222222',
+      stripHex(accounts[5]),
+      '00000000000000e8d4a51001'
+    )
+    const transferMessage15low = buildMessage(
       Action.TRANSFER,
       1,
       '1111111111111111111111111111111111111111111111111111111111111111',
       stripHex(accounts[5]),
       '000000000000000000000064'
     )
-    const transferMessage15200 = buildMessage(
+    const transferMessage15high = buildMessage(
       Action.TRANSFER,
       1,
-      '2222222222222222222222222222222222222222222222222222222222222222',
+      '1111111111111111111111111111111111111111111111111111111111111111',
       stripHex(accounts[5]),
-      '0000000000000000000000c8'
+      '00000000000000e8d4a51002'
     )
-    const transferMessage25100 = buildMessage(
+    const transferMessage25min = buildMessage(
       Action.TRANSFER,
       2,
       '3333333333333333333333333333333333333333333333333333333333333333',
       stripHex(accounts[5]),
-      '000000000000000000000064'
+      '0000000000000002540be401'
     )
     const transferMessage1err = buildMessage(Action.TRANSFER, 1)
+    const changeMinPerTxLimit1 = buildMessage(Action.CHANGE_MIN_PER_TX_LIMIT, 1, '0000000000000002540be401', '0000000000000000000000000000000000')
+    const changeMinPerTxLimit1high = buildMessage(Action.CHANGE_MIN_PER_TX_LIMIT, 1, '100000000000000000000000', '0000000000000000000000000000000000')
+    const changeMinPerTxLimit1low = buildMessage(Action.CHANGE_MIN_PER_TX_LIMIT, 1, '000000000000000000000064', '0000000000000000000000000000000000')
+    const changeMinPerTxLimit1err = buildMessage(Action.CHANGE_MIN_PER_TX_LIMIT, 1)
+    const changeMaxPerTxLimit1 = buildMessage(Action.CHANGE_MAX_PER_TX_LIMIT, 1, '00000000000000e8d4a51001', '0000000000000000000000000000000000')
+    const changeMaxPerTxLimit1low = buildMessage(Action.CHANGE_MAX_PER_TX_LIMIT, 1, '000000000000000000000064', '0000000000000000000000000000000000')
+    const changeMaxPerTxLimit1err = buildMessage(Action.CHANGE_MAX_PER_TX_LIMIT, 1)
+    const decreaseExecutionMinLimit1low = buildMessage(Action.DECREASE_EXECUTION_MIN_TX_LIMIT, 1, '000000000000000000000064', '0000000000000000000000000000000000')
+    const decreaseExecutionMinLimit11 = buildMessage(Action.DECREASE_EXECUTION_MIN_TX_LIMIT, 1, '0000000000000002540be400', '0000000000000000000000000000000000')
+    const decreaseExecutionMinLimit12 = buildMessage(Action.DECREASE_EXECUTION_MIN_TX_LIMIT, 1, '0000000000000002540be401', '0000000000000000000000000000000000')
+    const decreaseExecutionMinLimit1err = buildMessage(Action.DECREASE_EXECUTION_MIN_TX_LIMIT, 1)
+    const increaseExecutionMaxLimit1low = buildMessage(Action.INCREASE_EXECUTION_MAX_TX_LIMIT, 1, '000000000000000000000064', '0000000000000000000000000000000000')
+    const increaseExecutionMaxLimit11 = buildMessage(Action.INCREASE_EXECUTION_MAX_TX_LIMIT, 1, '00000000000000e8d4a51002', '0000000000000000000000000000000000')
+    const increaseExecutionMaxLimit12 = buildMessage(Action.INCREASE_EXECUTION_MAX_TX_LIMIT, 1, '00000000000000e8d4a51001', '0000000000000000000000000000000000')
+    const increaseExecutionMaxLimit1err = buildMessage(Action.INCREASE_EXECUTION_MAX_TX_LIMIT, 1)
+    const changeRangeSizeMessage10 = buildMessage(Action.CHANGE_RANGE_SIZE, 1, '0000', '000000000000000000000000000000000000000000000000000000')
+    const changeRangeSizeMessage11 = buildMessage(Action.CHANGE_RANGE_SIZE, 1, '0001', '000000000000000000000000000000000000000000000000000000')
+    const changeRangeSizeMessage1max = buildMessage(Action.CHANGE_RANGE_SIZE, 1, 'ffff', '000000000000000000000000000000000000000000000000000000')
+    const changeRangeSizeMessage1err = buildMessage(Action.CHANGE_RANGE_SIZE, 1)
     const unknownMessage = buildMessage(
       Action.UNKNOWN_MESSAGE,
       1
@@ -254,13 +306,19 @@ contract('EthToBncBridge', async (accounts) => {
       addValidatorMessage111, addValidatorMessage112, addValidatorMessage14,
       addValidatorMessage1err, changeThresholdMessage10, changeThresholdMessage11,
       changeThresholdMessage13, changeThresholdMessage14, changeThresholdMessage1err,
-      changeRangeSizeMessage10, changeRangeSizeMessage11, changeRangeSizeMessage1max,
-      changeRangeSizeMessage1err, changeCloseEpochMessage10, changeCloseEpochMessage11,
-      changeCloseEpochMessage1err, startKeygenMessage11, startKeygenMessage12,
-      startKeygenMessage1err, confirmFundsTransferMessage1, confirmFundsTransferMessage1err,
-      cancelKeygenMessage1, cancelKeygenMessage21, cancelKeygenMessage22, cancelKeygenMessage2err,
-      confirmKeygenMessage2, startVotingMessage2, transferMessage15100, transferMessage15200,
-      transferMessage25100, transferMessage1err, unknownMessage
+      changeCloseEpochMessage10, changeCloseEpochMessage11, changeCloseEpochMessage1err,
+      startKeygenMessage11, startKeygenMessage12, startKeygenMessage1err,
+      confirmFundsTransferMessage1, confirmFundsTransferMessage1err, cancelKeygenMessage1,
+      cancelKeygenMessage21, cancelKeygenMessage22, cancelKeygenMessage2err, confirmKeygenMessage2,
+      startVotingMessage2, transferMessage15min, transferMessage15max, transferMessage15low,
+      transferMessage15high, transferMessage25min, transferMessage1err, changeMinPerTxLimit1,
+      changeMinPerTxLimit1high, changeMinPerTxLimit1low, changeMinPerTxLimit1err,
+      changeMaxPerTxLimit1, changeMaxPerTxLimit1low, changeMaxPerTxLimit1err,
+      decreaseExecutionMinLimit1low, decreaseExecutionMinLimit11, decreaseExecutionMinLimit12,
+      decreaseExecutionMinLimit1err, increaseExecutionMaxLimit1low, increaseExecutionMaxLimit11,
+      increaseExecutionMaxLimit12, increaseExecutionMaxLimit1err, changeRangeSizeMessage10,
+      changeRangeSizeMessage11, changeRangeSizeMessage1max, changeRangeSizeMessage1err,
+      unknownMessage
     ]
 
     const validSignatures = {}
@@ -302,9 +360,6 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await bridge.getParties()).to.bignumber.equal('3')
         expect(await bridge.getValidators()).to.deep.equal(validators)
         expect(await bridge.getThreshold()).to.bignumber.equal('2')
-        expect(await bridge.getMinPerTx()).to.bignumber.equal(MIN_TX_LIMIT)
-        expect(await bridge.getMaxPerTx()).to.bignumber.equal(MAX_TX_LIMIT)
-        expect(await bridge.getRangeSize()).to.bignumber.equal('15')
         expect(await bridge.getStartBlock()).to.bignumber.above('0')
         expect(await bridge.getCloseEpoch()).to.equal(true)
         expect(await bridge.state()).to.bignumber.equal(State.READY)
@@ -350,12 +405,6 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await bridge.getNextValidators()).to.deep.equal(validators)
         expect(await bridge.getThreshold()).to.bignumber.equal('2')
         expect(await bridge.getNextThreshold()).to.bignumber.equal('2')
-        expect(await bridge.getMinPerTx()).to.bignumber.equal(MIN_TX_LIMIT)
-        expect(await bridge.getNextMinPerTx()).to.bignumber.equal(MIN_TX_LIMIT)
-        expect(await bridge.getMaxPerTx()).to.bignumber.equal(MAX_TX_LIMIT)
-        expect(await bridge.getNextMaxPerTx()).to.bignumber.equal(MAX_TX_LIMIT)
-        expect(await bridge.getRangeSize()).to.bignumber.equal('15')
-        expect(await bridge.getNextRangeSize()).to.bignumber.equal('15')
         expect(await bridge.getCloseEpoch()).to.equal(true)
         expect(await bridge.getNextCloseEpoch()).to.equal(true)
         expect(await bridge.state()).to.bignumber.equal(State.CLOSING_EPOCH)
@@ -569,34 +618,6 @@ contract('EthToBncBridge', async (accounts) => {
         }).skipBeforeEach = true
       })
 
-      describe('change range size', async () => {
-        it('should not accept 0 range size', async () => {
-          await applyMessage(changeRangeSizeMessage10).should.be.rejected
-        })
-
-        it('should accept range size 1', async () => {
-          await applyMessage(changeRangeSizeMessage11).should.be.fulfilled
-          expect(await bridge.getRangeSize()).to.bignumber.equal('15')
-          expect(await bridge.getNextRangeSize()).to.bignumber.equal('1')
-        })
-
-        it('should set max allowed range size', async () => {
-          await applyMessage(changeRangeSizeMessage1max).should.be.fulfilled
-          expect(await bridge.getRangeSize()).to.bignumber.equal('15')
-          expect(await bridge.getNextRangeSize()).to.bignumber.equal('65535')
-        })
-
-        it('should not accept message with wrong length', async () => {
-          await applyMessage(changeRangeSizeMessage1err).should.be.rejected
-        })
-
-        it('should fail to change range size in ready state', async () => {
-          bridge = await deployBridge()
-          await applyMessage(confirmKeygenMessage11)
-          await applyMessage(changeRangeSizeMessage11).should.be.rejected
-        }).skipBeforeEach = true
-      })
-
       describe('change close epoch', async () => {
         it('should enable closing epoch', async () => {
           await applyMessage(changeCloseEpochMessage11).should.be.fulfilled
@@ -620,6 +641,120 @@ contract('EthToBncBridge', async (accounts) => {
           await applyMessage(confirmKeygenMessage11)
           await applyMessage(changeCloseEpochMessage10).should.be.rejected
         }).skipBeforeEach = true
+      })
+    })
+
+    describe('not epoch-related changes', async () => {
+      beforeEach(async () => {
+        bridge = await deployBridge()
+        await applyMessage(confirmKeygenMessage11)
+      })
+
+      describe('change range size', async () => {
+        it('should not accept 0 range size', async () => {
+          await applyMessage(changeRangeSizeMessage10).should.be.rejected
+        })
+
+        it('should accept range size 1', async () => {
+          const startBlock = await bridge.rangeSizeStartBlock()
+          const { logs } = await applyMessage(changeRangeSizeMessage11).should.be.fulfilled
+          expect(await bridge.rangeSize()).to.bignumber.equal('1')
+          expect(await bridge.rangeSizeVersion()).to.bignumber.equal('1')
+          expect(await bridge.rangeSizeStartBlock()).to.bignumber.above(startBlock)
+          expectEventInLogs(logs, 'ForceSign')
+        })
+
+        it('should set max allowed range size', async () => {
+          await applyMessage(changeRangeSizeMessage1max).should.be.fulfilled
+          expect(await bridge.rangeSize()).to.bignumber.equal('65535')
+        })
+
+        it('should change range size twice', async () => {
+          await applyMessage(changeRangeSizeMessage11)
+          const startBlock = await bridge.rangeSizeStartBlock()
+          await applyMessage(changeRangeSizeMessage1max).should.be.fulfilled
+          expect(await bridge.rangeSize()).to.bignumber.equal('65535')
+          expect(await bridge.rangeSizeVersion()).to.bignumber.equal('2')
+          expect(await bridge.rangeSizeStartBlock()).to.bignumber.above(startBlock)
+        })
+
+        it('should not accept message with wrong length', async () => {
+          await applyMessage(changeRangeSizeMessage1err).should.be.rejected
+        })
+      })
+
+      describe('change min per tx limit', async () => {
+        it('should not accept too low limit', async () => {
+          await applyMessage(changeMinPerTxLimit1low).should.be.rejected
+        })
+
+        it('should not accept limit higher than max per tx limit', async () => {
+          await applyMessage(changeMinPerTxLimit1high).should.be.rejected
+        })
+
+        it('should accept valid min limit', async () => {
+          await applyMessage(changeMinPerTxLimit1).should.be.fulfilled
+          expect(await bridge.minPerTxLimit()).to.bignumber.equal('10000000001')
+        })
+
+        it('should not accept message with wrong length', async () => {
+          await applyMessage(changeMinPerTxLimit1err).should.be.rejected
+        })
+      })
+
+      describe('change max per tx limit', async () => {
+        it('should not accept too low limit', async () => {
+          await applyMessage(changeMaxPerTxLimit1low).should.be.rejected
+        })
+
+        it('should accept valid max limit', async () => {
+          await applyMessage(changeMaxPerTxLimit1).should.be.fulfilled
+          expect(await bridge.maxPerTxLimit()).to.bignumber.equal('1000000000001')
+        })
+
+        it('should not accept message with wrong length', async () => {
+          await applyMessage(changeMaxPerTxLimit1err).should.be.rejected
+        })
+      })
+
+      describe('decrease execution min limit', async () => {
+        it('should not accept too low limit', async () => {
+          await applyMessage(decreaseExecutionMinLimit1low).should.be.rejected
+        })
+
+        it('should accept valid execution min limit', async () => {
+          await applyMessage(decreaseExecutionMinLimit11).should.be.fulfilled
+          expect(await bridge.executionMinLimit()).to.bignumber.equal('10000000000')
+        })
+
+        it('should not allow to increase limit', async () => {
+          await applyMessage(decreaseExecutionMinLimit11)
+          await applyMessage(decreaseExecutionMinLimit12).should.be.rejected
+        })
+
+        it('should not accept message with wrong length', async () => {
+          await applyMessage(decreaseExecutionMinLimit1err).should.be.rejected
+        })
+      })
+
+      describe('increase execution max limit', async () => {
+        it('should not accept too low limit', async () => {
+          await applyMessage(increaseExecutionMaxLimit1low).should.be.rejected
+        })
+
+        it('should accept valid execution max limit', async () => {
+          await applyMessage(increaseExecutionMaxLimit11).should.be.fulfilled
+          expect(await bridge.executionMaxLimit()).to.bignumber.equal('1000000000002')
+        })
+
+        it('should not allow to decrease limit', async () => {
+          await applyMessage(increaseExecutionMaxLimit11)
+          await applyMessage(increaseExecutionMaxLimit12).should.be.rejected
+        })
+
+        it('should not accept message with wrong length', async () => {
+          await applyMessage(increaseExecutionMaxLimit1err).should.be.rejected
+        })
       })
     })
 
@@ -700,9 +835,6 @@ contract('EthToBncBridge', async (accounts) => {
         expect(await bridge.nextEpoch()).to.bignumber.equal('2')
         expect(await bridge.getValidators()).to.deep.equal(validators)
         expect(await bridge.getThreshold()).to.bignumber.equal('2')
-        expect(await bridge.getMinPerTx()).to.bignumber.equal(MIN_TX_LIMIT)
-        expect(await bridge.getMaxPerTx()).to.bignumber.equal(MAX_TX_LIMIT)
-        expect(await bridge.getRangeSize()).to.bignumber.equal('15')
         expect(await bridge.getCloseEpoch()).to.equal(false)
       })
 
@@ -785,32 +917,41 @@ contract('EthToBncBridge', async (accounts) => {
       })
 
       it('should transfer tokens', async () => {
-        await token.transfer(bridge.address, 100, { from: accounts[1] })
-        await applyMessage(transferMessage15100).should.be.fulfilled
+        await token.transfer(bridge.address, EXECUTION_MIN_LIMIT, { from: accounts[1] })
+        await applyMessage(transferMessage15min).should.be.fulfilled
         expect(await token.balanceOf(bridge.address)).to.bignumber.equal('0')
-        expect(await token.balanceOf(accounts[5])).to.bignumber.equal('100')
+        expect(await token.balanceOf(accounts[5])).to.bignumber.equal(EXECUTION_MIN_LIMIT)
         expect(await token.allowance(bridge.address, accounts[5])).to.bignumber.equal('0')
       })
 
-      it('should approve 100 tokens', async () => {
-        await applyMessage(transferMessage15100).should.be.fulfilled
+      it('should approve min number of tokens', async () => {
+        await applyMessage(transferMessage15min).should.be.fulfilled
         expect(await token.balanceOf(bridge.address)).to.bignumber.equal('0')
         expect(await token.balanceOf(accounts[5])).to.bignumber.equal('0')
-        expect(await token.allowance(bridge.address, accounts[5])).to.bignumber.equal('100')
+        expect(
+          await token.allowance(bridge.address, accounts[5])
+        ).to.bignumber.equal(EXECUTION_MIN_LIMIT)
       })
 
-      it('should approve 200 tokens', async () => {
-        await token.transfer(bridge.address, 100, { from: accounts[1] })
-        await applyMessage(transferMessage15200).should.be.fulfilled
-        expect(await token.balanceOf(bridge.address)).to.bignumber.equal('100')
+      it('should approve max number of tokens', async () => {
+        await token.transfer(bridge.address, EXECUTION_MIN_LIMIT, { from: accounts[1] })
+        await applyMessage(transferMessage15max).should.be.fulfilled
+        expect(await token.balanceOf(bridge.address)).to.bignumber.equal(EXECUTION_MIN_LIMIT)
         expect(await token.balanceOf(accounts[5])).to.bignumber.equal('0')
-        expect(await token.allowance(bridge.address, accounts[5])).to.bignumber.equal('200')
+        expect(
+          await token.allowance(bridge.address, accounts[5])
+        ).to.bignumber.equal(EXECUTION_MAX_LIMIT)
+      })
+
+      it('should not accept too low/high execution value', async () => {
+        await applyMessage(transferMessage15low).should.be.rejected
+        await applyMessage(transferMessage15high).should.be.rejected
       })
 
       it('should not accept transfer message for next epoch', async () => {
         await applyMessage(startVotingMessage1)
-        await token.transfer(bridge.address, 100, { from: accounts[1] })
-        await applyMessage(transferMessage25100).should.be.rejected
+        await token.transfer(bridge.address, EXECUTION_MIN_LIMIT, { from: accounts[1] })
+        await applyMessage(transferMessage25min).should.be.rejected
       })
 
       it('should accept transfer message for previous epoch', async () => {
@@ -818,10 +959,12 @@ contract('EthToBncBridge', async (accounts) => {
         await applyMessage(startKeygenMessage11)
         await applyMessage(confirmKeygenMessage2)
         await applyMessage(confirmFundsTransferMessage1)
-        await applyMessage(transferMessage15100).should.be.fulfilled
+        await applyMessage(transferMessage15min).should.be.fulfilled
         expect(await token.balanceOf(bridge.address)).to.bignumber.equal('0')
         expect(await token.balanceOf(accounts[5])).to.bignumber.equal('0')
-        expect(await token.allowance(bridge.address, accounts[5])).to.bignumber.equal('100')
+        expect(
+          await token.allowance(bridge.address, accounts[5])
+        ).to.bignumber.equal(EXECUTION_MIN_LIMIT)
       })
 
       it('should not accept message with wrong length', async () => {
