@@ -5,6 +5,8 @@ const { waitPromise, seqMap } = require('./utils/wait')
 
 const testEthToBnc = require('./ethToBnc')
 const testEthToBncWithRestart = require('./ethToBncWithRestart')
+const testEthToBncWithRangeSizeChange = require('./ethToBncWithRangeSizeChange')
+const testChangeLimits = require('./changeLimits')
 const testBncToEth = require('./bncToEth')
 const testRemoveValidator = require('./removeValidator')
 const testAddValidator = require('./addValidator')
@@ -61,6 +63,8 @@ describe('bridge tests', function () {
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
+  testChangeLimits(() => users)
+  testEthToBncWithRangeSizeChange(() => users)
   testEthToBnc(() => users)
 
   testRemoveValidator(validatorsConfig[1])

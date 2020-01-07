@@ -36,6 +36,21 @@ function createController(validatorId) {
     },
     async voteCancelKeygen() {
       return (await retry(() => proxy.get('/vote/cancelKeygen'))).data
+    },
+    async voteChangeRangeSize(rangeSize) {
+      return (await retry(() => proxy.get(`/vote/changeRangeSize/${rangeSize}`))).data
+    },
+    async voteChangeMinPerTxLimit(limit) {
+      return (await retry(() => proxy.get(`/vote/changeMinPerTxLimit/${limit}`))).data
+    },
+    async voteChangeMaxPerTxLimit(limit) {
+      return (await retry(() => proxy.get(`/vote/changeMaxPerTxLimit/${limit}`))).data
+    },
+    async voteDecreaseExecutionMinLimit(limit) {
+      return (await retry(() => proxy.get(`/vote/decreaseExecutionMinLimit/${limit}`))).data
+    },
+    async voteIncreaseExecutionMaxLimit(limit) {
+      return (await retry(() => proxy.get(`/vote/increaseExecutionMaxLimit/${limit}`))).data
     }
   }
 }
