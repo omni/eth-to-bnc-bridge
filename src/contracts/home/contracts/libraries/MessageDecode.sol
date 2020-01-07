@@ -10,6 +10,12 @@ library MessageDecode {
         }
     }
 
+    function _decodeUint96(bytes memory message) internal pure returns (uint96 a) {
+        assembly {
+            a := mload(add(message, 15))
+        }
+    }
+
     function _decodeBoolean(bytes memory message) internal pure returns (bool a) {
         assembly {
             a := and(mload(add(message, 4)), 1)

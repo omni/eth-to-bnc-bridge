@@ -11,14 +11,18 @@ contract EthToBncBridge is BridgeMessageProcessor {
     constructor(
         uint16 threshold,
         address[] memory validators,
+        bool closeEpoch,
         address _tokenContract,
-        uint96[2] memory limits,
-        uint16 rangeSize,
-        bool closeEpoch
+        uint96[2] memory homeLimits,
+        uint96[2] memory foreignLimits,
+        uint16 _rangeSize
     ) public {
         require(threshold > 0 && threshold <= validators.length, "Incorrect threshold");
-        require(limits[0] >= 10 ** 10 && limits[0] <= limits[1], "Incorrect limits");
-        require(rangeSize > 0, "Range size must be positive");
+        require(homeLimits[0] >= LIMITS_LOWER_BOUND
+            && homeLimits[0] <= homeLimits[1], "Incorrect home limits");
+        require(foreignLimits[0] >= LIMITS_LOWER_BOUND
+            && foreignLimits[0] <= foreignLimits[1], "Incorrect foreign limits");
+        require(_rangeSize > 0, "Range size must be positive");
 
         tokenContract = IERC20(_tokenContract);
 
@@ -26,17 +30,30 @@ contract EthToBncBridge is BridgeMessageProcessor {
         state = State.KEYGEN;
         nextEpoch = 1;
 
-        _initNextEpoch(validators, threshold, rangeSize, closeEpoch, limits[0], limits[1]);
+        _initNextEpoch(validators, threshold, closeEpoch);
+        rangeSize = _rangeSize;
+        rangeSizeStartBlock = uint32(block.number);
 
+        minPerTxLimit = homeLimits[0];
+        maxPerTxLimit = homeLimits[1];
+
+        executionMinLimit = foreignLimits[0];
+        executionMaxLimit = foreignLimits[1];
+
+        emit RangeSizeChanged(rangeSize);
         emit NewEpoch(0, 1);
     }
 
     function exchange(uint96 value) public ready {
-        require(value >= getMinPerTx() && value <= getMaxPerTx(), "Value lies outside of allowed limits");
+        require(value >= minPerTxLimit && value <= maxPerTxLimit, "Value lies outside of the allowed limits");
 
-        uint32 txRange = (uint32(block.number) - getStartBlock()) / uint32(getRangeSize());
-        if (!usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))]) {
-            usedExchangeRanges[keccak256(abi.encodePacked(txRange, epoch))] = true;
+        // current range number, starting from last change of range size
+        uint32 txRangeNumber = (uint32(block.number) - rangeSizeStartBlock) / uint32(rangeSize);
+        bytes32 txRangeId = keccak256(abi.encodePacked(rangeSizeVersion, txRangeNumber));
+
+        // first exchange in the new range, triggers nonce increase
+        if (!usedExchangeRanges[txRangeId]) {
+            usedExchangeRanges[txRangeId] = true;
             epochStates[epoch].nonce++;
         }
 

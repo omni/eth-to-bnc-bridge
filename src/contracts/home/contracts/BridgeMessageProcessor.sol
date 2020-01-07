@@ -10,6 +10,25 @@ contract BridgeMessageProcessor is BridgeTransitions {
 
     uint internal constant SIGNATURE_SIZE = 65;
 
+    enum Action {
+        CONFIRM_KEYGEN,
+        CONFIRM_FUNDS_TRANSFER,
+        CONFIRM_CLOSE_EPOCH,
+        START_VOTING,
+        ADD_VALIDATOR,
+        REMOVE_VALIDATOR,
+        CHANGE_THRESHOLD,
+        CHANGE_CLOSE_EPOCH,
+        START_KEYGEN,
+        CANCEL_KEYGEN,
+        TRANSFER,
+        CHANGE_MIN_PER_TX_LIMIT,
+        CHANGE_MAX_PER_TX_LIMIT,
+        INCREASE_EXECUTION_MAX_TX_LIMIT,
+        DECREASE_EXECUTION_MIN_TX_LIMIT,
+        CHANGE_RANGE_SIZE
+    }
+
     event AppliedMessage(bytes message);
 
     mapping(bytes32 => bool) public handledMessages;
@@ -20,7 +39,7 @@ contract BridgeMessageProcessor is BridgeTransitions {
 
         Action msgAction = Action(uint8(message[0]));
 
-        if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.VOTE_CANCEL_KEYGEN) {
+        if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.CANCEL_KEYGEN) {
             require(msgEpoch == nextEpoch, "Incorrect message epoch");
         } else if (msgAction == Action.TRANSFER) {
             require(msgEpoch <= epoch, "Incorrect message epoch");
@@ -39,47 +58,67 @@ contract BridgeMessageProcessor is BridgeTransitions {
         } else if (msgAction == Action.CONFIRM_CLOSE_EPOCH) {
             require(message.length == 3, "Incorrect message length");
             _confirmCloseEpoch();
-        } else if (msgAction == Action.VOTE_START_VOTING) {
+        } else if (msgAction == Action.START_VOTING) {
             require(message.length == 3, "Incorrect message length");
             _startVoting();
-        } else if (msgAction == Action.VOTE_ADD_VALIDATOR) {
+        } else if (msgAction == Action.ADD_VALIDATOR) {
             // [3,22] - address, [23,31] - extra data
             require(message.length == 32, "Incorrect message length");
             address validator = message._decodeAddress();
             _addValidator(validator);
-        } else if (msgAction == Action.VOTE_REMOVE_VALIDATOR) {
+        } else if (msgAction == Action.REMOVE_VALIDATOR) {
             // [3,22] - address, [23,31] - extra data
             require(message.length == 32, "Incorrect message length");
             address validator = message._decodeAddress();
             _removeValidator(validator);
-        } else if (msgAction == Action.VOTE_CHANGE_THRESHOLD) {
+        } else if (msgAction == Action.CHANGE_THRESHOLD) {
             // [3,4] - threshold, [5,31] - extra data
             require(message.length == 32, "Incorrect message length");
             uint16 threshold = message._decodeUint16();
             _changeThreshold(threshold);
-        } else if (msgAction == Action.VOTE_CHANGE_RANGE_SIZE) {
-            // [3,4] - rangeSize, [5,31] - extra data
-            require(message.length == 32, "Incorrect message length");
-            uint16 rangeSize = message._decodeUint16();
-            _changeRangeSize(rangeSize);
-        } else if (msgAction == Action.VOTE_CHANGE_CLOSE_EPOCH) {
+        } else if (msgAction == Action.CHANGE_CLOSE_EPOCH) {
             // [3] - closeEpoch, [4,31] - extra data
             require(message.length == 32, "Incorrect message length");
             bool closeEpoch = message._decodeBoolean();
             _changeCloseEpoch(closeEpoch);
-        } else if (msgAction == Action.VOTE_START_KEYGEN) {
+        } else if (msgAction == Action.START_KEYGEN) {
             // [3-31] - extra data
             require(message.length == 32, "Incorrect message length");
             _startKeygen();
-        } else if (msgAction == Action.VOTE_CANCEL_KEYGEN) {
+        } else if (msgAction == Action.CANCEL_KEYGEN) {
             // [3-31] - extra data
             require(message.length == 32, "Incorrect message length");
             _cancelKeygen();
-        } else { // Action.TRANSFER
+        } else if (msgAction == Action.TRANSFER) {
             // [3,34] - txHash, [35,54] - address, [55,66] - value
             require(message.length == 67, "Incorrect message length");
             (address to, uint96 value) = message._decodeTransfer();
             _transfer(to, value);
+        } else if (msgAction == Action.CHANGE_MIN_PER_TX_LIMIT) {
+            // [3,14] - new limit, [15,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint96 limit = message._decodeUint96();
+            _changeMinPerTxLimit(limit);
+        } else if (msgAction == Action.CHANGE_MAX_PER_TX_LIMIT) {
+            // [3,14] - new limit, [15,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint96 limit = message._decodeUint96();
+            _changeMaxPerTxLimit(limit);
+        } else if (msgAction == Action.INCREASE_EXECUTION_MAX_TX_LIMIT) {
+            // [3,14] - new limit, [15,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint96 limit = message._decodeUint96();
+            _increaseExecutionMaxLimit(limit);
+        } else if (msgAction == Action.DECREASE_EXECUTION_MIN_TX_LIMIT) {
+            // [3,14] - new limit, [15,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint96 limit = message._decodeUint96();
+            _decreaseExecutionMinLimit(limit);
+        } else { // Action.CHANGE_RANGE_SIZE
+            // [3,4] - rangeSize, [5,31] - extra data
+            require(message.length == 32, "Incorrect message length");
+            uint16 rangeSize = message._decodeUint16();
+            _changeRangeSize(rangeSize);
         } // invalid actions will not reach this line, since casting uint8 to Action will revert execution
 
         emit AppliedMessage(message);

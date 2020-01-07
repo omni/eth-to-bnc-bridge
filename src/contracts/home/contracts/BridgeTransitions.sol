@@ -2,9 +2,9 @@ pragma solidity ^0.5.0;
 
 import "./BridgeEpochs.sol";
 import "./BridgeStates.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./BridgeConfig.sol";
 
-contract BridgeTransitions is BridgeEpochs, BridgeStates {
+contract BridgeTransitions is BridgeEpochs, BridgeStates, BridgeConfig {
     event EpochEnd(uint16 indexed epoch);
     event EpochClose(uint16 indexed epoch);
     event ForceSign();
@@ -12,23 +12,7 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
     event NewEpochCancelled(uint16 indexed epoch);
     event NewFundsTransfer(uint16 indexed oldEpoch, uint16 indexed newEpoch);
     event EpochStart(uint16 indexed epoch, bytes20 foreignAddress);
-
-    enum Action {
-        CONFIRM_KEYGEN,
-        CONFIRM_FUNDS_TRANSFER,
-        CONFIRM_CLOSE_EPOCH,
-        VOTE_START_VOTING,
-        VOTE_ADD_VALIDATOR,
-        VOTE_REMOVE_VALIDATOR,
-        VOTE_CHANGE_THRESHOLD,
-        VOTE_CHANGE_RANGE_SIZE,
-        VOTE_CHANGE_CLOSE_EPOCH,
-        VOTE_START_KEYGEN,
-        VOTE_CANCEL_KEYGEN,
-        TRANSFER
-    }
-
-    IERC20 public tokenContract;
+    event RangeSizeChanged(uint16 rangeSize);
 
     function _confirmKeygen(bytes20 foreignAddress) internal keygen {
         epochStates[nextEpoch].foreignAddress = foreignAddress;
@@ -36,6 +20,7 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
             state = State.READY;
             epochStates[nextEpoch].startBlock = uint32(block.number);
             epoch = nextEpoch;
+            rangeSizeStartBlock = uint32(block.number);
             emit EpochStart(epoch, foreignAddress);
         } else {
             state = State.FUNDS_TRANSFER;
@@ -47,6 +32,7 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
         state = State.READY;
         epochStates[nextEpoch].startBlock = uint32(block.number);
         epoch = nextEpoch;
+        rangeSizeStartBlock = uint32(block.number);
         emit EpochStart(epoch, getForeignAddress());
     }
 
@@ -57,17 +43,17 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
 
     function _startVoting() internal ready {
         nextEpoch++;
-        _initNextEpoch(getValidators(), getThreshold(), getRangeSize(), getCloseEpoch(), getMinPerTx(), getMaxPerTx());
+        _initNextEpoch(getValidators(), getThreshold(), getCloseEpoch());
 
         if (getCloseEpoch()) {
             state = State.CLOSING_EPOCH;
-            emit ForceSign();
             emit EpochClose(epoch);
         } else {
             state = State.VOTING;
-            emit ForceSign();
             emit EpochEnd(epoch);
         }
+
+        _forceSign();
     }
 
     function _addValidator(address validator) internal voting {
@@ -99,12 +85,6 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
         epochStates[nextEpoch].threshold = threshold;
     }
 
-    function _changeRangeSize(uint16 rangeSize) internal voting {
-        require(rangeSize > 0, "Invalid range size");
-
-        epochStates[nextEpoch].rangeSize = rangeSize;
-    }
-
     function _changeCloseEpoch(bool closeEpoch) internal voting {
         epochStates[nextEpoch].closeEpoch = closeEpoch;
     }
@@ -123,10 +103,47 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates {
     }
 
     function _transfer(address to, uint96 value) internal {
+        require(value >= executionMinLimit && value <= executionMaxLimit, "Value lies outside of the allowed limits");
         if (tokenContract.balanceOf(address(this)) >= value) {
             tokenContract.transfer(to, value);
         } else {
             tokenContract.approve(to, value);
         }
+    }
+
+    function _changeMinPerTxLimit(uint96 limit) internal {
+        require(limit >= LIMITS_LOWER_BOUND && limit <= maxPerTxLimit, "Invalid limit");
+        minPerTxLimit = limit;
+    }
+
+    function _changeMaxPerTxLimit(uint96 limit) internal {
+        require(limit >= minPerTxLimit, "Invalid limit");
+        maxPerTxLimit = limit;
+    }
+
+    function _increaseExecutionMaxLimit(uint96 limit) internal {
+        require(limit > executionMaxLimit, "Invalid limit");
+        executionMaxLimit = limit;
+    }
+
+    function _decreaseExecutionMinLimit(uint96 limit) internal {
+        require(limit >= LIMITS_LOWER_BOUND && limit < executionMinLimit, "Invalid limit");
+        executionMinLimit = limit;
+    }
+
+    function _changeRangeSize(uint16 _rangeSize) internal {
+        require(_rangeSize > 0, "Invalid range size");
+
+        rangeSize = _rangeSize;
+        rangeSizeStartBlock = uint32(block.number);
+        _forceSign();
+
+        emit RangeSizeChanged(rangeSize);
+    }
+
+    function _forceSign() internal {
+        // to guarantee, that the next processed range id will be a new one
+        rangeSizeVersion++;
+        emit ForceSign();
     }
 }
