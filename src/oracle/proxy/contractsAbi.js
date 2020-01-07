@@ -4,8 +4,12 @@ const tokenAbi = [
 const bridgeAbi = [
   'function getForeignAddress() view returns (bytes20)',
   'function epoch() view returns (uint16)',
-  'function getRangeSize() view returns (uint16)',
-  'function getNextRangeSize() view returns (uint16)',
+  'function rangeSize() view returns (uint16)',
+  'function rangeSizeStartBlock() view returns (uint32)',
+  'function minPerTxLimit() view returns (uint96)',
+  'function maxPerTxLimit() view returns (uint96)',
+  'function executionMinLimit() view returns (uint96)',
+  'function executionMaxLimit() view returns (uint96)',
   'function getStartBlock() view returns (uint32)',
   'function getNonce() view returns (uint16)',
   'function nextEpoch() view returns (uint16)',
@@ -18,8 +22,7 @@ const bridgeAbi = [
   'function getCloseEpoch() view returns (bool)',
   'function getNextCloseEpoch() view returns (bool)',
   'function state() view returns (uint8)',
-  'function votesCount(bytes32) view returns (uint16)',
-  'function getNextPartyId(address a) view returns (uint16)',
+  'function getNextPartyId(address partyAddress) view returns (uint16)',
   'function applyMessage(bytes message, bytes signatures)'
 ]
 const sharedDbAbi = [

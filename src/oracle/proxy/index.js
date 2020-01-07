@@ -14,7 +14,7 @@ const createProvider = require('../shared/ethProvider')
 const { connectRabbit, assertQueue } = require('../shared/amqp')
 const { hexAddressToBncAddress, padZeros, publicKeyToHexAddress } = require('../shared/crypto')
 const {
-  parseNumber, parseAddress, parseBool, logRequest
+  parseNumber, parseAddress, parseBool, parseTokens, logRequest
 } = require('./expressUtils')
 const { getForeignBalances } = require('../shared/binanceClient')
 
@@ -209,14 +209,14 @@ async function confirmCloseEpoch(req, res) {
 
 async function voteStartVoting(req, res) {
   const epoch = await bridge.epoch()
-  await processMessage(Action.VOTE_START_VOTING, epoch)
+  await processMessage(Action.START_VOTING, epoch)
   res.send('Voted\n')
 }
 
 async function voteStartKeygen(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_START_KEYGEN,
+    Action.START_KEYGEN,
     epoch,
     padZeros(req.attempt.toString(16), 58)
   )
@@ -226,7 +226,7 @@ async function voteStartKeygen(req, res) {
 async function voteCancelKeygen(req, res) {
   const epoch = await bridge.nextEpoch()
   await processMessage(
-    Action.VOTE_CANCEL_KEYGEN,
+    Action.CANCEL_KEYGEN,
     epoch,
     padZeros(req.attempt.toString(16), 58)
   )
@@ -236,7 +236,7 @@ async function voteCancelKeygen(req, res) {
 async function voteAddValidator(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_ADD_VALIDATOR,
+    Action.ADD_VALIDATOR,
     epoch,
     req.validator,
     padZeros(req.attempt.toString(16), 18)
@@ -247,7 +247,7 @@ async function voteAddValidator(req, res) {
 async function voteChangeThreshold(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_CHANGE_THRESHOLD,
+    Action.CHANGE_THRESHOLD,
     epoch,
     req.threshold,
     padZeros(req.attempt.toString(16), 54)
@@ -258,7 +258,7 @@ async function voteChangeThreshold(req, res) {
 async function voteChangeRangeSize(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_CHANGE_RANGE_SIZE,
+    Action.CHANGE_RANGE_SIZE,
     epoch,
     req.rangeSize,
     padZeros(req.attempt.toString(16), 54)
@@ -269,7 +269,7 @@ async function voteChangeRangeSize(req, res) {
 async function voteChangeCloseEpoch(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_CHANGE_CLOSE_EPOCH,
+    Action.CHANGE_CLOSE_EPOCH,
     epoch,
     req.closeEpoch,
     padZeros(req.attempt.toString(16), 56)
@@ -280,10 +280,54 @@ async function voteChangeCloseEpoch(req, res) {
 async function voteRemoveValidator(req, res) {
   const epoch = await bridge.epoch()
   await processMessage(
-    Action.VOTE_REMOVE_VALIDATOR,
+    Action.REMOVE_VALIDATOR,
     epoch,
     req.validator,
     padZeros(req.attempt.toString(16), 18)
+  )
+  res.send('Voted\n')
+}
+
+async function voteChangeMinPerTxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_MIN_PER_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteChangeMaxPerTxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_MAX_PER_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteDecreaseExecutionMinLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.DECREASE_EXECUTION_MIN_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteIncreaseExecutionMaxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.INCREASE_EXECUTION_MAX_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
   )
   res.send('Voted\n')
 }
@@ -301,17 +345,26 @@ async function transfer(req, res) {
   logger.info('Transfer end')
 }
 
+function normalizeTokens(value) {
+  return parseFloat(new BN(value).dividedBy('1e18').toFixed(8, 3))
+}
+
 async function info(req, res) {
   try {
     const [
-      foreignHexAddress, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch,
-      epochStartBlock, foreignNonce, nextEpoch, threshold, nextThreshold, validators,
-      nextValidators, bridgeStatus, homeBalance
+      foreignHexAddress, epoch, rangeSize, rangeSizeStartBlock, minPerTxLimit, maxPerTxLimit,
+      executionMinLimit, executionMaxLimit, closeEpoch, nextCloseEpoch, epochStartBlock,
+      foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, bridgeStatus,
+      homeBalance
     ] = await Promise.all([
       bridge.getForeignAddress(),
       bridge.epoch(),
-      bridge.getRangeSize(),
-      bridge.getNextRangeSize(),
+      bridge.rangeSize(),
+      bridge.rangeSizeStartBlock(),
+      bridge.minPerTxLimit().then(normalizeTokens),
+      bridge.maxPerTxLimit().then(normalizeTokens),
+      bridge.executionMinLimit().then(normalizeTokens),
+      bridge.executionMaxLimit().then(normalizeTokens),
       bridge.getCloseEpoch(),
       bridge.getNextCloseEpoch(),
       bridge.getStartBlock(),
@@ -322,15 +375,18 @@ async function info(req, res) {
       bridge.getValidators(),
       bridge.getNextValidators(),
       bridge.state(),
-      token.balanceOf(HOME_BRIDGE_ADDRESS)
-        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
+      token.balanceOf(HOME_BRIDGE_ADDRESS).then(normalizeTokens)
     ])
     const foreignAddress = hexAddressToBncAddress(foreignHexAddress)
     const balances = await getForeignBalances(foreignAddress)
     const msg = {
       epoch,
       rangeSize,
-      nextRangeSize,
+      rangeSizeStartBlock,
+      minPerTxLimit,
+      maxPerTxLimit,
+      executionMinLimit,
+      executionMaxLimit,
       epochStartBlock,
       nextEpoch,
       threshold,
@@ -383,8 +439,12 @@ votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
 votesProxyApp.get('/vote/addValidator/:validator', parseAddress('validator'), voteAddValidator)
 votesProxyApp.get('/vote/removeValidator/:validator', parseAddress('validator'), voteRemoveValidator)
 votesProxyApp.get('/vote/changeThreshold/:threshold', parseNumber(false, 'threshold'), voteChangeThreshold)
-votesProxyApp.get('/vote/changeRangeSize/:rangeSize', parseNumber(false, 'rangeSize'), voteChangeRangeSize)
 votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', parseBool('closeEpoch'), voteChangeCloseEpoch)
+votesProxyApp.get('/vote/changeMinPerTxLimit/:limit', parseTokens('limit'), voteChangeMinPerTxLimit)
+votesProxyApp.get('/vote/changeMaxPerTxLimit/:limit', parseTokens('limit'), voteChangeMaxPerTxLimit)
+votesProxyApp.get('/vote/decreaseExecutionMinLimit/:limit', parseTokens('limit'), voteDecreaseExecutionMinLimit)
+votesProxyApp.get('/vote/increaseExecutionMaxLimit/:limit', parseTokens('limit'), voteIncreaseExecutionMaxLimit)
+votesProxyApp.get('/vote/changeRangeSize/:rangeSize', parseNumber(false, 'rangeSize'), voteChangeRangeSize)
 votesProxyApp.get('/info', info)
 
 async function main() {

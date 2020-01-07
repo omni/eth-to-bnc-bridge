@@ -25,10 +25,10 @@ const bridgeAbi = [
   'event EpochStart(uint16 indexed epoch, bytes20 foreignAddress)',
   'event EpochClose(uint16 indexed epoch)',
   'event ForceSign()',
+  'event RangeSizeChanged(uint16 rangeSize)',
   'function getForeignAddress(uint16 epoch) view returns (bytes20)',
   'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getParties(uint16 epoch) view returns (uint16)',
-  'function getRangeSize(uint16 epoch) view returns (uint16)',
   'function getValidators(uint16 epoch) view returns (address[])'
 ]
 const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, provider)
@@ -47,6 +47,7 @@ let epoch
 let epochStart
 let redisTx
 let rangeSize
+let rangeSizeStartBlock
 let lastTransactionBlockNumber
 let isCurrentValidator
 let activeEpoch
@@ -126,7 +127,7 @@ async function sendSign(event, transactionHash) {
       x: publicKey.substr(4, 64),
       y: publicKey.substr(68, 64)
     }),
-    value: (new BN(event.values.value)).dividedBy(10 ** 18).toFixed(8, 3),
+    value: (new BN(event.values.value)).dividedBy('1e18').toFixed(8, 3),
     nonce: event.values.nonce
   }
 
@@ -158,14 +159,12 @@ async function processEpochStart(event) {
   epoch = event.values.epoch
   epochStart = blockNumber
   logger.info(`Epoch ${epoch} started`)
-  rangeSize = await bridge.getRangeSize(epoch)
   isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
   if (isCurrentValidator) {
     logger.info(`${validatorAddress} is a current validator`)
   } else {
     logger.info(`${validatorAddress} is not a current validator`)
   }
-  logger.info(`Updated range size to ${rangeSize}`)
   foreignNonce[epoch] = 0
 }
 
@@ -222,8 +221,16 @@ async function initialize() {
     blockNumber = saved
     foreignNonce[epoch] = parseInt(await redis.get(`foreignNonce${epoch}`), 10) || 0
   }
-  rangeSize = await bridge.getRangeSize(epoch)
-  logger.debug(`Range size ${rangeSize}`)
+  const rangeSizeLogs = await provider.getLogs({
+    address: HOME_BRIDGE_ADDRESS,
+    fromBlock: 1,
+    toBlock: 'latest',
+    topics: bridge.filters.RangeSizeChanged().topics
+  })
+  const lastRangeSizeEvent = rangeSizeLogs[rangeSizeLogs.length - 1]
+  rangeSize = bridge.interface.parseLog(lastRangeSizeEvent).values.rangeSize
+  rangeSizeStartBlock = lastRangeSizeEvent.blockNumber
+  logger.debug(`Range size ${rangeSize} starting from block ${rangeSizeStartBlock}`)
   logger.debug('Checking if current validator')
   isCurrentValidator = (await bridge.getValidators(epoch)).includes(validatorAddress)
   if (isCurrentValidator) {
@@ -265,7 +272,7 @@ async function loop() {
   }))
 
   for (let curBlockNumber = blockNumber, i = 0; curBlockNumber <= endBlock; curBlockNumber += 1) {
-    const rangeOffset = (curBlockNumber + 1 - epochStart) % rangeSize
+    const rangeOffset = (curBlockNumber + 1 - rangeSizeStartBlock) % rangeSize
     const rangeStart = curBlockNumber - (rangeOffset || rangeSize)
     let epochTimeUpdated = false
     while (i < bridgeEvents.length && bridgeEvents[i].blockNumber === curBlockNumber) {
@@ -326,6 +333,11 @@ async function loop() {
               redisTx.set('lastTransactionBlockNumber', 0)
               await sendStartSign()
             }
+            break
+          case 'RangeSizeChanged':
+            rangeSize = event.values.rangeSize
+            rangeSizeStartBlock = curBlockNumber
+            logger.debug(`Range size updated to ${rangeSize} at block ${rangeSizeStartBlock}`)
             break
           default:
             logger.warn('Unknown event %o', event)

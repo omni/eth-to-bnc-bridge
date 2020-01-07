@@ -1,3 +1,4 @@
+const BN = require('bignumber.js')
 const ethers = require('ethers')
 
 const logger = require('../shared/logger')
@@ -12,6 +13,18 @@ function parseNumber(fromQuery, field, defaultValue = null) {
     } else if (!source[field] && defaultValue !== null) {
       req[field] = defaultValue
       logger.trace(`Set req.${field} to ${defaultValue}`)
+      next()
+    } else {
+      res.status(400).end()
+    }
+  }
+}
+
+function parseTokens(field) {
+  return (req, res, next) => {
+    if (/^[0-9]+(\.[0-9]{1,8})?$/.test(req.params[field])) {
+      req[field] = new BN(req.params[field]).multipliedBy('1e18').toString(16)
+      logger.trace(`Set req.${field} to ${req[field]}`)
       next()
     } else {
       res.status(400).end()
@@ -58,6 +71,7 @@ function logRequest(req, res, next) {
 module.exports = {
   parseNumber,
   parseAddress,
+  parseTokens,
   parseBool,
   logRequest
 }

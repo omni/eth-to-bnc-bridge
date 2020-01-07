@@ -126,7 +126,7 @@ async function loop() {
       const publicKeyEncoded = (await getTx(tx.txHash)).signatures[0].pub_key.value
       await proxyHttpClient.post('/transfer', {
         to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
-        value: new BN(tx.value).multipliedBy(10 ** 18)
+        value: new BN(tx.value).multipliedBy('1e18')
           .toString(16),
         hash: tx.txHash,
         epoch

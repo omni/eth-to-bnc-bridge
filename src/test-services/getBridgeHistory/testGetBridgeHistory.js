@@ -19,29 +19,33 @@ const Action = {
   CONFIRM_KEYGEN: 0,
   CONFIRM_FUNDS_TRANSFER: 1,
   CONFIRM_CLOSE_EPOCH: 2,
-  VOTE_START_VOTING: 3,
-  VOTE_ADD_VALIDATOR: 4,
-  VOTE_REMOVE_VALIDATOR: 5,
-  VOTE_CHANGE_THRESHOLD: 6,
-  VOTE_CHANGE_RANGE_SIZE: 7,
-  VOTE_CHANGE_CLOSE_EPOCH: 8,
-  VOTE_START_KEYGEN: 9,
-  VOTE_CANCEL_KEYGEN: 10,
-  TRANSFER: 11
+  START_VOTING: 3,
+  ADD_VALIDATOR: 4,
+  REMOVE_VALIDATOR: 5,
+  CHANGE_THRESHOLD: 6,
+  CHANGE_CLOSE_EPOCH: 7,
+  START_KEYGEN: 8,
+  CANCEL_KEYGEN: 9,
+  TRANSFER: 10,
+  CHANGE_MIN_PER_TX_LIMIT: 11,
+  CHANGE_MAX_PER_TX_LIMIT: 12,
+  INCREASE_EXECUTION_MAX_TX_LIMIT: 13,
+  DECREASE_EXECUTION_MIN_TX_LIMIT: 14,
+  CHANGE_RANGE_SIZE: 15
 }
 
 const actionNames = [
   'CONFIRM_KEYGEN',
   'CONFIRM_FUNDS_TRANSFER',
   'CONFIRM_CLOSE_EPOCH',
-  'VOTE_START_VOTING',
-  'VOTE_ADD_VALIDATOR',
-  'VOTE_REMOVE_VALIDATOR',
-  'VOTE_CHANGE_THRESHOLD',
-  'VOTE_CHANGE_RANGE_SIZE',
-  'VOTE_CHANGE_CLOSE_EPOCH',
-  'VOTE_START_KEYGEN',
-  'VOTE_CANCEL_KEYGEN',
+  'START_VOTING',
+  'ADD_VALIDATOR',
+  'REMOVE_VALIDATOR',
+  'CHANGE_THRESHOLD',
+  'CHANGE_RANGE_SIZE',
+  'CHANGE_CLOSE_EPOCH',
+  'START_KEYGEN',
+  'CANCEL_KEYGEN',
   'TRANSFER'
 ]
 
@@ -68,35 +72,35 @@ function processEvent(event) {
       }
     case Action.CONFIRM_FUNDS_TRANSFER:
     case Action.CONFIRM_CLOSE_EPOCH:
-    case Action.VOTE_START_VOTING:
+    case Action.START_VOTING:
       return baseMsg
-    case Action.VOTE_ADD_VALIDATOR:
-    case Action.VOTE_REMOVE_VALIDATOR:
+    case Action.ADD_VALIDATOR:
+    case Action.REMOVE_VALIDATOR:
       return {
         ...baseMsg,
         validator: `0x${message.slice(8, 48)}`,
         attempt: parseInt(message.slice(48, 66), 16)
       }
-    case Action.VOTE_CHANGE_THRESHOLD:
+    case Action.CHANGE_THRESHOLD:
       return {
         ...baseMsg,
         threshold: parseInt(message.slice(8, 12), 16),
         attempt: parseInt(message.slice(12, 66), 16)
       }
-    case Action.VOTE_CHANGE_RANGE_SIZE:
+    case Action.CHANGE_RANGE_SIZE:
       return {
         ...baseMsg,
         rangeSize: parseInt(message.slice(8, 12), 16),
         attempt: parseInt(message.slice(12, 66), 16)
       }
-    case Action.VOTE_CHANGE_CLOSE_EPOCH:
+    case Action.CHANGE_CLOSE_EPOCH:
       return {
         ...baseMsg,
         closeEpoch: parseInt(message.slice(8, 10), 16) > 0,
         attempt: parseInt(message.slice(10, 66), 16)
       }
-    case Action.VOTE_START_KEYGEN:
-    case Action.VOTE_CANCEL_KEYGEN:
+    case Action.START_KEYGEN:
+    case Action.CANCEL_KEYGEN:
       return {
         ...baseMsg,
         attempt: parseInt(message.slice(8, 66), 16)

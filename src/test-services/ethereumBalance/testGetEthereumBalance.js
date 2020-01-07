@@ -18,7 +18,7 @@ async function main() {
 
   try {
     const ercBalance = await token.balanceOf(address)
-    const floatBalance = new BN(ercBalance).dividedBy(10 ** 18).toFixed(8, 3)
+    const floatBalance = new BN(ercBalance).dividedBy('1e18').toFixed(8, 3)
     console.log(`${floatBalance.toString()} tokens`)
   } catch (e) {
     console.log('0 tokens')
