@@ -21,16 +21,31 @@ function ripemd160(bytes) {
     .digest('hex')
 }
 
-function publicKeyToAddress({ x, y }) {
+function publicKeyToHexAddress({ x, y }) {
   const compact = (parseInt(y[y.length - 1], 16) % 2 ? '03' : '02') + padZeros(x, 64)
   const sha256Hash = sha256(Buffer.from(compact, 'hex'))
-  const hash = ripemd160(Buffer.from(sha256Hash, 'hex'))
-  const words = bech32.toWords(Buffer.from(hash, 'hex'))
+  return ripemd160(Buffer.from(sha256Hash, 'hex'))
+}
+
+function stripHex(s) {
+  return s.startsWith('0x') ? s.substr(2) : s
+}
+
+function hexAddressToBncAddress(hexAddress) {
+  const addressBytes = Buffer.from(stripHex(hexAddress), 'hex')
+  const words = bech32.toWords(addressBytes)
   return bech32.encode('tbnb', words)
+}
+
+function publicKeyToAddress(publicKey) {
+  const hexAddress = publicKeyToHexAddress(publicKey)
+  return hexAddressToBncAddress(hexAddress)
 }
 
 module.exports = {
   publicKeyToAddress,
   padZeros,
-  sha256
+  sha256,
+  publicKeyToHexAddress,
+  hexAddressToBncAddress
 }

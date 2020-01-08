@@ -2,10 +2,10 @@ FROM node:10.16.0-alpine
 
 WORKDIR /test
 
-COPY package.json /test/
+COPY package.json ./
 
 RUN npm install
 
-COPY resetToBlock.js /test/
+COPY resetToBlock.js ./
 
 ENTRYPOINT ["node", "resetToBlock.js"]

@@ -1,5 +1,5 @@
 {
-  "name": "watcher",
+  "name": "bnc-watcher",
   "version": "0.0.1",
   "dependencies": {
     "amqplib": "0.5.3",
@@ -13,7 +13,10 @@
   },
   "engines": {
     "node": ">=10.6.0"
-  }
+  },
+  "files": [
+    "../shared"
+  ]
 }
 
 

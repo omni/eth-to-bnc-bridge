@@ -2,11 +2,9 @@ version: 2.1
 orbs:
   bridge:
     executors:
-      node-dev:
+      node:
         docker:
           - image: circleci/node:10.15
-        environment:
-          TARGET_NETWORK: development
     commands:
       fetch_repo:
         description: "Checkout and init submodules"
@@ -15,19 +13,58 @@ orbs:
           - run:
               name: "Initialize submodules"
               command: git submodule update --init
+      install_truffle:
+        description: "Install truffle"
+        steps:
+          - run:
+              name: "Install truffle"
+              command: npm install truffle
+      install_ganache:
+        description: "Install ganache-cli"
+        steps:
+          - run:
+              name: "Install ganache-cli"
+              command: npm install ganache-cli
+      install_linters:
+        description: "Install code linters"
+        steps:
+          - run:
+              name: "Install eslint"
+              command: |
+                npm install eslint
+                npm install eslint-config-airbnb
+                npm install eslint-plugin-node
+                npm install eslint-plugin-truffle
+                npm install eslint-plugin-import
+          - run:
+              name: "Install solhint"
+              command: npm install solhint
+          - run:
+              name: "Install hadolint"
+              command: |
+                sudo wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.17.3/hadolint-Linux-x86_64
+                sudo chmod +x /bin/hadolint
+      install_solidity_coverage:
+        description: "Install solidity-coverage"
+        steps:
+          - run:
+              name: "Install solidity-coverage"
+              command: npm install solidity-coverage
+      install_coveralls:
+        description: "Install coveralls plugin and lcov merger"
+        steps:
+          - run:
+              name: "Install coveralls plugin"
+              command: npm install coveralls
+          - run:
+              name: "Install lcov merger"
+              command: npm install lcov-result-merger
       setup_docker:
         description: "Set up remote docker engine"
         steps:
           - setup_remote_docker:
               version: 18.09.3
               docker_layer_caching: true
-      restore_tss_image:
-        description: "Restores tss image from cache"
-        steps:
-          - restore_cache:
-              name: "Restore tss image from cache"
-              key: "tss-v1-{{ .Branch }}"
-          - load_tss
       save_tss:
         description: "Save tss image to workspace"
         steps:
@@ -41,11 +78,6 @@ orbs:
               root: ./workspace
               paths:
                 - tss.tar.gz
-          - save_cache:
-              name: "Save tss image to cache"
-              paths:
-                - ./workspace/tss.tar.gz
-              key: "tss-v1-{{ .Branch }}"
       load_tss:
         description: "Load tss image from workspace"
         steps:
@@ -63,13 +95,16 @@ orbs:
               name: "Saving validator<< parameters.validator >> logs"
               command: |
                 mkdir -p ./artifacts/logs/validator<< parameters.validator >>
-                docker logs validator<< parameters.validator >>_rabbitmq_1 > ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
-                docker logs validator<< parameters.validator >>_redis_1 > ./artifacts/logs/validator<< parameters.validator >>/redis.log
-                docker logs validator<< parameters.validator >>_proxy_1 > ./artifacts/logs/validator<< parameters.validator >>/proxy.log
-                docker logs validator<< parameters.validator >>_eth-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/eth-watcher.log
-                docker logs validator<< parameters.validator >>_bnc-watcher_1 > ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
-                docker logs validator<< parameters.validator >>_signer_1 > ./artifacts/logs/validator<< parameters.validator >>/signer.log
-                docker logs validator<< parameters.validator >>_keygen_1 > ./artifacts/logs/validator<< parameters.validator >>/keygen.log
+                docker logs validator<< parameters.validator >>_rabbitmq_1 &> ./artifacts/logs/validator<< parameters.validator >>/rabbitmq.log
+                docker logs validator<< parameters.validator >>_redis_1 &> ./artifacts/logs/validator<< parameters.validator >>/redis.log
+                docker logs validator<< parameters.validator >>_proxy_1 &> ./artifacts/logs/validator<< parameters.validator >>/proxy.log
+                docker logs validator<< parameters.validator >>_home-watcher_1 &> ./artifacts/logs/validator<< parameters.validator >>/home-watcher.log
+                docker logs validator<< parameters.validator >>_side-watcher_1 &> ./artifacts/logs/validator<< parameters.validator >>/side-watcher.log
+                docker logs validator<< parameters.validator >>_bnc-watcher_1 &> ./artifacts/logs/validator<< parameters.validator >>/bnc-watcher.log
+                docker logs validator<< parameters.validator >>_sign-client_1 &> ./artifacts/logs/validator<< parameters.validator >>/sign-client.log
+                docker logs validator<< parameters.validator >>_keygen-client_1 &> ./artifacts/logs/validator<< parameters.validator >>/keygen-client.log
+                docker logs validator<< parameters.validator >>_side-sender_1 &> ./artifacts/logs/validator<< parameters.validator >>/side-sender.log
+                docker logs validator<< parameters.validator >>_home-sender_1 &> ./artifacts/logs/validator<< parameters.validator >>/home-sender.log
               when: always
       save_artifacts:
         description: "Save and upload tests results, save validator logs to artifacts"
@@ -78,7 +113,7 @@ orbs:
               name: "Save tests results"
               command: |
                 mkdir -p ./artifacts/test_results/mocha
-                docker cp "tests:/tests/results.xml" "./artifacts/test_results/mocha/results.xml"
+                cp "./tests/results.xml" "./artifacts/test_results/mocha/results.xml"
               when: always
           - store_test_results:
               path: ./artifacts/test_results/mocha
@@ -93,17 +128,24 @@ orbs:
               name: "Save ethereum logs"
               command: |
                 mkdir -p ./artifacts/logs/ethereum
-                docker logs ethereum-testnet_side-oracle_1 > ./artifacts/logs/ethereum/side-oracle.log
-                docker logs ethereum-testnet_ganache_home_1 > ./artifacts/logs/ethereum/ganache_home.log
-                docker logs ethereum-testnet_ganache_side_1 > ./artifacts/logs/ethereum/ganache_side.log
+                docker logs ethereum-testnet_ganache_home_1 &> ./artifacts/logs/ethereum/ganache_home.log
+                docker logs ethereum-testnet_ganache_side_1 &> ./artifacts/logs/ethereum/ganache_side.log
               when: always
           - run:
               name: "Save binance logs"
               command: |
                 mkdir -p ./artifacts/logs/binance
-                docker logs binance-testnet_node_1 > ./artifacts/logs/binance/node.log
-                docker logs binance-testnet_api-server_1 > ./artifacts/logs/binance/api-server.log
-                docker logs binance-testnet_http-api_1 > ./artifacts/logs/binance/http-api.log
+                docker logs binance-testnet_node_1 &> ./artifacts/logs/binance/node.log
+                docker logs binance-testnet_api-server_1 &> ./artifacts/logs/binance/api-server.log
+                docker logs binance-testnet_http-api_1 &> ./artifacts/logs/binance/http-api.log
+              when: always
+          - run:
+              name: "Save deploy logs"
+              command: |
+                mkdir -p ./artifacts/logs/deploy
+                docker logs deploy_token &> ./artifacts/logs/deploy/deploy_token.log
+                docker logs deploy_bridge &> ./artifacts/logs/deploy/deploy_bridge.log
+                docker logs deploy_db &> ./artifacts/logs/deploy/deploy_db.log
               when: always
           - store_artifacts:
               path: ./artifacts
@@ -111,62 +153,119 @@ orbs:
               when: always
 jobs:
   init_tss:
-    executor: bridge/node-dev
+    executor: bridge/node
     steps:
       - bridge/fetch_repo
       - bridge/setup_docker
-      - bridge/restore_tss_image
       - run:
           name: "Build tss image"
-          command: docker build --cache-from tss -t tss ./src/tss || docker build -t tss ./src/tss
+          command: docker build -t tss ./src/tss
       - bridge/save_tss
-  run_tests:
-    executor: bridge/node-dev
+  tests_e2e:
+    executor: bridge/node
     steps:
       - bridge/fetch_repo
       - bridge/setup_docker
       - attach_workspace:
           at: ./workspace
       - bridge/load_tss
-      - run:
-          name: "Init tests environment"
-          command: |
-            BLOCK_TIME=3 ./demo/start-ethereum-environment.sh
-            ./demo/start-binance-environment.sh
-            N=1 ./demo/validator-demo.sh -d
-            N=2 ./demo/validator-demo.sh -d
-            N=3 ./demo/validator-demo.sh -d
-      - run:
-          name: "Wait until validator nodes are ready"
-          command: |
-            docker run --network validator1_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-            docker run --network validator2_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-            docker run --network validator3_test_network --entrypoint ash appropriate/curl:latest -c "until curl -X GET http://proxy:8002/info > /dev/null 2>&1; do sleep 1; done"
-          no_output_timeout: 3m
-      - run:
-          name: "Build and prepare tests container"
-          command: |
-            docker build -t tests ./tests
-            docker create --env-file ./tests/.env --name tests tests
-            docker network connect binance_net tests
-            docker network connect ethereum_side_rpc_net tests
-            docker network connect ethereum_home_rpc_net tests
-            docker network connect validator1_test_network tests
-            docker network connect validator2_test_network tests
-            docker network connect validator3_test_network tests
-      - run:
-          name: "Run tests"
-          command: docker start -a tests
+      - run: npm run tests:e2e
       - run:
           name: "Check alive docker containers"
           command: docker ps
           when: always
       - bridge/save_artifacts
+  lint:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_linters
+      - run: npm run lint
+  tests_home:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_ganache
+      - bridge/install_truffle
+      - run:
+          name: "Install test dependencies"
+          command: |
+            cd ./src/contracts/home
+            npm install
+      - run: npm run tests:home
+  tests_side:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_ganache
+      - bridge/install_truffle
+      - run:
+          name: "Install test dependencies"
+          command: |
+            cd ./src/contracts/side
+            npm install
+      - run: npm run tests:side
+  tests_home_coverage:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_truffle
+      - bridge/install_solidity_coverage
+      - run:
+          name: "Install test dependencies"
+          command: |
+            cd ./src/contracts/home
+            npm install
+      - run: npm run tests:home:coverage
+      - persist_to_workspace:
+          name: "Save lcov.info"
+          root: ./src/contracts
+          paths:
+            - home/coverage/lcov.info
+  tests_side_coverage:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_truffle
+      - bridge/install_solidity_coverage
+      - run:
+          name: "Install test dependencies"
+          command: |
+            cd ./src/contracts/side
+            npm install
+      - run: npm run tests:side:coverage
+      - persist_to_workspace:
+          name: "Save lcov.info"
+          root: ./src/contracts
+          paths:
+            - side/coverage/lcov.info
+  upload_to_coveralls:
+    executor: bridge/node
+    steps:
+      - bridge/fetch_repo
+      - bridge/install_coveralls
+      - attach_workspace:
+          at: ./workspace
+      - run:
+          name: "Merge lcov files"
+          command: ./node_modules/.bin/lcov-result-merger './workspace/*/coverage/lcov.info' ./lcov.info
+      - run:
+          name: "Upload coveralls"
+          command: cat ./lcov.info | ./node_modules/.bin/coveralls
 workflows:
   version: 2
   main:
     jobs:
+      - lint
       - init_tss
-      - run_tests:
+      - tests_e2e:
           requires:
             - init_tss
+      - tests_home
+      - tests_side
+      - tests_home_coverage
+      - tests_side_coverage
+      - upload_to_coveralls:
+          requires:
+            - tests_home_coverage
+            - tests_side_coverage

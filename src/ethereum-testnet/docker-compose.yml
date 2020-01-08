@@ -18,13 +18,13 @@ services:
       - '8545:8545'
     volumes:
       - 'ganache_home_data:/app/db'
-  side-oracle:
-    build: side-oracle
-    image: side-oracle
-    env_file: side-oracle/.env.development
-    networks:
-      - ethereum_side_rpc_net
-      - ethereum_home_rpc_net
+#  side-oracle:
+#    build: side-oracle
+#    image: side-oracle
+#    env_file: side-oracle/.env.development
+#    networks:
+#      - ethereum_side_rpc_net
+#      - ethereum_home_rpc_net
 networks:
   ethereum_side_rpc_net:
     external: true

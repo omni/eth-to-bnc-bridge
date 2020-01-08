@@ -1,0 +1,16 @@
+{
+  "name": "home-contracts",
+  "version": "0.0.1",
+  "dependencies": {
+    "@openzeppelin/contracts": "2.4.0",
+    "@truffle/hdwallet-provider": "1.0.28"
+  },
+  "devDependencies": {
+    "chai": "4.2.0",
+    "chai-as-promised": "7.1.1",
+    "chai-bn": "0.2.0"
+  },
+  "engines": {
+    "node": ">=10.6.0"
+  }
+}

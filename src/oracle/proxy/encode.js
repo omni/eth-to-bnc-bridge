@@ -1,6 +1,6 @@
 const BN = require('bignumber.js')
 
-const { padZeros } = require('./crypto')
+const { padZeros } = require('../shared/crypto')
 
 function makeBuffer(value, length = 32, base = 16) {
   return Buffer.from(padZeros(new BN(value, base).toString(16), length * 2), 'hex')

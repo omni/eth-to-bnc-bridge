@@ -2,13 +2,13 @@ FROM node:10.16.0-alpine
 
 WORKDIR /watcher
 
-RUN apk update && \
-    apk add libssl1.1 libressl-dev curl
+RUN apk --no-cache add libressl-dev
 
-COPY ./bncWatcher/package.json /watcher/
+COPY ./bncWatcher/package.json ./
 
 RUN npm install
 
-COPY ./bncWatcher/bncWatcher.js ./shared/db.js ./shared/logger.js ./shared/crypto.js ./shared/amqp.js ./shared/wait.js /watcher/
+COPY ./bncWatcher/index.js ./src/
+COPY ./shared/db.js ./shared/logger.js ./shared/crypto.js ./shared/amqp.js ./shared/wait.js ./shared/binanceClient.js ./shared/ethProvider.js ./shared/
 
-ENTRYPOINT ["node", "bncWatcher.js"]
+ENTRYPOINT ["node", "src/index.js"]

@@ -56,13 +56,13 @@ The public Binance Chain testnet will keep a BEP2 token.
       ./src/test-services/getAddresses/run.sh <PRIVATE_KEY>
       ```
 2. Run test environment
-    * (2.1) Modify `src/deploy/deploy-test/.env.development` and specify the amount of tokens to mint in the parameter `TOKEN_INITIAL_MINT`.
+    * (2.1) Modify `src/contracts/home/deploy/.env.development` and specify the amount of tokens to mint in the parameter `TOKEN_INITIAL_MINT`.
     * (2.2) Run Ethereum testnets and deploy contracts
       ```
       TARGET_NETWORK=development ./demo/start-ethereum-environment.sh
       ```
       This command will also mint tokens, the owner of tokens is the address that corresponds to the 
-      private key specified in `HOME_PRIVATE_KEY` of `src/deploy/deploy-test/.env.development` (`0xA374DC09057D6B3253d04fACb15736B43fBc7943`).
+      private key specified in `HOME_PRIVATE_KEY` of `src/contracts/home/deploy/.env.development` (`0xA374DC09057D6B3253d04fACb15736B43fBc7943`).
     * (2.4) Run Binance testnet and api services
       ```
       ./demo/start-binance-environment.sh
@@ -136,6 +136,13 @@ The public Binance Chain testnet will keep a BEP2 token.
           // next epoch number, for which votes and keygen operations are applied
           "nextEpoch": 3,
       
+          // current and next epoch watcher range sizes, each range corresponds to at most one transaction in binance side
+          "rangeSize": 25,
+          "nextRangeSize": 25,
+      
+          // start block of current epoch in home chain
+          "epochStartBlock": 100,
+      
           // threshold number for current epoch, 
           // at least threshold votes are required for any changes in next epoch
           "threshold": 2, 
@@ -143,9 +150,16 @@ The public Binance Chain testnet will keep a BEP2 token.
           // threshold number for next epoch
           "nextThreshold": 2,
       
+          // true if bridge validators are required to close binance account for incoming transactions
+          "closeEpoch": true,
+          "nextCloseEpoch": false,
+      
           // current bridge addresses in home and foreign networks
           "homeBridgeAddress": "0x44c158FE850821ae69DaF37AADF5c539e9d0025B",
           "foreignBridgeAddress": "tbnb19z22khee969yj05dckg9usvmwndkucpyl543xk",
+      
+          // current pending nonce of bridge account in binance chain
+          "foreignNonce": 0,
       
           // current set of validators
           "validators": [
@@ -165,18 +179,8 @@ The public Binance Chain testnet will keep a BEP2 token.
           "foreignBalanceTokens": 100,
           "foreignBalanceNative": 0.0994,
       
-          // current bridge status, can be one of: ready, voting, keygen, funds_transfer
-          "bridgeStatus": "ready",
-      
-          // current votes count for starting voting, starting/cancelling keygen
-          // -1 means that enough confirmations are already collected
-          "votesForVoting": 0,
-          "votesForKeygen": 0,
-          "votesForCancelKeygen": 0,
-      
-          // collected confirmations for changing epoch to nextEpoch
-          // -1 means that enough confirmations are already collected
-          "confirmationsForFundsTransfer": 0
+          // current bridge status, can be one of: ready, closing_epoch, voting, keygen, funds_transfer
+          "bridgeStatus": "ready"
         }
       ``` 
     * (7.1) Start voting process for next epoch, via sending `$THRESHOLD` requests to `/vote/startVoting` url. Bridge 
@@ -241,19 +245,19 @@ Make sure, to first run demo in development mode, before trying to run it in the
       ```
 2. Run test environment
     * (2.1) Prepare three private keys for validators. Get the Ethereum account addresses for these keys.
-    * (2.2) Modify `src/deploy/deploy-home/.env.staging` and specify the token contract address in 
+    * (2.2) Modify `src/contracts/home/deploy/.env.staging` and specify the token contract address in 
     the Kovan network via `HOME_TOKEN_ADDRESS` (use empty address `0x` if you want to create new 
     ERC20 contract while deployment). \
     Set `VALIDATOR_ADDRESS_*` to Ethereum addresses obtained in the previous step. 
-    * (2.3) Modify `src/deploy/.keys.staging` and specify private keys for prefunded accounts in both networks.
-    These accounts are used for contract deployment. Use `src/deploy/.keys.staging.example` as an example.
+    * (2.3) Modify `src/contracts/.keys.staging` and specify private keys for prefunded accounts in both networks.
+    These accounts are used for contract deployment. Use `src/contracts/.keys.staging.example` as an example.
     * (2.4) Deploy contracts
       ```
       TARGET_NETWORK=staging ./demo/start-ethereum-environment.sh
       ```
       This command will deploy ERC20 contract and also mint tokens if you left `HOME_TOKEN_ADDRESS` empty,
       the owner of tokens is the address that corresponds to the private key specified in 
-      `HOME_PRIVATE_KEY` of `src/deploy/.keys.staging`.\
+      `HOME_PRIVATE_KEY` of `src/contracts/.keys.staging`.\
       Deployed contract addresses will be automatically updated in all required validators 
       and test services configs.
     * (2.5) Prefund validator accounts in home network (Kovan):
@@ -333,7 +337,6 @@ Make sure, to first run demo in development mode, before trying to run it in the
    docker kill binance-testnet_api-server_1
    docker kill ethereum-testnet_ganache_home_1
    docker kill ethereum-testnet_ganache_side_1
-   docker kill ethereum-testnet_side-oracle_1
    ```
 3. Remove testnets and validators data:
    ```
@@ -382,7 +385,15 @@ container for listening GET requests
         - `ADDRESS` - Ethereum address of a validator.
         - After enough votes are collected, validator is added into 
         the next validators list for the next epoch.
-    - http://localhost:5001/vote/addValidator/ADDRESS
+    - http://localhost:5001/vote/removeValidator/ADDRESS
         - `ADDRESS` - Ethereum address of a validator.
         - After enough votes are collected, validator is removed from
         the next validators list for the next epoch.
+    - http://localhost:5001/vote/changeThreshold/THRESHOLD
+        - `THRESHOLD` - Number. New threshold value.
+        - After enough votes are collected, new threshold is set for next epoch.
+    - http://localhost:5001/vote/changeCloseEpoch/CLOSE_EPOCH
+        - `CLOSE_EPOCH` - Boolean. Next epoch close epoch policy 
+        (If true, next validators set will first disable binance account for previous 
+        epoch, before moving onto a new one).
+        - After enough votes are collected, new close policy is set for the next epoch.

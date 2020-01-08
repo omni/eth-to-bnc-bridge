@@ -5,10 +5,13 @@ const { waitPromise, seqMap } = require('./utils/wait')
 
 const testEthToBnc = require('./ethToBnc')
 const testEthToBncWithRestart = require('./ethToBncWithRestart')
+const testEthToBncWithRangeSizeChange = require('./ethToBncWithRangeSizeChange')
+const testChangeLimits = require('./changeLimits')
 const testBncToEth = require('./bncToEth')
 const testRemoveValidator = require('./removeValidator')
 const testAddValidator = require('./addValidator')
 const testChangeThreshold = require('./changeThreshold')
+const testCancelKeygen = require('./cancelKeygen')
 
 const usersConfig = require('../config').users
 const validatorsConfig = require('../config').validators
@@ -60,6 +63,8 @@ describe('bridge tests', function () {
 
   testEthToBnc(() => users)
   testBncToEth(() => users)
+  testChangeLimits(() => users)
+  testEthToBncWithRangeSizeChange(() => users)
   testEthToBnc(() => users)
 
   testRemoveValidator(validatorsConfig[1])
@@ -80,4 +85,9 @@ describe('bridge tests', function () {
   testBncToEth(() => users)
   testEthToBncWithRestart(() => users)
   testEthToBnc(() => users)
+
+  testCancelKeygen()
+
+  testEthToBnc(() => users)
+  testBncToEth(() => users)
 })

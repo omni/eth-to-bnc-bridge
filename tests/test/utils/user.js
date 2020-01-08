@@ -33,21 +33,21 @@ async function createUser(privateKey, network) {
     bncAddress: opts.bncAddress,
     async getEthBalance() {
       const balance = await opts.wallet.getBalance()
-      return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
+      return parseFloat(new BN(balance).dividedBy('1e18').toFixed(8, 3))
     },
     async getSideEthBalance() {
       const balance = await opts.walletSide.getBalance()
-      return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
+      return parseFloat(new BN(balance).dividedBy('1e18').toFixed(8, 3))
     },
     async getErcBalance() {
       const balance = await opts.token.balanceOf(opts.ethAddress)
-      return parseFloat(new BN(balance).dividedBy(10 ** 18).toFixed(8, 3))
+      return parseFloat(new BN(balance).dividedBy('1e18').toFixed(8, 3))
     },
     async transferEth(to, value) {
       const tx = await opts.wallet.sendTransaction(
         {
           to,
-          value: `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`
+          value: `0x${new BN(value).multipliedBy('1e18').toString(16)}`
         },
         txOptions
       )
@@ -57,7 +57,7 @@ async function createUser(privateKey, network) {
       const tx = await opts.walletSide.sendTransaction(
         {
           to,
-          value: `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`
+          value: `0x${new BN(value).multipliedBy('1e18').toString(16)}`
         },
         txOptions
       )
@@ -66,7 +66,7 @@ async function createUser(privateKey, network) {
     async transferErc(to, value) {
       const tx = await opts.token.transfer(
         to,
-        `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
+        `0x${new BN(value).multipliedBy('1e18').toString(16)}`,
         txOptions
       )
       await tx.wait()
@@ -74,14 +74,14 @@ async function createUser(privateKey, network) {
     async approveErc(to, value) {
       const tx = await opts.token.approve(
         to,
-        `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
+        `0x${new BN(value).multipliedBy('1e18').toString(16)}`,
         txOptions
       )
       await tx.wait()
     },
     async exchangeErc(value) {
       const tx = await opts.bridge.exchange(
-        `0x${new BN(value).multipliedBy(10 ** 18).toString(16)}`,
+        `0x${new BN(value).multipliedBy('1e18').toString(16)}`,
         txOptions
       )
       await tx.wait()

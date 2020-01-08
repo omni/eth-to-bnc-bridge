@@ -2,12 +2,12 @@ FROM node:10.16.0-alpine
 
 WORKDIR /test
 
-RUN apk add build-base python
+RUN apk --no-cache add build-base python
 
-COPY package.json /test/
+COPY package.json ./
 
 RUN npm install
 
-COPY testBinanceSend.js /test/
+COPY testBinanceSend.js ./
 
 ENTRYPOINT ["node", "testBinanceSend.js"]

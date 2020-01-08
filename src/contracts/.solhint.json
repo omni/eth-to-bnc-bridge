@@ -1,0 +1,11 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "max-line-length": "error",
+    "func-order": "error",
+    "reason-string": ["error", {"maxLength": 64}],
+    "compiler-version": ["off", "^0.5.0"],
+    "mark-callable-contracts": "off",
+    "no-inline-assembly": "off"
+  }
+}

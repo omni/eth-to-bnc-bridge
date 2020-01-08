@@ -6,6 +6,7 @@ WORKDIR /api-server
 
 COPY --from=testnet-binaries /binaries/cli/testnet/${BNC_VERSION}/linux/tbnbcli ./
 
+# hadolint ignore=DL4006
 RUN echo 12345678 | ./tbnbcli keys add key --no-backup
 
 EXPOSE 8080

@@ -2,10 +2,10 @@ FROM node:10.16.0-alpine
 
 WORKDIR /test
 
-COPY package.json /test/
+COPY package.json ./
 
 RUN npm install
 
-COPY testGetBinanceBalance.js /test/
+COPY testGetBinanceBalance.js ./
 
 ENTRYPOINT ["node", "testGetBinanceBalance.js"]

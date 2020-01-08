@@ -14,22 +14,24 @@ else
     echo "Creating new binance test network"
 
     echo "Removing old environment"
-    docker kill $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') > /dev/null 2>&1 || true
-    docker volume rm binance_marketdata > /dev/null 2>&1 || true
+    docker kill $(docker ps -a | grep binance-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker rm $(docker ps -a | grep binance-testnet_ | awk '{print $1}') &>/dev/null || true
+    docker volume rm binance_marketdata &>/dev/null || true
 
-    docker network create binance_net > /dev/null 2>&1 || true
-    docker volume create binance_marketdata > /dev/null 2>&1 || true
-    docker volume create binance_data > /dev/null 2>&1 || true
+    docker network create binance_net &>/dev/null || true
+    docker volume create binance_marketdata &>/dev/null || true
+    docker volume create binance_data &>/dev/null || true
 
     need_to_deploy=true
 fi
 
 echo "Building required binaries"
-docker build -t testnet-binaries ../src/binance-testnet > /dev/null 2>&1 || true
+docker build -t testnet-binaries ../src/binance-testnet &>/dev/null
 
+echo "Building binance test environment docker images"
+docker-compose -f ../src/binance-testnet/docker-compose.yml build &>/dev/null
 echo "Running environment"
-docker-compose -f ../src/binance-testnet/docker-compose.yml up --build -d
+docker-compose -f ../src/binance-testnet/docker-compose.yml up -d
 
 if [[ -n "$need_to_deploy" ]]; then
     echo "Issuing test asset"
@@ -53,7 +55,7 @@ if [[ -n "$need_to_deploy" ]]; then
 
     echo "Sending tokens to controlled address"
     tbnbcli token multi-send  \
-    --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"10000000000000000:BNB,10000000000000000:'"$TOKEN_SYMBOL"'"}]'
+    --transfers '[{"to":"tbnb1z7u9f8mcuwxanns9xa6qgjtlka0d392epc0m9x","amount":"10000000000000000:BNB,10000000000000000:'"$TOKEN_SYMBOL"'"}]' &>/dev/null
 
     sleep 2
 else

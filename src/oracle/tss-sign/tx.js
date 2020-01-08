@@ -2,8 +2,8 @@ const TransactionBnc = require('@binance-chain/javascript-sdk/lib/tx').default
 const { crypto } = require('@binance-chain/javascript-sdk')
 const BN = require('bignumber.js')
 
-const logger = require('./logger')
-const { padZeros } = require('./crypto')
+const logger = require('../shared/logger')
+const { padZeros } = require('../shared/crypto')
 
 const { FOREIGN_CHAIN_ID } = process.env
 

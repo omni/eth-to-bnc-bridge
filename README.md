@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/poanetwork/eth-to-bnc-bridge/tree/master.svg?style=svg)](https://circleci.com/gh/poanetwork/eth-to-bnc-bridge/tree/master)
+[![Coverage Status](https://coveralls.io/repos/github/poanetwork/eth-to-bnc-bridge/badge.svg?branch=master)](https://coveralls.io/github/poanetwork/eth-to-bnc-bridge?branch=master)
 
 ## Ethereum to Binance Chain bridge
 

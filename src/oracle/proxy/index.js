@@ -1,146 +1,112 @@
 const express = require('express')
-const AsyncLock = require('async-lock')
-const axios = require('axios')
 const BN = require('bignumber.js')
 const ethers = require('ethers')
 
 const { tokenAbi, bridgeAbi, sharedDbAbi } = require('./contractsAbi')
 const {
-  Ok, Err, decodeStatus
+  Ok, Err, decodeState, encodeParam, Action
 } = require('./utils')
 const encode = require('./encode')
 const decode = require('./decode')
-const { createSender, waitForReceipt } = require('./sendTx')
-const logger = require('./logger')
-const { publicKeyToAddress, padZeros } = require('./crypto')
+const logger = require('../shared/logger')
+const { retry, delay } = require('../shared/wait')
+const createProvider = require('../shared/ethProvider')
+const { connectRabbit, assertQueue } = require('../shared/amqp')
+const { hexAddressToBncAddress, padZeros, publicKeyToHexAddress } = require('../shared/crypto')
+const {
+  parseNumber, parseAddress, parseBool, parseTokens, logRequest
+} = require('./expressUtils')
+const { getForeignBalances } = require('../shared/binanceClient')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS, VALIDATOR_PRIVATE_KEY,
-  HOME_TOKEN_ADDRESS, FOREIGN_URL, FOREIGN_ASSET
+  HOME_TOKEN_ADDRESS, FOREIGN_ASSET, RABBITMQ_URL
 } = process.env
 
-const Action = {
-  CONFIRM_KEYGEN: 0,
-  CONFIRM_FUNDS_TRANSFER: 1,
-  CONFIRM_CLOSE_EPOCH: 2,
-  VOTE_START_VOTING: 3,
-  VOTE_ADD_VALIDATOR: 4,
-  VOTE_REMOVE_VALIDATOR: 5,
-  VOTE_CHANGE_THRESHOLD: 6,
-  VOTE_CHANGE_RANGE_SIZE: 7,
-  VOTE_CHANGE_CLOSE_EPOCH: 8,
-  VOTE_START_KEYGEN: 9,
-  VOTE_CANCEL_KEYGEN: 10,
-  TRANSFER: 11
-}
-
-const homeProvider = new ethers.providers.JsonRpcProvider(HOME_RPC_URL)
-const sideProvider = new ethers.providers.JsonRpcProvider(SIDE_RPC_URL)
-const homeWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, homeProvider)
+const sideProvider = createProvider(SIDE_RPC_URL)
+const homeProvider = createProvider(HOME_RPC_URL)
 const sideWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY, sideProvider)
 
-const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeWallet)
-const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeWallet)
-const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideWallet)
+const token = new ethers.Contract(HOME_TOKEN_ADDRESS, tokenAbi, homeProvider)
+const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeProvider)
+const sharedDb = new ethers.Contract(SIDE_SHARED_DB_ADDRESS, sharedDbAbi, sideProvider)
 
-const validatorAddress = homeWallet.address
+const validatorAddress = sideWallet.address
 
-const httpClient = axios.create({ baseURL: FOREIGN_URL })
-
-const lock = new AsyncLock()
-
-let sideValidatorNonce
-let sideSender
+let channel
+let sideSendQueue
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ strict: false }))
 app.use(express.urlencoded({ extended: true }))
 
 const votesProxyApp = express()
 
-function sideSendQuery(query) {
-  return lock.acquire('side', async () => {
-    logger.debug('Sending side query')
-    const senderResponse = await sideSender({
-      data: query,
-      to: SIDE_SHARED_DB_ADDRESS,
-      nonce: sideValidatorNonce
-    })
-    if (senderResponse !== true) {
-      sideValidatorNonce += 1
-    }
-    return senderResponse
-  })
-}
-
 async function status(req, res) {
-  logger.debug('Status call')
   const [bridgeEpoch, bridgeStatus] = await Promise.all([
     bridge.epoch(),
-    bridge.status()
+    bridge.state()
   ])
   res.send({
     bridgeEpoch,
     bridgeStatus
   })
-  logger.debug('Status end')
 }
 
 async function get(req, res) {
-  logger.debug('Get call, %o', req.body.key)
-  const round = req.body.key.second
-  const uuid = req.body.key.third
-  let from
-  if (uuid.startsWith('k')) {
-    from = (await bridge.getNextValidators())[parseInt(req.body.key.first, 10) - 1]
-  } else {
-    const validators = await bridge.getValidators()
-    from = await sharedDb.getSignupAddress(
-      uuid,
-      validators,
-      parseInt(req.body.key.first, 10)
-    )
-  }
-  const to = Number(req.body.key.fourth) // 0 if empty
-  const key = ethers.utils.id(`${round}_${to}`)
+  const tags = req.body.key.split('-')
+  const fromId = parseInt(tags[0], 10)
+  const round = tags[tags.length - 2]
+  const uuid = tags[tags.length - 1]
+  const hash = ethers.utils.id(uuid)
+  const to = tags.length === 4 ? tags[1] : ''
+  const [mode, epoch] = uuid.split('_')
+  const validators = await bridge['getValidators(uint16)'](parseInt(epoch, 10))
+  const from = mode === 'k' ? validators[fromId - 1] : await sharedDb.getSignupAddress(hash, validators, fromId)
+  const key = ethers.utils.id(`${round}_${Number(to)}`)
 
-  const data = await sharedDb.getData(from, ethers.utils.id(uuid), key)
+  const data = await sharedDb.getData(from, hash, key)
 
   if (data.length > 2) {
     logger.trace(`Received encoded data: ${data}`)
-    const decoded = decode(uuid[0] === 'k', round, data)
+    const decoded = decode(mode === 'k', round, data)
     logger.trace('Decoded data: %o', decoded)
     res.send(Ok({
       key: req.body.key,
       value: decoded
     }))
   } else {
-    setTimeout(() => res.send(Err(null)), 1000)
+    await delay(1000)
+    res.send(Err(null))
   }
+}
 
-  logger.debug('Get end')
+function sendJob(data) {
+  sideSendQueue.send({
+    data
+  })
 }
 
 async function set(req, res) {
-  logger.debug('Set call')
-  const round = req.body.key.second
-  const uuid = req.body.key.third
-  const to = Number(req.body.key.fourth)
-  const key = ethers.utils.id(`${round}_${to}`)
+  const tags = req.body.key.split('-')
+  const round = tags[tags.length - 2]
+  const uuid = tags[tags.length - 1]
+  const hash = ethers.utils.id(uuid)
+  const to = tags.length === 4 ? tags[1] : ''
+  const key = ethers.utils.id(`${round}_${Number(to)}`)
 
   logger.trace('Received data: %o', req.body.value)
   const encoded = encode(uuid[0] === 'k', round, req.body.value)
   logger.trace(`Encoded data: ${encoded.toString('hex')}`)
   logger.trace(`Received data: ${req.body.value.length} bytes, encoded data: ${encoded.length} bytes`)
-  const query = sharedDb.interface.functions.setData.encode([ethers.utils.id(uuid), key, encoded])
-  await sideSendQuery(query)
+  logger.debug(`${hash} ${key}`)
+  const query = sharedDb.interface.functions.setData.encode([hash, key, encoded])
+  sendJob(query)
 
   res.send(Ok(null))
-  logger.debug('Set end')
 }
 
 async function signupKeygen(req, res) {
-  logger.debug('SignupKeygen call')
   const epoch = await bridge.nextEpoch()
   const partyId = await bridge.getNextPartyId(validatorAddress)
 
@@ -148,8 +114,9 @@ async function signupKeygen(req, res) {
   let attempt = 1
   let uuid
   while (true) {
-    uuid = `k${epoch}_${attempt}`
-    const data = await sharedDb.getData(validatorAddress, ethers.utils.id(uuid), ethers.utils.id('round1_0'))
+    uuid = `k_${epoch}_${attempt}`
+    const hash = ethers.utils.id(uuid)
+    const data = await sharedDb.getData(validatorAddress, hash, ethers.utils.id('round1_0'))
     if (data.length === 2) {
       break
     }
@@ -166,22 +133,21 @@ async function signupKeygen(req, res) {
       uuid,
       number: partyId
     }))
-    logger.debug('SignupKeygen end')
   }
 }
 
 async function signupSign(req, res) {
-  logger.debug('SignupSign call')
-  const msgHash = req.body.third
+  const [, , msgHash] = req.body.split('-')
 
   logger.debug('Checking previous attempts')
   let attempt = 1
   let uuid
   let hash
+  const epoch = await bridge.epoch()
   while (true) {
-    uuid = `${msgHash}_${attempt}`
+    uuid = `s_${epoch}_${msgHash}_${attempt}`
     hash = ethers.utils.id(uuid)
-    const data = await sharedDb.isSignuped(hash)
+    const data = await sharedDb.isSignuped(hash, validatorAddress)
     if (!data) {
       break
     }
@@ -191,233 +157,219 @@ async function signupSign(req, res) {
   logger.debug(`Using attempt ${attempt}`)
 
   const query = sharedDb.interface.functions.signup.encode([hash])
-  const { txHash } = await sideSendQuery(query)
-  const receipt = await waitForReceipt(SIDE_RPC_URL, txHash)
 
-  // Already have signup
-  if (receipt.status === false) {
-    res.send(Ok({
-      uuid: hash,
-      number: 0
-    }))
-    logger.debug('Already have signup')
-    return
-  }
-
+  sendJob(query)
   const validators = await bridge.getValidators()
-  const id = await sharedDb.getSignupNumber(hash, validators, validatorAddress)
+  const id = await retry(
+    () => sharedDb.getSignupNumber(hash, validators, validatorAddress),
+    -1,
+    (signupId) => signupId > 0
+  )
 
   res.send(Ok({
-    uuid: hash,
+    uuid,
     number: id
   }))
-  logger.debug('SignupSign end')
 }
 
-function encodeParam(param) {
-  switch (typeof param) {
-    case 'string':
-      if (param.startsWith('0x')) {
-        return Buffer.from(param.slice(2), 'hex')
-      }
-      return Buffer.from(param, 'hex')
-    case 'number':
-      return Buffer.from(padZeros(param.toString(16), 4), 'hex')
-    case 'boolean':
-      return Buffer.from([param ? 1 : 0])
-    default:
-      return null
-  }
-}
-
-function buildMessage(type, ...params) {
-  logger.debug(`${type}, %o`, params)
-  return Buffer.concat([
+async function processMessage(type, ...params) {
+  logger.debug(`Building message ${type}, %o`, params)
+  const message = Buffer.concat([
     Buffer.from([type]),
     ...params.map(encodeParam)
   ])
-}
 
-async function processMessage(message) {
   const signature = await sideWallet.signMessage(message)
   logger.debug('Adding signature to shared db contract')
   const query = sharedDb.interface.functions.addSignature.encode([`0x${message.toString('hex')}`, signature])
-  await sideSendQuery(query)
+  sendJob(query)
 }
 
 async function confirmKeygen(req, res) {
-  logger.debug('Confirm keygen call')
   const { x, y, epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_KEYGEN, epoch, padZeros(x, 64), padZeros(y, 64))
-  await processMessage(message)
+  const hexAddress = publicKeyToHexAddress({
+    x,
+    y
+  })
+  await processMessage(Action.CONFIRM_KEYGEN, epoch, hexAddress)
   res.send()
-  logger.debug('Confirm keygen end')
 }
 
 async function confirmFundsTransfer(req, res) {
-  logger.debug('Confirm funds transfer call')
   const { epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_FUNDS_TRANSFER, epoch)
-  await processMessage(message)
+  await processMessage(Action.CONFIRM_FUNDS_TRANSFER, epoch)
   res.send()
-  logger.debug('Confirm funds transfer end')
 }
 
 async function confirmCloseEpoch(req, res) {
-  logger.debug('Confirm close epoch call')
   const { epoch } = req.body
-  const message = buildMessage(Action.CONFIRM_CLOSE_EPOCH, epoch)
-  await processMessage(message)
+  await processMessage(Action.CONFIRM_CLOSE_EPOCH, epoch)
   res.send()
-  logger.debug('Confirm close epoch end')
 }
 
 async function voteStartVoting(req, res) {
-  logger.info('Voting for starting new epoch voting process')
   const epoch = await bridge.epoch()
-  const message = buildMessage(Action.VOTE_START_VOTING, epoch)
-  await processMessage(message)
+  await processMessage(Action.START_VOTING, epoch)
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteStartKeygen(req, res) {
-  logger.info('Voting for starting new epoch keygen')
   const epoch = await bridge.epoch()
-  const message = buildMessage(Action.VOTE_START_KEYGEN, epoch)
-  await processMessage(message)
+  await processMessage(
+    Action.START_KEYGEN,
+    epoch,
+    padZeros(req.attempt.toString(16), 58)
+  )
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteCancelKeygen(req, res) {
-  logger.info('Voting for cancelling new epoch keygen')
   const epoch = await bridge.nextEpoch()
-  const message = buildMessage(Action.VOTE_CANCEL_KEYGEN, epoch)
-  await processMessage(message)
+  await processMessage(
+    Action.CANCEL_KEYGEN,
+    epoch,
+    padZeros(req.attempt.toString(16), 58)
+  )
   res.send('Voted\n')
-  logger.info('Voted successfully')
 }
 
 async function voteAddValidator(req, res) {
-  if (ethers.utils.isHexString(req.params.validator, 20)) {
-    logger.info('Voting for adding new validator')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_ADD_VALIDATOR,
-      epoch,
-      req.params.validator,
-      padZeros(req.attempt, 18)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.ADD_VALIDATOR,
+    epoch,
+    req.validator,
+    padZeros(req.attempt.toString(16), 18)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeThreshold(req, res) {
-  if (/^[0-9]+$/.test(req.params.threshold)) {
-    logger.info('Voting for changing threshold')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_THRESHOLD,
-      epoch,
-      parseInt(req.params.threshold, 10),
-      padZeros(req.attempt, 54)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_THRESHOLD,
+    epoch,
+    req.threshold,
+    padZeros(req.attempt.toString(16), 54)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeRangeSize(req, res) {
-  if (/^[0-9]+$/.test(req.params.rangeSize)) {
-    logger.info('Voting for changing range size')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_RANGE_SIZE,
-      epoch,
-      parseInt(req.params.rangeSize, 10),
-      padZeros(req.attempt, 54)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_RANGE_SIZE,
+    epoch,
+    req.rangeSize,
+    padZeros(req.attempt.toString(16), 54)
+  )
+  res.send('Voted\n')
 }
 
 async function voteChangeCloseEpoch(req, res) {
-  if (req.params.closeEpoch === 'true' || req.params.closeEpoch === 'false') {
-    logger.info('Voting for changing close epoch')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_CHANGE_CLOSE_EPOCH,
-      epoch,
-      req.params.closeEpoch === 'true',
-      padZeros(req.attempt, 56)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_CLOSE_EPOCH,
+    epoch,
+    req.closeEpoch,
+    padZeros(req.attempt.toString(16), 56)
+  )
+  res.send('Voted\n')
 }
 
 async function voteRemoveValidator(req, res) {
-  if (ethers.utils.isHexString(req.params.validator, 20)) {
-    logger.info('Voting for removing validator')
-    const epoch = await bridge.epoch()
-    const message = buildMessage(
-      Action.VOTE_REMOVE_VALIDATOR,
-      epoch,
-      req.params.validator,
-      padZeros(req.attempt, 18)
-    )
-    await processMessage(message)
-    res.send('Voted\n')
-    logger.info('Voted successfully')
-  }
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.REMOVE_VALIDATOR,
+    epoch,
+    req.validator,
+    padZeros(req.attempt.toString(16), 18)
+  )
+  res.send('Voted\n')
+}
+
+async function voteChangeMinPerTxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_MIN_PER_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteChangeMaxPerTxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.CHANGE_MAX_PER_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteDecreaseExecutionMinLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.DECREASE_EXECUTION_MIN_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
+}
+
+async function voteIncreaseExecutionMaxLimit(req, res) {
+  const epoch = await bridge.epoch()
+  await processMessage(
+    Action.INCREASE_EXECUTION_MAX_TX_LIMIT,
+    epoch,
+    padZeros(req.limit, 24),
+    padZeros(req.attempt.toString(16), 34)
+  )
+  res.send('Voted\n')
 }
 
 async function transfer(req, res) {
   logger.info('Transfer start')
   const {
-    hash, to, value, epoch
+    hash, to, value
   } = req.body
   if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
-    const message = buildMessage(Action.TRANSFER, epoch, hash, to, padZeros(value, 24))
-    logger.info(`Message for sign: ${message.toString('hex')}`)
-    await processMessage(message)
+    const message = `${padZeros(Action.TRANSFER.toString(16), 2)}${hash}${to.slice(2)}${padZeros(value, 24)}`
+    if (await bridge.handledMessages(ethers.utils.hashMessage(message))) {
+      logger.info('This tx hash was already processed, skipping')
+    } else {
+      await processMessage(Action.TRANSFER, hash, to, padZeros(value, 24))
+    }
   }
   res.send()
   logger.info('Transfer end')
 }
 
-function getForeignBalances(address) {
-  return httpClient
-    .get(`/api/v1/account/${address}`)
-    .then((res) => res.data.balances.reduce((prev, cur) => {
-      // eslint-disable-next-line no-param-reassign
-      prev[cur.symbol] = cur.free
-      return prev
-    }, {}))
-    .catch(() => ({}))
+function normalizeTokens(value) {
+  return parseFloat(new BN(value).dividedBy('1e18').toFixed(8, 3))
 }
 
 async function info(req, res) {
-  logger.debug('Info start')
   try {
     const [
-      x, y, epoch, rangeSize, nextRangeSize, closeEpoch, nextCloseEpoch, epochStartBlock,
+      foreignHexAddress, epoch, rangeSize, rangeSizeStartBlock, minPerTxLimit, maxPerTxLimit,
+      executionMinLimit, executionMaxLimit, closeEpoch, nextCloseEpoch, epochStartBlock,
       foreignNonce, nextEpoch, threshold, nextThreshold, validators, nextValidators, bridgeStatus,
       homeBalance
     ] = await Promise.all([
-      bridge.getX().then((value) => new BN(value).toString(16)),
-      bridge.getY().then((value) => new BN(value).toString(16)),
+      bridge.getForeignAddress(),
       bridge.epoch(),
-      bridge.getRangeSize(),
-      bridge.getNextRangeSize(),
+      bridge.rangeSize(),
+      bridge.rangeSizeStartBlock(),
+      bridge.minPerTxLimit().then(normalizeTokens),
+      bridge.maxPerTxLimit().then(normalizeTokens),
+      bridge.executionMinLimit().then(normalizeTokens),
+      bridge.executionMaxLimit().then(normalizeTokens),
       bridge.getCloseEpoch(),
       bridge.getNextCloseEpoch(),
       bridge.getStartBlock(),
@@ -427,19 +379,19 @@ async function info(req, res) {
       bridge.getNextThreshold(),
       bridge.getValidators(),
       bridge.getNextValidators(),
-      bridge.status(),
-      token.balanceOf(HOME_BRIDGE_ADDRESS)
-        .then((value) => parseFloat(new BN(value).dividedBy(10 ** 18).toFixed(8, 3)))
+      bridge.state(),
+      token.balanceOf(HOME_BRIDGE_ADDRESS).then(normalizeTokens)
     ])
-    const foreignAddress = publicKeyToAddress({
-      x,
-      y
-    })
+    const foreignAddress = hexAddressToBncAddress(foreignHexAddress)
     const balances = await getForeignBalances(foreignAddress)
     const msg = {
       epoch,
       rangeSize,
-      nextRangeSize,
+      rangeSizeStartBlock,
+      minPerTxLimit,
+      maxPerTxLimit,
+      executionMinLimit,
+      executionMaxLimit,
       epochStartBlock,
       nextEpoch,
       threshold,
@@ -454,7 +406,7 @@ async function info(req, res) {
       homeBalance,
       foreignBalanceTokens: parseFloat(balances[FOREIGN_ASSET]) || 0,
       foreignBalanceNative: parseFloat(balances.BNB) || 0,
-      bridgeStatus: decodeStatus(bridgeStatus)
+      bridgeStatus: decodeState(bridgeStatus)
     }
     logger.trace('%o', msg)
     res.send(msg)
@@ -465,9 +417,10 @@ async function info(req, res) {
       error: e
     })
   }
-  logger.debug('Info end')
 }
 
+
+app.use('/', logRequest)
 app.get('/status', status)
 
 app.post('/get', get)
@@ -480,33 +433,28 @@ app.post('/confirmFundsTransfer', confirmFundsTransfer)
 app.post('/confirmCloseEpoch', confirmCloseEpoch)
 app.post('/transfer', transfer)
 
+votesProxyApp.use('/', logRequest)
+
 votesProxyApp.get('/vote/startVoting', voteStartVoting)
+
+votesProxyApp.use('/vote', parseNumber(true, 'attempt', 0))
+
 votesProxyApp.get('/vote/startKeygen', voteStartKeygen)
 votesProxyApp.get('/vote/cancelKeygen', voteCancelKeygen)
-
-votesProxyApp.use('/vote', (req, res, next) => {
-  if (/^[0-9]+$/.test(req.query.attempt)) {
-    req.attempt = parseInt(req.query.attempt, 10).toString(16)
-    logger.debug(`Vote attempt 0x${req.attempt}`)
-    next()
-  } else if (!req.query.attempt) {
-    req.attempt = '0'
-    logger.debug('Vote attempt 0x00')
-    next()
-  }
-})
-
-votesProxyApp.get('/vote/addValidator/:validator', voteAddValidator)
-votesProxyApp.get('/vote/removeValidator/:validator', voteRemoveValidator)
-votesProxyApp.get('/vote/changeThreshold/:threshold', voteChangeThreshold)
-votesProxyApp.get('/vote/changeRangeSize/:rangeSize', voteChangeRangeSize)
-votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', voteChangeCloseEpoch)
+votesProxyApp.get('/vote/addValidator/:validator', parseAddress('validator'), voteAddValidator)
+votesProxyApp.get('/vote/removeValidator/:validator', parseAddress('validator'), voteRemoveValidator)
+votesProxyApp.get('/vote/changeThreshold/:threshold', parseNumber(false, 'threshold'), voteChangeThreshold)
+votesProxyApp.get('/vote/changeCloseEpoch/:closeEpoch', parseBool('closeEpoch'), voteChangeCloseEpoch)
+votesProxyApp.get('/vote/changeMinPerTxLimit/:limit', parseTokens('limit'), voteChangeMinPerTxLimit)
+votesProxyApp.get('/vote/changeMaxPerTxLimit/:limit', parseTokens('limit'), voteChangeMaxPerTxLimit)
+votesProxyApp.get('/vote/decreaseExecutionMinLimit/:limit', parseTokens('limit'), voteDecreaseExecutionMinLimit)
+votesProxyApp.get('/vote/increaseExecutionMaxLimit/:limit', parseTokens('limit'), voteIncreaseExecutionMaxLimit)
+votesProxyApp.get('/vote/changeRangeSize/:rangeSize', parseNumber(false, 'rangeSize'), voteChangeRangeSize)
 votesProxyApp.get('/info', info)
 
 async function main() {
-  sideValidatorNonce = await sideWallet.getTransactionCount()
-
-  sideSender = await createSender(SIDE_RPC_URL, VALIDATOR_PRIVATE_KEY)
+  channel = await connectRabbit(RABBITMQ_URL)
+  sideSendQueue = await assertQueue(channel, 'sideSendQueue')
 
   logger.warn(`My validator address in home and side networks is ${validatorAddress}`)
 

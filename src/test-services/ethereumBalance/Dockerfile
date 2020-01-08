@@ -2,10 +2,10 @@ FROM node:10.16.0-alpine
 
 WORKDIR /test
 
-COPY package.json /test/
+COPY package.json ./
 
 RUN npm install
 
-COPY testGetEthereumBalance.js /test/
+COPY testGetEthereumBalance.js ./
 
 ENTRYPOINT ["node", "testGetEthereumBalance.js"]
