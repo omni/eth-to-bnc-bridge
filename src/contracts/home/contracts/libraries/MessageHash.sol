@@ -11,8 +11,8 @@ library MessageHash {
         if (message.length == 32) {
             return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
         }
-        if (message.length == 67) {
-            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n67", message));
+        if (message.length == 65) {
+            return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n65", message));
         }
         revert("Incorrect message length");
     }

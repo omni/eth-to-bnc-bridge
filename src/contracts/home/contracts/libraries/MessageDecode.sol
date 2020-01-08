@@ -4,6 +4,11 @@ library MessageDecode {
     // [0] - action type
     // [1,2] - epoch
     // [3..] - payload
+    function _decodeEpoch(bytes memory message) internal pure returns (uint16 a) {
+        assembly {
+            a := mload(add(message, 3))
+        }
+    }
     function _decodeUint16(bytes memory message) internal pure returns (uint16 a) {
         assembly {
             a := mload(add(message, 5))
@@ -30,8 +35,8 @@ library MessageDecode {
 
     function _decodeTransfer(bytes memory message) internal pure returns (address a, uint96 b) {
         assembly {
-            a := mload(add(message, 55))
-            b := mload(add(message, 67))
+            a := mload(add(message, 53))
+            b := mload(add(message, 65))
         }
     }
 }

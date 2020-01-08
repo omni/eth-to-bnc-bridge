@@ -94,8 +94,12 @@ function padZeros(arg, len) {
   return s
 }
 
-function buildMessage(type, epoch, ...args) {
-  return `0x${padZeros(type, 2)}${padZeros(epoch, 4)}${args.reduce(((previousValue, currentValue) => previousValue + currentValue), '')}`
+function buildMessage(type, ...args) {
+  const epoch = args[0]
+  if (typeof epoch === 'number') {
+    return `0x${padZeros(type, 2)}${padZeros(epoch, 4)}${args.slice(1).reduce(((previousValue, currentValue) => previousValue + currentValue), '')}`
+  }
+  return `0x${padZeros(type, 2)}${args.reduce(((previousValue, currentValue) => previousValue + currentValue), '')}`
 }
 
 async function sign(address, data) {
@@ -119,6 +123,10 @@ async function skipBlocks(n = 1) {
   }
 }
 
+function keccak256(message) {
+  return web3.eth.accounts.hashMessage(message)
+}
+
 module.exports = {
   State,
   Action,
@@ -127,5 +135,6 @@ module.exports = {
   buildMessage,
   stripHex,
   sign,
-  skipBlocks
+  skipBlocks,
+  keccak256
 }

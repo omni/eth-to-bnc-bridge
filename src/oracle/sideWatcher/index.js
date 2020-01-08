@@ -16,7 +16,9 @@ const SIDE_MAX_FETCH_RANGE_SIZE = parseInt(process.env.SIDE_MAX_FETCH_RANGE_SIZE
 const bridgeAbi = [
   'function applyMessage(bytes message, bytes signatures)',
   'function getThreshold(uint16 epoch) view returns (uint16)',
-  'function getValidators(uint16 epoch) view returns (address[])'
+  'function getValidators(uint16 epoch) view returns (address[])',
+  'function handledMessages(bytes32 msgHash) view returns (bool)',
+  'function epoch() view returns (uint16)'
 ]
 const sharedDbAbi = [
   'event NewSignature(address indexed signer, bytes32 msgHash)',
@@ -24,6 +26,7 @@ const sharedDbAbi = [
   'function getSignatures(bytes32 msgHash, address[] validators) view returns (bytes)',
   'function isResponsibleToSend(bytes32 msgHash, address[] validators, uint16 threshold, address validatorAddress) view returns (bool)'
 ]
+const ACTION_TRANSFER = 10
 
 const sideProvider = createProvider(SIDE_RPC_URL)
 const homeProvider = createProvider(HOME_RPC_URL)
@@ -35,13 +38,16 @@ const validatorAddress = ethers.utils.computeAddress(`0x${VALIDATOR_PRIVATE_KEY}
 
 let blockNumber
 let homeSendQueue
+let rescheduleTransferQueue
 let channel
 let curBlockNumber
 
-async function handleNewSignature(event) {
-  const { msgHash } = event.values
+async function handleNewMessage(msgHash) {
   const message = await sharedDb.signedMessages(msgHash)
-  const epoch = parseInt(message.slice(4, 8), 16)
+  const messageAction = parseInt(message.slice(2, 4), 16)
+  const epoch = messageAction === ACTION_TRANSFER
+    ? await bridge.epoch()
+    : parseInt(message.slice(4, 8), 16)
   const [threshold, validators] = await Promise.all([
     bridge.getThreshold(epoch),
     bridge.getValidators(epoch)
@@ -56,20 +62,27 @@ async function handleNewSignature(event) {
 
   if (isResponsibleToSend) {
     logger.info(`This validator is responsible to send message ${message}`)
-    const signatures = await retry(
-      () => sharedDb.getSignatures(msgHash, validators),
-      -1,
-      (curSignatures) => (curSignatures.length - 2) / 130 >= threshold
-    )
+    const isAlreadyProcessed = await bridge.handledMessages(msgHash)
+    if (isAlreadyProcessed) {
+      logger.debug('This message was already processed')
+    } else {
+      const signatures = await retry(
+        () => sharedDb.getSignatures(msgHash, validators),
+        -1,
+        (curSignatures) => (curSignatures.length - 2) / 130 >= threshold
+      )
 
-    const requiredSignatures = signatures.slice(0, 2 + 130 * threshold)
+      const requiredSignatures = signatures.slice(0, 2 + 130 * threshold)
 
-    const data = await bridge.interface.functions.applyMessage.encode([message, requiredSignatures])
+      const data = await bridge.interface.functions.applyMessage.encode(
+        [message, requiredSignatures]
+      )
 
-    homeSendQueue.send({
-      data,
-      blockNumber: curBlockNumber
-    })
+      homeSendQueue.send({
+        data,
+        blockNumber: curBlockNumber
+      })
+    }
   } else {
     logger.debug(`This validator is not responsible to send message ${message}`)
   }
@@ -100,7 +113,7 @@ async function loop() {
     curBlockNumber = bridgeEvents[i].blockNumber
     const event = sharedDb.interface.parseLog(bridgeEvents[i])
     logger.trace('Consumed event %o %o', event, bridgeEvents[i])
-    await handleNewSignature(event)
+    await handleNewMessage(event.values.msgHash)
   }
 
   blockNumber = endBlock + 1
@@ -112,6 +125,13 @@ async function loop() {
 async function initialize() {
   channel = await connectRabbit(RABBITMQ_URL)
   homeSendQueue = await assertQueue(channel, 'homeSendQueue')
+  rescheduleTransferQueue = await assertQueue(channel, 'rescheduleTransferQueue')
+
+  rescheduleTransferQueue.consume(async (msg) => {
+    const { msgHash } = JSON.parse(msg.content)
+    await handleNewMessage(msgHash)
+    channel.ack(msg)
+  })
 
   blockNumber = (parseInt(await redis.get('sideBlock'), 10) + 1) || parseInt(SIDE_START_BLOCK, 10)
 

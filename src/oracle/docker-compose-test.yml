@@ -111,15 +111,16 @@ services:
       <<: *common-environment
       PROXY_URL: http://local_proxy:8001
       REDIS_HOST: redis
+      HOME_RPC_URL:
+      HOME_BRIDGE_ADDRESS:
       FOREIGN_URL:
       FOREIGN_ASSET:
       FOREIGN_FETCH_MAX_TIME_INTERVAL:
       FOREIGN_FETCH_INTERVAL:
       FOREIGN_FETCH_BLOCK_TIME_OFFSET:
-    volumes:
-      - '${PWD}/${TARGET_NETWORK}/keys:/keys'
     networks:
       - test_network
+      - ethereum_home_rpc_net
       - binance_net
   side-watcher:
     build:

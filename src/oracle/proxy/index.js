@@ -335,11 +335,16 @@ async function voteIncreaseExecutionMaxLimit(req, res) {
 async function transfer(req, res) {
   logger.info('Transfer start')
   const {
-    hash, to, value, epoch
+    hash, to, value
   } = req.body
   if (ethers.utils.isHexString(to, 20)) {
     logger.info(`Calling transfer to ${to}, 0x${value} tokens`)
-    await processMessage(Action.TRANSFER, epoch, hash, to, padZeros(value, 24))
+    const message = `${padZeros(Action.TRANSFER.toString(16), 2)}${hash}${to.slice(2)}${padZeros(value, 24)}`
+    if (await bridge.handledMessages(ethers.utils.hashMessage(message))) {
+      logger.info('This tx hash was already processed, skipping')
+    } else {
+      await processMessage(Action.TRANSFER, hash, to, padZeros(value, 24))
+    }
   }
   res.send()
   logger.info('Transfer end')

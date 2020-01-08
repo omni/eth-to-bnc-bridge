@@ -1,4 +1,5 @@
 const ethers = require('ethers')
+const bech32 = require('bech32')
 
 const {
   HOME_RPC_URL, HOME_BRIDGE_ADDRESS, WITH_SIGNATURES, SIDE_RPC_URL, SIDE_SHARED_DB_ADDRESS
@@ -42,15 +43,25 @@ const actionNames = [
   'ADD_VALIDATOR',
   'REMOVE_VALIDATOR',
   'CHANGE_THRESHOLD',
-  'CHANGE_RANGE_SIZE',
   'CHANGE_CLOSE_EPOCH',
   'START_KEYGEN',
   'CANCEL_KEYGEN',
-  'TRANSFER'
+  'TRANSFER',
+  'CHANGE_MIN_PER_TX_LIMIT',
+  'CHANGE_MAX_PER_TX_LIMIT',
+  'INCREASE_EXECUTION_MAX_TX_LIMIT',
+  'DECREASE_EXECUTION_MIN_TX_LIMIT',
+  'CHANGE_RANGE_SIZE'
 ]
 
 let bridge
 let sharedDb
+
+function hexAddressToBncAddress(hexAddress) {
+  const addressBytes = Buffer.from(hexAddress, 'hex')
+  const words = bech32.toWords(addressBytes)
+  return bech32.encode('tbnb', words)
+}
 
 function processEvent(event) {
   const { message } = event.values
@@ -67,8 +78,7 @@ function processEvent(event) {
     case Action.CONFIRM_KEYGEN:
       return {
         ...baseMsg,
-        x: message.slice(8, 72),
-        y: message.slice(72, 136)
+        foreignAddress: hexAddressToBncAddress(message.slice(8, 48))
       }
     case Action.CONFIRM_FUNDS_TRANSFER:
     case Action.CONFIRM_CLOSE_EPOCH:
@@ -111,6 +121,15 @@ function processEvent(event) {
         txHash: message.slice(8, 72),
         to: `0x${message.slice(72, 112)}`,
         value: `0x${message.slice(112, 136)}`
+      }
+    case Action.CHANGE_MIN_PER_TX_LIMIT:
+    case Action.CHANGE_MAX_PER_TX_LIMIT:
+    case Action.INCREASE_EXECUTION_MAX_TX_LIMIT:
+    case Action.DECREASE_EXECUTION_MIN_TX_LIMIT:
+      return {
+        ...baseMsg,
+        limit: `0x${message.slice(8, 32)}`,
+        attempt: parseInt(message.slice(32, 66), 16)
       }
     default:
       return {

@@ -1,17 +1,17 @@
 const axios = require('axios')
 const BN = require('bignumber.js')
-const fs = require('fs')
-const { computeAddress } = require('ethers').utils
+const ethers = require('ethers')
 
 const logger = require('../shared/logger')
 const redis = require('../shared/db')
-const { publicKeyToAddress } = require('../shared/crypto')
+const createProvider = require('../shared/ethProvider')
+const { hexAddressToBncAddress } = require('../shared/crypto')
 const { delay } = require('../shared/wait')
 const { connectRabbit, assertQueue } = require('../shared/amqp')
 const { getTx, getBlockTime, fetchNewTransactions } = require('../shared/binanceClient')
 
 const {
-  PROXY_URL, RABBITMQ_URL
+  PROXY_URL, RABBITMQ_URL, HOME_RPC_URL, HOME_BRIDGE_ADDRESS
 } = process.env
 
 const FOREIGN_FETCH_INTERVAL = parseInt(process.env.FOREIGN_FETCH_INTERVAL, 10)
@@ -20,17 +20,19 @@ const FOREIGN_FETCH_MAX_TIME_INTERVAL = parseInt(process.env.FOREIGN_FETCH_MAX_T
 
 const proxyHttpClient = axios.create({ baseURL: PROXY_URL })
 
+const bridgeAbi = [
+  'function getForeignAddress(uint16 epoch) view returns (bytes20)'
+]
+
+const homeProvider = createProvider(HOME_RPC_URL)
+const bridge = new ethers.Contract(HOME_BRIDGE_ADDRESS, bridgeAbi, homeProvider)
+
 let channel
 let epochTimeIntervalsQueue
 
-function getForeignAddress(epoch) {
-  const keysFile = `/keys/keys${epoch}.store`
-  try {
-    const publicKey = JSON.parse(fs.readFileSync(keysFile))[5]
-    return publicKeyToAddress(publicKey)
-  } catch (e) {
-    return null
-  }
+async function getForeignAddress(epoch) {
+  const foreignHexAddress = await bridge.getForeignAddress(epoch)
+  return hexAddressToBncAddress(foreignHexAddress)
 }
 
 async function fetchTimeIntervalsQueue() {
@@ -99,15 +101,7 @@ async function loop() {
     return
   }
 
-  const address = getForeignAddress(epoch)
-
-  if (!address) {
-    logger.debug('Validator is not included in current epoch')
-    await redis.set(`foreignTime${epoch}`, endTime)
-    await delay(FOREIGN_FETCH_INTERVAL)
-    return
-  }
-
+  const address = await getForeignAddress(epoch)
   const transactions = await fetchNewTransactions(address, startTime, endTime)
 
   if (transactions.length === 0) {
@@ -125,11 +119,9 @@ async function loop() {
     if (tx.memo === '') {
       const publicKeyEncoded = (await getTx(tx.txHash)).signatures[0].pub_key.value
       await proxyHttpClient.post('/transfer', {
-        to: computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
-        value: new BN(tx.value).multipliedBy('1e18')
-          .toString(16),
-        hash: tx.txHash,
-        epoch
+        to: ethers.utils.computeAddress(Buffer.from(publicKeyEncoded, 'base64')),
+        value: new BN(tx.value).multipliedBy('1e18').toString(16),
+        hash: tx.txHash
       })
     }
   }

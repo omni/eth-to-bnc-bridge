@@ -4,4 +4,5 @@ demo/validator*/development
 demo/validator*/staging
 src/contracts/*/build
 src/contracts/*/coverage
+src/contracts/*/coverageEnv
 src/tss/multi-party-ecdsa

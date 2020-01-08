@@ -26,6 +26,7 @@ const bridgeAbi = [
   'event EpochClose(uint16 indexed epoch)',
   'event ForceSign()',
   'event RangeSizeChanged(uint16 rangeSize)',
+  'event RescheduleTransferMessage(bytes32 msgHash)',
   'function getForeignAddress(uint16 epoch) view returns (bytes20)',
   'function getThreshold(uint16 epoch) view returns (uint16)',
   'function getParties(uint16 epoch) view returns (uint16)',
@@ -41,6 +42,7 @@ let signQueue
 let keygenQueue
 let cancelKeygenQueue
 let epochTimeIntervalsQueue
+let rescheduleTransferQueue
 let chainId
 let blockNumber
 let epoch
@@ -185,6 +187,17 @@ async function sendEpochClose() {
   redisTx.incr(`foreignNonce${epoch}`)
 }
 
+async function rescheduleTransferMessage(transactionHash, msgHash) {
+  const tx = await provider.getTransaction(transactionHash)
+  if (tx.from === validatorAddress) {
+    logger.debug(`Rescheduling transfer action for message ${msgHash}`)
+    rescheduleTransferQueue.send({
+      msgHash,
+      blockNumber: tx.blockNumber
+    })
+  }
+}
+
 async function initialize() {
   channel = await connectRabbit(RABBITMQ_URL)
   exchangeQueue = await assertQueue(channel, 'exchangeQueue')
@@ -192,6 +205,7 @@ async function initialize() {
   keygenQueue = await assertQueue(channel, 'keygenQueue')
   cancelKeygenQueue = await assertQueue(channel, 'cancelKeygenQueue')
   epochTimeIntervalsQueue = await assertQueue(channel, 'epochTimeIntervalsQueue')
+  rescheduleTransferQueue = await assertQueue(channel, 'rescheduleTransferQueue')
 
   activeEpoch = !!(await redis.get('activeEpoch'))
 
@@ -244,6 +258,7 @@ async function initialize() {
   await resetFutureMessages(channel, exchangeQueue, blockNumber)
   await resetFutureMessages(channel, signQueue, blockNumber)
   await resetFutureMessages(channel, epochTimeIntervalsQueue, blockNumber)
+  await resetFutureMessages(channel, rescheduleTransferQueue, blockNumber)
   logger.debug('Sending start commands')
   await axios.get(`${KEYGEN_CLIENT_URL}/start`)
   await axios.get(`${SIGN_CLIENT_URL}/start`)
@@ -338,6 +353,9 @@ async function loop() {
             rangeSize = event.values.rangeSize
             rangeSizeStartBlock = curBlockNumber
             logger.debug(`Range size updated to ${rangeSize} at block ${rangeSizeStartBlock}`)
+            break
+          case 'RescheduleTransferMessage':
+            await rescheduleTransferMessage(bridgeEvents[i].transactionHash, event.values.msgHash)
             break
           default:
             logger.warn('Unknown event %o', event)

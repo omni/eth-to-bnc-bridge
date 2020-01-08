@@ -23,6 +23,7 @@ const bridgeAbi = [
   'function getNextCloseEpoch() view returns (bool)',
   'function state() view returns (uint8)',
   'function getNextPartyId(address partyAddress) view returns (uint16)',
+  'function handledMessages(bytes32 msgHash) view returns (bool)',
   'function applyMessage(bytes message, bytes signatures)'
 ]
 const sharedDbAbi = [

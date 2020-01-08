@@ -30,22 +30,43 @@ contract BridgeMessageProcessor is BridgeTransitions {
     }
 
     event AppliedMessage(bytes message);
+    event RescheduleTransferMessage(bytes32 msgHash);
 
     mapping(bytes32 => bool) public handledMessages;
 
     function applyMessage(bytes memory message, bytes memory signatures) public {
-        (bytes32 msgHash, uint16 msgEpoch) = checkSignedMessage(message, signatures);
-        handledMessages[msgHash] = true;
-
         Action msgAction = Action(uint8(message[0]));
+        uint16 msgEpoch;
+        bytes32 msgHash = message._hash();
 
-        if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.CANCEL_KEYGEN) {
-            require(msgEpoch == nextEpoch, "Incorrect message epoch");
-        } else if (msgAction == Action.TRANSFER) {
-            require(msgEpoch <= epoch, "Incorrect message epoch");
+        // In case of transfer action, it is possible that a new epoch will start,
+        // until a correspondent transfer action transaction will be processed.
+        // In such case, if a list of provided signatures for old epoch is not sufficient,
+        // a message should be automatically reprocessed.
+        // Special event helps to find such stuck messages.
+        if (msgAction == Action.TRANSFER) {
+            // solhint-disable-next-line avoid-low-level-calls
+            (bool success,) = address(this).call(abi.encodeWithSelector(
+                    this.checkSignedMessage.selector,
+                    epoch,
+                    msgHash,
+                    signatures
+                ));
+            if (!success) {
+                emit RescheduleTransferMessage(msgHash);
+                return;
+            }
         } else {
-            require(msgEpoch == epoch, "Incorrect message epoch");
+            msgEpoch = message._decodeEpoch();
+            checkSignedMessage(msgEpoch, msgHash, signatures);
+
+            if (msgAction == Action.CONFIRM_KEYGEN || msgAction == Action.CANCEL_KEYGEN) {
+                require(msgEpoch == nextEpoch, "Incorrect message epoch");
+            } else {
+                require(msgEpoch == epoch, "Incorrect message epoch");
+            }
         }
+        handledMessages[msgHash] = true;
 
         if (msgAction == Action.CONFIRM_KEYGEN) {
             // [3,22] - foreign address bytes
@@ -90,8 +111,8 @@ contract BridgeMessageProcessor is BridgeTransitions {
             require(message.length == 32, "Incorrect message length");
             _cancelKeygen();
         } else if (msgAction == Action.TRANSFER) {
-            // [3,34] - txHash, [35,54] - address, [55,66] - value
-            require(message.length == 67, "Incorrect message length");
+            // [1,32] - txHash, [33,52] - address, [53,64] - value
+            require(message.length == 65, "Incorrect message length");
             (address to, uint96 value) = message._decodeTransfer();
             _transfer(to, value);
         } else if (msgAction == Action.CHANGE_MIN_PER_TX_LIMIT) {
@@ -114,30 +135,25 @@ contract BridgeMessageProcessor is BridgeTransitions {
             require(message.length == 32, "Incorrect message length");
             uint96 limit = message._decodeUint96();
             _decreaseExecutionMinLimit(limit);
-        } else { // Action.CHANGE_RANGE_SIZE
+        } else {// Action.CHANGE_RANGE_SIZE
             // [3,4] - rangeSize, [5,31] - extra data
             require(message.length == 32, "Incorrect message length");
             uint16 rangeSize = message._decodeUint16();
             _changeRangeSize(rangeSize);
-        } // invalid actions will not reach this line, since casting uint8 to Action will revert execution
+        }
+        // invalid actions will not reach this line, since casting uint8 to Action will revert execution
 
         emit AppliedMessage(message);
     }
 
-    function checkSignedMessage(bytes memory message, bytes memory signatures) public view returns (bytes32, uint16) {
+    function checkSignedMessage(uint16 msgEpoch, bytes32 msgHash, bytes memory signatures) public view {
         require(signatures.length % SIGNATURE_SIZE == 0, "Incorrect signatures length");
 
-        bytes32 msgHash = message._hash();
         require(!handledMessages[msgHash], "Tx was already handled");
 
-        uint16 msgEpoch;
-        assembly {
-            msgEpoch := mload(add(message, 3))
-        }
-        require(msgEpoch > 0 && msgEpoch <= nextEpoch, "Invalid epoch number");
+        require(msgEpoch > 0 && (msgEpoch == epoch || msgEpoch == nextEpoch), "Invalid epoch number");
 
         uint signaturesNum = signatures.length / SIGNATURE_SIZE;
-        require(signaturesNum >= getThreshold(msgEpoch), "Not enough signatures");
 
         address[] memory possibleValidators = getValidators(msgEpoch);
 
@@ -145,6 +161,7 @@ contract BridgeMessageProcessor is BridgeTransitions {
         bytes32 s;
         uint8 v;
 
+        uint16 validSignatures = 0;
         for (uint i = 0; i < signaturesNum; i++) {
             uint offset = i * SIGNATURE_SIZE;
 
@@ -155,15 +172,14 @@ contract BridgeMessageProcessor is BridgeTransitions {
             }
 
             address signer = ecrecover(msgHash, v, r, s);
-            uint j;
-            for (j = 0; j < possibleValidators.length; j++) {
+            for (uint j = 0; j < possibleValidators.length; j++) {
                 if (possibleValidators[j] == signer) {
                     delete possibleValidators[j];
+                    validSignatures++;
                     break;
                 }
             }
-            require(j != possibleValidators.length, "Not a validator signature");
         }
-        return (msgHash, msgEpoch);
+        require(validSignatures >= getThreshold(msgEpoch), "Not enough valid signatures");
     }
 }

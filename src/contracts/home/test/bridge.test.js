@@ -1,7 +1,8 @@
 const { expect } = require('chai')
 
 const {
-  State, Action, getDeployResult, expectEventInLogs, buildMessage, sign, stripHex, skipBlocks
+  State, Action, getDeployResult, expectEventInLogs, buildMessage, sign, stripHex, skipBlocks,
+  keccak256
 } = require('./utils')
 
 const EthToBncBridge = artifacts.require('EthToBncBridge')
@@ -125,80 +126,54 @@ contract('EthToBncBridge', async (accounts) => {
   })
 
   describe('signatures checks', async () => {
-    const keygenMessage = buildMessage(Action.CONFIRM_KEYGEN, 1, '0000000000000000000000000000000000000000')
-    const votingMessage0 = buildMessage(Action.START_VOTING, 0)
-    const votingMessage1 = buildMessage(Action.START_VOTING, 1)
-    const validatorMessage = buildMessage(Action.ADD_VALIDATOR, 1, stripHex(accounts[0]), '000000000000000000')
-    const transferMessage = buildMessage(Action.TRANSFER, 1, '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-    const messages = [keygenMessage, votingMessage1, validatorMessage, transferMessage]
-    const invalidMessage = `${votingMessage1}00`
+    const message = '0x010203'
+    const messageHash = keccak256(message)
+    let signature1
+    let signature2
+    let signature3
 
     before(async () => {
       bridge = await deployBridge()
+      signature1 = stripHex(await sign(validators[0], message))
+      signature2 = stripHex(await sign(validators[1], message))
+      signature3 = stripHex(await sign(validators[2], message))
     })
 
-    for (let i = 0; i < messages.length; i += 1) {
-      const message = messages[i]
-      it(`should accept 2 or 3 correct signatures for message of length ${(message.length - 2) / 2} bytes`, async () => {
-        const signature1 = stripHex(await sign(validators[0], message))
-        const signature2 = stripHex(await sign(validators[1], message))
-        const signature3 = stripHex(await sign(validators[2], message))
-
-        await bridge.checkSignedMessage(message, `0x${signature1}${signature2}`).should.be.fulfilled
-        await bridge.checkSignedMessage(message, `0x${signature2}${signature1}`).should.be.fulfilled
-        await bridge.checkSignedMessage(message, `0x${signature2}${signature3}`).should.be.fulfilled
-        await bridge.checkSignedMessage(message, `0x${signature3}${signature1}`).should.be.fulfilled
-        await bridge.checkSignedMessage(message, `0x${signature1}${signature2}${signature3}`).should.be.fulfilled
-        await bridge.checkSignedMessage(message, `0x${signature3}${signature1}${signature2}`).should.be.fulfilled
-      })
-    }
-
-    it(`should not accept correct signatures for message of length ${(invalidMessage.length - 2) / 2} bytes`, async () => {
-      const signature1 = stripHex(await sign(validators[0], invalidMessage))
-      const signature2 = stripHex(await sign(validators[1], invalidMessage))
-
-      await bridge.checkSignedMessage(invalidMessage, `0x${signature1}${signature2}`).should.be.rejected
+    it('should accept 2 or 3 correct signatures', async () => {
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature2}`).should.be.fulfilled
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature2}${signature1}`).should.be.fulfilled
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature2}${signature3}`).should.be.fulfilled
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature3}${signature1}`).should.be.fulfilled
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature2}${signature3}`).should.be.fulfilled
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature3}${signature1}${signature2}`).should.be.fulfilled
     })
 
     it('should not accept empty signatures', async () => {
-      await bridge.checkSignedMessage(keygenMessage, '0x').should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, '0x').should.be.rejected
     })
 
     it('should not accept signatures of wrong length', async () => {
-      const signature1 = stripHex(await sign(validators[0], keygenMessage))
-      const signature2 = stripHex(await sign(validators[1], keygenMessage))
-
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}${signature2}00`).should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature2}00`).should.be.rejected
     })
 
     it('should not accept 1 correct signature', async () => {
-      const signature1 = stripHex(await sign(validators[0], keygenMessage))
-
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}`).should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}`).should.be.rejected
     })
 
     it('should not accept message with 0 epoch', async () => {
-      const signature1 = stripHex(await sign(validators[0], votingMessage0))
-      const signature2 = stripHex(await sign(validators[1], votingMessage0))
-
-      await bridge.checkSignedMessage(votingMessage0, `0x${signature1}${signature2}`).should.be.rejected
+      await bridge.checkSignedMessage(0, messageHash, `0x${signature1}${signature2}`).should.be.rejected
     })
 
-    it('should not accept repeated correct signatures', async () => {
-      const signature1 = stripHex(await sign(validators[0], keygenMessage))
-      const signature2 = stripHex(await sign(validators[1], keygenMessage))
-
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}${signature1}`).should.be.rejected
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}${signature2}${signature1}`).should.be.rejected
+    it('should not accept repeated correct signatures as valid', async () => {
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature1}`).should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature2}${signature1}`).should.be.fulfilled
     })
 
-    it('should accept signatures only from validators', async () => {
-      const signature1 = stripHex(await sign(validators[0], keygenMessage))
-      const signature2 = stripHex(await sign(validators[1], keygenMessage))
-      const wrongSignature = stripHex(await sign(accounts[5], keygenMessage))
+    it('should accept signatures if enough valid signatures', async () => {
+      const wrongSignature = stripHex(await sign(accounts[5], message))
 
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}${wrongSignature}`).should.be.rejected
-      await bridge.checkSignedMessage(keygenMessage, `0x${signature1}${signature2}${wrongSignature}`).should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${wrongSignature}`).should.be.rejected
+      await bridge.checkSignedMessage(1, messageHash, `0x${signature1}${signature2}${wrongSignature}`).should.be.fulfilled
     })
   })
 
@@ -241,38 +216,33 @@ contract('EthToBncBridge', async (accounts) => {
     const startVotingMessage2 = buildMessage(Action.START_VOTING, 2)
     const transferMessage15min = buildMessage(
       Action.TRANSFER,
-      1,
       '1111111111111111111111111111111111111111111111111111111111111111',
       stripHex(accounts[5]),
       '0000000000000002540be401'
     )
+    const transferMessage15min1s = buildMessage(
+      Action.TRANSFER,
+      '1111111111111111111111111111111111111111111111111111111111111111',
+      stripHex(accounts[5]),
+      '0000000000000002540be402'
+    )
     const transferMessage15max = buildMessage(
       Action.TRANSFER,
-      1,
       '2222222222222222222222222222222222222222222222222222222222222222',
       stripHex(accounts[5]),
       '00000000000000e8d4a51001'
     )
     const transferMessage15low = buildMessage(
       Action.TRANSFER,
-      1,
       '1111111111111111111111111111111111111111111111111111111111111111',
       stripHex(accounts[5]),
       '000000000000000000000064'
     )
     const transferMessage15high = buildMessage(
       Action.TRANSFER,
-      1,
       '1111111111111111111111111111111111111111111111111111111111111111',
       stripHex(accounts[5]),
       '00000000000000e8d4a51002'
-    )
-    const transferMessage25min = buildMessage(
-      Action.TRANSFER,
-      2,
-      '3333333333333333333333333333333333333333333333333333333333333333',
-      stripHex(accounts[5]),
-      '0000000000000002540be401'
     )
     const transferMessage1err = buildMessage(Action.TRANSFER, 1)
     const changeMinPerTxLimit1 = buildMessage(Action.CHANGE_MIN_PER_TX_LIMIT, 1, '0000000000000002540be401', '0000000000000000000000000000000000')
@@ -298,6 +268,7 @@ contract('EthToBncBridge', async (accounts) => {
       Action.UNKNOWN_MESSAGE,
       1
     )
+    const invalidMessage = buildMessage(Action.CONFIRM_KEYGEN, 1, '00')
     const validMessages = [
       confirmKeygenMessage11, confirmKeygenMessage12, confirmKeygenMessage1err, startVotingMessage1,
       startVotingMessage1err, confirmCloseEpochMessage1, confirmCloseEpochMessage1err,
@@ -311,14 +282,13 @@ contract('EthToBncBridge', async (accounts) => {
       confirmFundsTransferMessage1, confirmFundsTransferMessage1err, cancelKeygenMessage1,
       cancelKeygenMessage21, cancelKeygenMessage22, cancelKeygenMessage2err, confirmKeygenMessage2,
       startVotingMessage2, transferMessage15min, transferMessage15max, transferMessage15low,
-      transferMessage15high, transferMessage25min, transferMessage1err, changeMinPerTxLimit1,
-      changeMinPerTxLimit1high, changeMinPerTxLimit1low, changeMinPerTxLimit1err,
-      changeMaxPerTxLimit1, changeMaxPerTxLimit1low, changeMaxPerTxLimit1err,
-      decreaseExecutionMinLimit1low, decreaseExecutionMinLimit11, decreaseExecutionMinLimit12,
-      decreaseExecutionMinLimit1err, increaseExecutionMaxLimit1low, increaseExecutionMaxLimit11,
-      increaseExecutionMaxLimit12, increaseExecutionMaxLimit1err, changeRangeSizeMessage10,
-      changeRangeSizeMessage11, changeRangeSizeMessage1max, changeRangeSizeMessage1err,
-      unknownMessage
+      transferMessage15high, transferMessage1err, changeMinPerTxLimit1, changeMinPerTxLimit1high,
+      changeMinPerTxLimit1low, changeMinPerTxLimit1err, changeMaxPerTxLimit1,
+      changeMaxPerTxLimit1low, changeMaxPerTxLimit1err, decreaseExecutionMinLimit1low,
+      decreaseExecutionMinLimit11, decreaseExecutionMinLimit12, decreaseExecutionMinLimit1err,
+      increaseExecutionMaxLimit1low, increaseExecutionMaxLimit11, increaseExecutionMaxLimit12,
+      increaseExecutionMaxLimit1err, changeRangeSizeMessage10, changeRangeSizeMessage11,
+      changeRangeSizeMessage1max, changeRangeSizeMessage1err, unknownMessage, invalidMessage
     ]
 
     const validSignatures = {}
@@ -328,6 +298,7 @@ contract('EthToBncBridge', async (accounts) => {
     }
 
     before(async () => {
+      validSignatures[transferMessage15min1s] = await sign(validators[0], transferMessage15min1s)
       for (let i = 0; i < validMessages.length; i += 1) {
         const message = validMessages[i]
 
@@ -370,7 +341,11 @@ contract('EthToBncBridge', async (accounts) => {
         const signature2 = stripHex(await sign(validators[1], confirmKeygenMessage11))
 
         await applyMessage(confirmKeygenMessage11)
-        await bridge.checkSignedMessage(confirmKeygenMessage11, `0x${signature1}${signature2}`).should.be.rejected
+        await bridge.checkSignedMessage(1, keccak256(confirmKeygenMessage11), `0x${signature1}${signature2}`).should.be.rejected
+      })
+
+      it('should not accept invalid length message', async () => {
+        await applyMessage(invalidMessage).should.be.rejected
       })
 
       it('should not be able to apply keygen confirm message for 2nd epoch', async () => {
@@ -948,23 +923,16 @@ contract('EthToBncBridge', async (accounts) => {
         await applyMessage(transferMessage15high).should.be.rejected
       })
 
-      it('should not accept transfer message for next epoch', async () => {
-        await applyMessage(startVotingMessage1)
-        await token.transfer(bridge.address, EXECUTION_MIN_LIMIT, { from: accounts[1] })
-        await applyMessage(transferMessage25min).should.be.rejected
-      })
-
-      it('should accept transfer message for previous epoch', async () => {
-        await applyMessage(startVotingMessage1)
-        await applyMessage(startKeygenMessage11)
-        await applyMessage(confirmKeygenMessage2)
-        await applyMessage(confirmFundsTransferMessage1)
-        await applyMessage(transferMessage15min).should.be.fulfilled
+      it('should request transfer message reschedule', async () => {
+        const { logs } = await applyMessage(transferMessage15min1s).should.be.fulfilled
+        expectEventInLogs(logs, 'RescheduleTransferMessage', {
+          msgHash: keccak256(transferMessage15min1s)
+        })
         expect(await token.balanceOf(bridge.address)).to.bignumber.equal('0')
         expect(await token.balanceOf(accounts[5])).to.bignumber.equal('0')
         expect(
           await token.allowance(bridge.address, accounts[5])
-        ).to.bignumber.equal(EXECUTION_MIN_LIMIT)
+        ).to.bignumber.equal('0')
       })
 
       it('should not accept message with wrong length', async () => {

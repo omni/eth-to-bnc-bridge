@@ -45,6 +45,8 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates, BridgeConfig {
         nextEpoch++;
         _initNextEpoch(getValidators(), getThreshold(), getCloseEpoch());
 
+        _forceSign();
+
         if (getCloseEpoch()) {
             state = State.CLOSING_EPOCH;
             emit EpochClose(epoch);
@@ -52,8 +54,6 @@ contract BridgeTransitions is BridgeEpochs, BridgeStates, BridgeConfig {
             state = State.VOTING;
             emit EpochEnd(epoch);
         }
-
-        _forceSign();
     }
 
     function _addValidator(address validator) internal voting {
